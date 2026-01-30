@@ -1,0 +1,219 @@
+import { prisma } from '../../lib/prisma';
+import { AppError } from '../../middlewares/error.middleware';
+import { aiService } from '../ai/ai.service';
+import { characterService } from '../character/character.service';
+import { gameEventService } from '../game/game-event.service';
+import { MessageType } from '@prisma/client';
+
+interface SendMessageData {
+  characterId: string;
+  content: string;
+  messageType?: MessageType;
+  metadata?: Record<string, unknown>;
+}
+
+export const chatService = {
+  async getHistory(userId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+
+    const [messages, total] = await Promise.all([
+      prisma.message.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          character: {
+            select: {
+              id: true,
+              name: true,
+              avatarStyle: true,
+            },
+          },
+        },
+      }),
+      prisma.message.count({ where: { userId } }),
+    ]);
+
+    return {
+      messages: messages.reverse(),
+      total,
+      page,
+      pageSize: limit,
+      hasMore: skip + messages.length < total,
+    };
+  },
+
+  async getCharacterHistory(
+    userId: string,
+    characterId: string,
+    limit: number,
+    cursor?: string
+  ) {
+    // Verify character belongs to user
+    const character = await prisma.character.findFirst({
+      where: { id: characterId, userId },
+    });
+
+    if (!character) {
+      throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
+    }
+
+    const messages = await prisma.message.findMany({
+      where: {
+        userId,
+        characterId,
+        ...(cursor && { id: { lt: cursor } }),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+    });
+
+    const hasMore = messages.length > limit;
+    if (hasMore) messages.pop();
+
+    return {
+      messages: messages.reverse(),
+      hasMore,
+      nextCursor: hasMore ? messages[0]?.id : undefined,
+    };
+  },
+
+  async sendMessage(userId: string, data: SendMessageData) {
+    // Verify character belongs to user
+    const character = await prisma.character.findFirst({
+      where: { id: data.characterId, userId },
+      include: {
+        characterFacts: {
+          orderBy: { importance: 'desc' },
+          take: 10,
+        },
+      },
+    });
+
+    if (!character) {
+      throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
+    }
+
+    // Get user info
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true, username: true },
+    });
+
+    // Save user message
+    const userMessage = await prisma.message.create({
+      data: {
+        userId,
+        characterId: data.characterId,
+        role: 'USER',
+        content: data.content,
+        messageType: data.messageType || 'TEXT',
+        metadata: data.metadata as object | undefined,
+      },
+    });
+
+    // Get recent messages for context
+    const recentMessages = await prisma.message.findMany({
+      where: { userId, characterId: data.characterId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    // Generate AI response
+    const aiResponse = await aiService.generateResponse({
+      characterId: character.id,
+      personality: character.personality as 'caring' | 'playful' | 'shy' | 'passionate' | 'intellectual',
+      mood: character.mood as 'happy' | 'sad' | 'excited' | 'sleepy' | 'romantic' | 'neutral',
+      relationshipStage: character.relationshipStage,
+      affection: character.affection,
+      recentMessages: recentMessages.reverse(),
+      facts: character.characterFacts,
+      userName: user?.displayName || user?.username || 'bạn',
+      characterName: character.name,
+      userMessage: data.content,
+    });
+
+    // Save AI message
+    const aiMessage = await prisma.message.create({
+      data: {
+        userId,
+        characterId: data.characterId,
+        role: 'AI',
+        content: aiResponse.content,
+        messageType: 'TEXT',
+        emotion: aiResponse.emotion,
+      },
+    });
+
+    // Update character mood if changed
+    if (aiResponse.moodChange) {
+      await prisma.character.update({
+        where: { id: character.id },
+        data: { mood: aiResponse.moodChange },
+      });
+    }
+
+    // Update affection
+    if (aiResponse.affectionChange) {
+      await characterService.updateAffection(character.id, aiResponse.affectionChange);
+    }
+
+    // Add XP for chatting
+    await characterService.addExperience(character.id, 1);
+
+    // Process game event for quest progress and milestones
+    const gameResult = await gameEventService.processAction({
+      userId,
+      characterId: data.characterId,
+      action: 'SEND_MESSAGE',
+      metadata: { messageId: userMessage.id },
+    });
+
+    return {
+      userMessage,
+      aiMessage,
+      emotion: aiResponse.emotion,
+      moodChange: aiResponse.moodChange,
+      affectionChange: aiResponse.affectionChange,
+      questsCompleted: gameResult.questsCompleted,
+      milestonesUnlocked: gameResult.milestonesUnlocked,
+    };
+  },
+
+  async deleteMessage(userId: string, messageId: string) {
+    const message = await prisma.message.findFirst({
+      where: { id: messageId, userId },
+    });
+
+    if (!message) {
+      throw new AppError('Message not found', 404, 'MESSAGE_NOT_FOUND');
+    }
+
+    await prisma.message.delete({
+      where: { id: messageId },
+    });
+  },
+
+  async searchMessages(userId: string, query: string, limit: number) {
+    return prisma.message.findMany({
+      where: {
+        userId,
+        content: {
+          contains: query,
+          mode: 'insensitive',
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        character: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+  },
+};

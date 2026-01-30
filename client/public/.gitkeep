@@ -1,0 +1,10 @@
+// Public folder for Next.js static assets
+// Place images, fonts, and other static files here
+
+// Example structure:
+// public/
+//   images/
+//     logo.png
+//     avatar-default.png
+//   fonts/
+//     PlusJakartaSans.woff2

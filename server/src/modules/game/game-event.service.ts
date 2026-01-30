@@ -1,0 +1,591 @@
+/**
+ * Game Event Service
+ * Handles all game events, triggers, and progression
+ * This is the central hub for quest progress, memories, and rewards
+ */
+
+import { prisma } from '../../lib/prisma';
+import { questService } from '../quest/quest.service';
+import { characterService } from '../character/character.service';
+
+// Action types that can trigger quest progress
+export type GameAction = 
+  | 'SEND_MESSAGE'
+  | 'RECEIVE_MESSAGE' 
+  | 'SEND_GIFT'
+  | 'DAILY_LOGIN'
+  | 'FIRST_MESSAGE_TODAY'
+  | 'REACH_AFFECTION_LEVEL'
+  | 'COMPLETE_QUEST'
+  | 'UNLOCK_SCENE'
+  | 'RELATIONSHIP_UPGRADE';
+
+// Milestone types for automatic memory creation
+export type MilestoneType =
+  | 'FIRST_CHAT'
+  | 'FIRST_GIFT'
+  | 'AFFECTION_100'
+  | 'AFFECTION_500'
+  | 'AFFECTION_1000'
+  | 'RELATIONSHIP_FRIEND'
+  | 'RELATIONSHIP_LOVER'
+  | 'STREAK_7_DAYS'
+  | 'STREAK_30_DAYS'
+  | 'MESSAGES_100'
+  | 'MESSAGES_500'
+  | 'GIFTS_10'
+  | 'GIFTS_50'
+  | 'LEVEL_UP';
+
+interface GameEventData {
+  userId: string;
+  characterId?: string;
+  action: GameAction;
+  metadata?: Record<string, unknown>;
+}
+
+export interface QuestCompletionResult {
+  questId: string;
+  questTitle: string;
+  rewards: {
+    coins: number;
+    gems: number;
+    xp: number;
+    affection: number;
+  };
+}
+
+export const gameEventService = {
+  /**
+   * Process a game action - updates quests, checks milestones, creates memories
+   */
+  async processAction(data: GameEventData): Promise<{
+    questsUpdated: number;
+    questsCompleted: QuestCompletionResult[];
+    milestonesUnlocked: string[];
+    newMemories: string[];
+  }> {
+    const { userId, characterId, action, metadata } = data;
+    
+    const result = {
+      questsUpdated: 0,
+      questsCompleted: [] as QuestCompletionResult[],
+      milestonesUnlocked: [] as string[],
+      newMemories: [] as string[],
+    };
+
+    // 1. Auto-start daily quests if not started
+    await this.autoStartDailyQuests(userId);
+
+    // 2. Update quest progress based on action
+    const questUpdates = await this.updateQuestProgress(userId, action, metadata);
+    result.questsUpdated = questUpdates.updated;
+    result.questsCompleted = questUpdates.completed;
+
+    // 3. Auto-claim completed quests and give rewards
+    for (const completed of result.questsCompleted) {
+      await this.autoClaimQuest(userId, completed.questId);
+    }
+
+    // 4. Check for milestones
+    if (characterId) {
+      const milestones = await this.checkMilestones(userId, characterId, action, metadata);
+      result.milestonesUnlocked = milestones.unlocked;
+      result.newMemories = milestones.memories;
+    }
+
+    // 5. Update user stats
+    await this.updateUserStats(userId, action);
+
+    return result;
+  },
+
+  /**
+   * Auto-start all daily quests for the user at the beginning of each day
+   */
+  async autoStartDailyQuests(userId: string): Promise<void> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get all daily quests
+    const dailyQuests = await prisma.quest.findMany({
+      where: { type: 'DAILY', isActive: true },
+    });
+
+    for (const quest of dailyQuests) {
+      // Check if already started today
+      const existing = await prisma.userQuest.findFirst({
+        where: {
+          userId,
+          questId: quest.id,
+          startedAt: { gte: today },
+        },
+      });
+
+      if (!existing) {
+        // Delete old daily quest progress
+        await prisma.userQuest.deleteMany({
+          where: {
+            userId,
+            questId: quest.id,
+            startedAt: { lt: today },
+          },
+        });
+
+        // Create new progress for today
+        const requirements = quest.requirements as { count?: number };
+        await prisma.userQuest.create({
+          data: {
+            userId,
+            questId: quest.id,
+            maxProgress: requirements.count || 1,
+            status: 'IN_PROGRESS',
+          },
+        });
+      }
+    }
+  },
+
+  /**
+   * Update quest progress based on action
+   */
+  async updateQuestProgress(
+    userId: string,
+    action: GameAction,
+    metadata?: Record<string, unknown>
+  ): Promise<{ updated: number; completed: QuestCompletionResult[] }> {
+    const completed: QuestCompletionResult[] = [];
+    let updated = 0;
+
+    // Map actions to quest requirement actions
+    const actionMapping: Record<GameAction, string[]> = {
+      'SEND_MESSAGE': ['send_message', 'chat'],
+      'RECEIVE_MESSAGE': ['receive_message'],
+      'SEND_GIFT': ['send_gift', 'gift'],
+      'DAILY_LOGIN': ['daily_login', 'login'],
+      'FIRST_MESSAGE_TODAY': ['first_message', 'morning_greeting'],
+      'REACH_AFFECTION_LEVEL': ['reach_affection'],
+      'COMPLETE_QUEST': ['complete_quest'],
+      'UNLOCK_SCENE': ['unlock_scene'],
+      'RELATIONSHIP_UPGRADE': ['relationship_upgrade'],
+    };
+
+    const matchingActions = actionMapping[action] || [action.toLowerCase()];
+
+    // Find all in-progress quests
+    const userQuests = await prisma.userQuest.findMany({
+      where: {
+        userId,
+        status: 'IN_PROGRESS',
+      },
+      include: { quest: true },
+    });
+
+    for (const uq of userQuests) {
+      const requirements = uq.quest.requirements as { action?: string; count?: number };
+      
+      if (requirements.action && matchingActions.includes(requirements.action)) {
+        const increment = (metadata?.count as number) || 1;
+        const newProgress = Math.min(uq.progress + increment, uq.maxProgress);
+        const isCompleted = newProgress >= uq.maxProgress;
+
+        await prisma.userQuest.update({
+          where: { id: uq.id },
+          data: {
+            progress: newProgress,
+            status: isCompleted ? 'COMPLETED' : 'IN_PROGRESS',
+            completedAt: isCompleted ? new Date() : null,
+          },
+        });
+
+        updated++;
+
+        if (isCompleted) {
+          completed.push({
+            questId: uq.quest.id,
+            questTitle: uq.quest.title,
+            rewards: {
+              coins: uq.quest.rewardCoins,
+              gems: uq.quest.rewardGems,
+              xp: uq.quest.rewardXp,
+              affection: uq.quest.rewardAffection,
+            },
+          });
+        }
+      }
+    }
+
+    return { updated, completed };
+  },
+
+  /**
+   * Auto-claim a completed quest and distribute rewards
+   */
+  async autoClaimQuest(userId: string, questId: string): Promise<void> {
+    const userQuest = await prisma.userQuest.findUnique({
+      where: { userId_questId: { userId, questId } },
+      include: { quest: true },
+    });
+
+    if (!userQuest || userQuest.status !== 'COMPLETED') {
+      return;
+    }
+
+    const quest = userQuest.quest;
+
+    // Update to claimed
+    await prisma.userQuest.update({
+      where: { id: userQuest.id },
+      data: {
+        status: 'CLAIMED',
+        claimedAt: new Date(),
+      },
+    });
+
+    // Give rewards to user
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        coins: { increment: quest.rewardCoins },
+        gems: { increment: quest.rewardGems },
+      },
+    });
+
+    // Update character
+    const character = await prisma.character.findFirst({
+      where: { userId, isActive: true },
+    });
+
+    if (character) {
+      if (quest.rewardXp > 0) {
+        await characterService.addExperience(character.id, quest.rewardXp);
+      }
+      if (quest.rewardAffection > 0) {
+        await characterService.updateAffection(character.id, quest.rewardAffection);
+      }
+    }
+
+    // Process COMPLETE_QUEST action for meta-quests
+    await this.processAction({
+      userId,
+      characterId: character?.id,
+      action: 'COMPLETE_QUEST',
+      metadata: { questId, questType: quest.type },
+    });
+  },
+
+  /**
+   * Check and unlock milestones, create memories
+   */
+  async checkMilestones(
+    userId: string,
+    characterId: string,
+    action: GameAction,
+    metadata?: Record<string, unknown>
+  ): Promise<{ unlocked: string[]; memories: string[] }> {
+    const unlocked: string[] = [];
+    const memories: string[] = [];
+
+    const character = await prisma.character.findUnique({
+      where: { id: characterId },
+    });
+
+    if (!character) return { unlocked, memories };
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) return { unlocked, memories };
+
+    // Get user stats
+    const messageCount = await prisma.message.count({
+      where: { userId, role: 'USER' },
+    });
+
+    const giftCount = await prisma.giftHistory.count({
+      where: { userId },
+    });
+
+    // Check various milestones
+    const milestonesToCheck: { type: MilestoneType; condition: boolean; title: string; description: string }[] = [
+      {
+        type: 'FIRST_CHAT',
+        condition: action === 'SEND_MESSAGE' && messageCount === 1,
+        title: 'Cuộc trò chuyện đầu tiên',
+        description: `Lần đầu tiên bạn và ${character.name} trò chuyện cùng nhau.`,
+      },
+      {
+        type: 'FIRST_GIFT',
+        condition: action === 'SEND_GIFT' && giftCount === 1,
+        title: 'Món quà đầu tiên',
+        description: `Bạn đã tặng ${character.name} món quà đầu tiên!`,
+      },
+      {
+        type: 'AFFECTION_100',
+        condition: character.affection >= 100 && character.affection < 110,
+        title: 'Tình cảm nảy nở',
+        description: `Mối quan hệ với ${character.name} đang phát triển tốt đẹp.`,
+      },
+      {
+        type: 'AFFECTION_500',
+        condition: character.affection >= 500 && character.affection < 510,
+        title: 'Người bạn thân',
+        description: `${character.name} giờ đây là người bạn thân thiết của bạn.`,
+      },
+      {
+        type: 'AFFECTION_1000',
+        condition: character.affection >= 1000 && character.affection < 1010,
+        title: 'Tình yêu đích thực',
+        description: `Bạn và ${character.name} đã có một tình yêu sâu đậm.`,
+      },
+      {
+        type: 'MESSAGES_100',
+        condition: messageCount === 100,
+        title: '100 tin nhắn',
+        description: `Bạn và ${character.name} đã trao đổi 100 tin nhắn!`,
+      },
+      {
+        type: 'MESSAGES_500',
+        condition: messageCount === 500,
+        title: 'Người bạn chuyện trò',
+        description: `500 tin nhắn - những cuộc trò chuyện không bao giờ kết thúc!`,
+      },
+      {
+        type: 'GIFTS_10',
+        condition: giftCount === 10,
+        title: 'Người hào phóng',
+        description: `Bạn đã tặng ${character.name} 10 món quà!`,
+      },
+      {
+        type: 'STREAK_7_DAYS',
+        condition: user.streak === 7,
+        title: 'Một tuần bên nhau',
+        description: `7 ngày liên tiếp trò chuyện với ${character.name}!`,
+      },
+      {
+        type: 'STREAK_30_DAYS',
+        condition: user.streak === 30,
+        title: 'Một tháng yêu thương',
+        description: `30 ngày bên nhau - tình cảm thật sự!`,
+      },
+    ];
+
+    for (const milestone of milestonesToCheck) {
+      if (milestone.condition) {
+        // Check if already unlocked
+        const existing = await prisma.memory.findFirst({
+          where: {
+            userId,
+            type: 'MILESTONE',
+            metadata: {
+              path: ['milestoneType'],
+              equals: milestone.type,
+            },
+          },
+        });
+
+        if (!existing) {
+          // Create memory for this milestone
+          const memory = await prisma.memory.create({
+            data: {
+              userId,
+              characterId,
+              type: 'MILESTONE',
+              title: milestone.title,
+              description: milestone.description,
+              milestone: milestone.type,
+              metadata: {
+                milestoneType: milestone.type,
+                unlockedAt: new Date().toISOString(),
+              },
+            },
+          });
+
+          unlocked.push(milestone.type);
+          memories.push(memory.id);
+
+          // Give bonus rewards for milestones
+          await this.giveMilestoneReward(userId, characterId, milestone.type);
+        }
+      }
+    }
+
+    return { unlocked, memories };
+  },
+
+  /**
+   * Give bonus rewards for unlocking milestones
+   */
+  async giveMilestoneReward(userId: string, characterId: string, milestoneType: MilestoneType): Promise<void> {
+    const rewards: Record<MilestoneType, { coins: number; gems: number; affection: number }> = {
+      'FIRST_CHAT': { coins: 50, gems: 5, affection: 10 },
+      'FIRST_GIFT': { coins: 100, gems: 10, affection: 20 },
+      'AFFECTION_100': { coins: 200, gems: 20, affection: 0 },
+      'AFFECTION_500': { coins: 500, gems: 50, affection: 0 },
+      'AFFECTION_1000': { coins: 1000, gems: 100, affection: 0 },
+      'RELATIONSHIP_FRIEND': { coins: 300, gems: 30, affection: 50 },
+      'RELATIONSHIP_LOVER': { coins: 500, gems: 50, affection: 100 },
+      'STREAK_7_DAYS': { coins: 200, gems: 20, affection: 30 },
+      'STREAK_30_DAYS': { coins: 1000, gems: 100, affection: 100 },
+      'MESSAGES_100': { coins: 150, gems: 15, affection: 20 },
+      'MESSAGES_500': { coins: 500, gems: 50, affection: 50 },
+      'GIFTS_10': { coins: 200, gems: 20, affection: 30 },
+      'GIFTS_50': { coins: 500, gems: 50, affection: 100 },
+      'LEVEL_UP': { coins: 100, gems: 10, affection: 0 },
+    };
+
+    const reward = rewards[milestoneType];
+    if (!reward) return;
+
+    // Update user
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        coins: { increment: reward.coins },
+        gems: { increment: reward.gems },
+      },
+    });
+
+    // Update character affection
+    if (reward.affection > 0) {
+      await characterService.updateAffection(characterId, reward.affection);
+    }
+  },
+
+  /**
+   * Update user stats (streak, last active, etc.)
+   */
+  async updateUserStats(userId: string, action: GameAction): Promise<void> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) return;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const lastActive = user.lastActiveAt ? new Date(user.lastActiveAt) : null;
+    const lastActiveDay = lastActive 
+      ? new Date(lastActive.getFullYear(), lastActive.getMonth(), lastActive.getDate())
+      : null;
+
+    // Check if this is first activity today
+    const isNewDay = !lastActiveDay || today.getTime() > lastActiveDay.getTime();
+    
+    if (isNewDay) {
+      // Check if streak continues or resets
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const streakContinues = lastActiveDay && lastActiveDay.getTime() === yesterday.getTime();
+      
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          streak: streakContinues ? { increment: 1 } : 1,
+          lastActiveAt: now,
+        },
+      });
+
+      // Process daily login action
+      if (action !== 'DAILY_LOGIN') {
+        await this.processAction({
+          userId,
+          action: 'DAILY_LOGIN',
+        });
+      }
+    } else {
+      // Just update last active
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          lastActiveAt: now,
+        },
+      });
+    }
+  },
+
+  /**
+   * Create a special memory for an event
+   */
+  async createEventMemory(
+    userId: string,
+    characterId: string,
+    title: string,
+    description: string,
+    type: 'CHAT' | 'GIFT' | 'MILESTONE' | 'SPECIAL' | 'DATE' = 'SPECIAL',
+    metadata?: Record<string, unknown>
+  ): Promise<string> {
+    const memory = await prisma.memory.create({
+      data: {
+        userId,
+        characterId,
+        type: type as any,
+        title,
+        description,
+        metadata: metadata ? JSON.stringify(metadata) : undefined,
+      },
+    });
+
+    return memory.id;
+  },
+
+  /**
+   * Get today's progress summary for a user
+   */
+  async getDailyProgress(userId: string): Promise<{
+    questsCompleted: number;
+    totalQuests: number;
+    messagesSent: number;
+    giftsSent: number;
+    streak: number;
+    coinsEarned: number;
+  }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    // Get today's completed quests
+    const completedQuests = await prisma.userQuest.count({
+      where: {
+        userId,
+        status: { in: ['COMPLETED', 'CLAIMED'] },
+        completedAt: { gte: today },
+      },
+    });
+
+    const totalDailyQuests = await prisma.quest.count({
+      where: { type: 'DAILY', isActive: true },
+    });
+
+    // Get today's messages
+    const messagesSent = await prisma.message.count({
+      where: {
+        userId,
+        role: 'USER',
+        createdAt: { gte: today },
+      },
+    });
+
+    // Get today's gifts
+    const giftsSent = await prisma.giftHistory.count({
+      where: {
+        userId,
+        createdAt: { gte: today },
+      },
+    });
+
+    return {
+      questsCompleted: completedQuests,
+      totalQuests: totalDailyQuests,
+      messagesSent,
+      giftsSent,
+      streak: user?.streak || 0,
+      coinsEarned: 0, // TODO: Track daily earnings
+    };
+  },
+};

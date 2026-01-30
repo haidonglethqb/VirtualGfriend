@@ -1,0 +1,548 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Heart, Send, Mic, Smile,
+  Gift, Phone, Video, Sparkles, X, Check, Loader2
+} from 'lucide-react';
+import { AppLayout } from '@/components/layout/app-layout';
+import { useAuthStore } from '@/store/auth-store';
+import { useCharacterStore } from '@/store/character-store';
+import { useChatStore } from '@/store/chat-store';
+import { socketService } from '@/services/socket';
+import { getMoodEmoji } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/services/api';
+
+interface InventoryItem {
+  id: string;
+  quantity: number;
+  gift: {
+    id: string;
+    name: string;
+    description: string;
+    emoji: string;
+    affectionBonus: number;
+  };
+}
+
+export default function ChatPage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const { isAuthenticated, accessToken } = useAuthStore();
+  const { character, fetchCharacter, updateAffection, isLoading: characterLoading, needsCreation } = useCharacterStore();
+  const { 
+    messages, 
+    isTyping,
+    isLoading: messagesLoading,
+    addMessage, 
+    setTyping,
+    fetchMessages 
+  } = useChatStore();
+
+  const [inputMessage, setInputMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Gift modal state
+  const [showGiftModal, setShowGiftModal] = useState(false);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+  const [selectedGift, setSelectedGift] = useState<InventoryItem | null>(null);
+  const [isSendingGift, setIsSendingGift] = useState(false);
+  const [giftSuccess, setGiftSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+
+    if (needsCreation) {
+      router.push('/dashboard');
+      return;
+    }
+
+    if (!character && !characterLoading) {
+      fetchCharacter();
+    }
+    
+    fetchMessages();
+
+    if (accessToken) {
+      socketService.connect(accessToken);
+    }
+
+    socketService.on('message:receive', (message: unknown) => {
+      addMessage(message as Parameters<typeof addMessage>[0]);
+      setTyping(false);
+    });
+
+    socketService.on('character:typing', (data: unknown) => {
+      const typingData = data as { isTyping: boolean };
+      setTyping(typingData.isTyping);
+    });
+
+    return () => {
+      socketService.off('message:receive');
+      socketService.off('character:typing');
+    };
+  }, [isAuthenticated, router, fetchMessages, addMessage, setTyping, needsCreation, character, characterLoading, fetchCharacter, accessToken]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping]);
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || isSending || !character) return;
+
+    const content = inputMessage.trim();
+    setInputMessage('');
+    setIsSending(true);
+
+    socketService.emit('message:send', { 
+      content,
+      characterId: character.id 
+    });
+
+    setIsSending(false);
+    inputRef.current?.focus();
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const openGiftModal = async () => {
+    setShowGiftModal(true);
+    setIsLoadingInventory(true);
+    try {
+      const response = await api.get<InventoryItem[]>('/shop/inventory');
+      if (response.success) {
+        setInventory(response.data);
+      }
+    } catch {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể tải túi đồ',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingInventory(false);
+    }
+  };
+
+  const handleSendGift = async () => {
+    if (!selectedGift || !character) return;
+    
+    setIsSendingGift(true);
+    try {
+      const response = await api.post<{ newAffection: number; reaction: string }>('/shop/send', {
+        characterId: character.id,
+        giftId: selectedGift.gift.id,
+      });
+
+      if (response.success) {
+        updateAffection(response.data.newAffection - character.affection);
+        await fetchMessages();
+        setGiftSuccess(true);
+        
+        setInventory(prev => prev.map(item => 
+          item.id === selectedGift.id 
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
+        ).filter(item => item.quantity > 0));
+
+        setTimeout(() => {
+          setGiftSuccess(false);
+          setSelectedGift(null);
+          setShowGiftModal(false);
+        }, 1500);
+      }
+    } catch {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể tặng quà',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSendingGift(false);
+    }
+  };
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  const affectionLevel = Math.floor((character?.affection || 0) / 100) + 1;
+
+  return (
+    <AppLayout>
+      <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-12rem)] lg:h-[calc(100vh-10rem)]">
+        {/* Left Side: Character Card */}
+        <div className="hidden lg:flex lg:w-80 flex-col">
+          {/* Character Info Card */}
+          <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6 flex flex-col items-center">
+            {/* Avatar */}
+            <div className="relative mb-4">
+              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-6xl border-4 border-love/30 shadow-[0_0_40px_rgba(244,37,140,0.3)]">
+                {character?.gender === 'FEMALE' ? '😊' : '😎'}
+              </div>
+              <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 border-3 border-[#271b21] rounded-full" />
+            </div>
+            
+            <h2 className="text-xl font-bold mb-1">{character?.name || 'Người yêu'}</h2>
+            <p className="text-sm text-green-400 flex items-center gap-1 mb-4">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              Online • {getMoodEmoji(character?.mood || 'NEUTRAL')} Đang vui
+            </p>
+
+            {/* Affection Level */}
+            <div className="w-full p-4 rounded-xl bg-[#181114] border border-[#392830]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-[#ba9cab]">Độ thân mật</span>
+                <span className="text-xs font-bold text-love">Level {affectionLevel}</span>
+              </div>
+              <div className="h-2 bg-[#392830] rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-love to-pink-500 rounded-full transition-all"
+                  style={{ width: `${(character?.affection || 0) % 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center gap-3 mt-4">
+              <button className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title="Gọi thoại">
+                <Phone className="w-5 h-5 text-[#ba9cab]" />
+              </button>
+              <button className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title="Gọi video">
+                <Video className="w-5 h-5 text-[#ba9cab]" />
+              </button>
+              <button 
+                onClick={openGiftModal}
+                className="w-12 h-12 rounded-full bg-love/20 border border-love/30 flex items-center justify-center hover:bg-love hover:text-white text-love transition-all" 
+                title="Tặng quà"
+              >
+                <Gift className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Chat Interface */}
+        <div className="flex-1 flex flex-col rounded-2xl bg-[#271b21] border border-[#392830] overflow-hidden">
+          {/* Chat Header - Mobile */}
+          <div className="lg:hidden flex items-center justify-between p-4 border-b border-[#392830]">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-lg">
+                  {character?.gender === 'FEMALE' ? '😊' : '😎'}
+                </div>
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[#271b21] rounded-full" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm">{character?.name || 'Người yêu'}</h3>
+                <p className="text-xs text-green-400">Online</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#181114] border border-[#392830]">
+                <Heart className="w-4 h-4 text-love fill-love" />
+                <span className="text-xs font-bold">Lv.{affectionLevel}</span>
+              </div>
+              <button 
+                onClick={openGiftModal}
+                className="w-9 h-9 rounded-full bg-love/20 border border-love/30 flex items-center justify-center text-love"
+              >
+                <Gift className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col gap-4 scrollbar-hide">
+          {/* Loading state */}
+          {messagesLoading && (
+            <div className="flex flex-col items-center justify-center h-full">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 bg-love rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-3 h-3 bg-love rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-3 h-3 bg-love rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <p className="text-white/50 mt-4">Đang tải tin nhắn...</p>
+            </div>
+          )}
+
+          {/* Welcome message if no messages */}
+          {!messagesLoading && messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="w-24 h-24 rounded-full gradient-love flex items-center justify-center mb-6 shadow-love-strong">
+                <Sparkles className="w-12 h-12 text-white" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2">Bắt đầu cuộc trò chuyện!</h2>
+              <p className="text-white/50 max-w-sm">
+                Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện với {character?.name || 'người yêu'} của bạn 💕
+              </p>
+            </div>
+          )}
+
+          {/* Message list */}
+          <AnimatePresence>
+            {messages.map((message, index) => {
+              const isUser = message.role === 'USER';
+              const showTimestamp = index === 0 || 
+                new Date(messages[index - 1].createdAt).toDateString() !== new Date(message.createdAt).toDateString();
+              
+              return (
+                <div key={message.id || index}>
+                  {/* Timestamp */}
+                  {showTimestamp && (
+                    <div className="flex justify-center my-4">
+                      <span className="text-[10px] uppercase tracking-widest text-white/30 font-bold bg-black/20 px-3 py-1 rounded-full">
+                        {new Date(message.createdAt).toLocaleDateString('vi-VN', { 
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long'
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className={`flex ${isUser ? 'flex-col items-end self-end' : 'gap-4 items-end'}`}
+                  >
+                    {!isUser && (
+                      <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1">
+                        {character?.gender === 'FEMALE' ? '👩' : '👨'}
+                      </div>
+                    )}
+                    <div className={`flex flex-col gap-1 max-w-[85%] ${isUser ? 'items-end' : ''}`}>
+                      <div
+                        className={`px-5 py-3 text-sm md:text-base leading-relaxed ${
+                          isUser
+                            ? 'bg-love text-white rounded-2xl rounded-br-sm shadow-[0_4px_20px_rgba(244,37,140,0.25)]'
+                            : 'bg-white/10 backdrop-blur-sm text-white/90 rounded-2xl rounded-bl-sm border border-white/5'
+                        }`}
+                      >
+                        {message.content}
+                      </div>
+                      <span className={`text-[10px] text-white/40 ${isUser ? 'pr-1' : 'pl-1'}`}>
+                        {new Date(message.createdAt).toLocaleTimeString('vi-VN', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </span>
+                    </div>
+                  </motion.div>
+                </div>
+              );
+            })}
+          </AnimatePresence>
+
+          {/* Typing indicator */}
+          {isTyping && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-4 items-end"
+            >
+              <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1">
+                {character?.gender === 'FEMALE' ? '👩' : '👨'}
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm px-4 py-3 rounded-2xl rounded-bl-sm border border-white/5">
+                <div className="flex gap-1.5 items-center h-4">
+                  <span className="w-2 h-2 bg-love/60 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                  <span className="w-2 h-2 bg-love/60 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+                  <span className="w-2 h-2 bg-love/60 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          <div ref={messagesEndRef} className="h-4" />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-4 md:p-6 bg-gradient-to-t from-[#181114]/90 to-transparent pt-10">
+          <div className="relative group">
+            <input 
+              ref={inputRef}
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isSending}
+              className="w-full bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 focus:border-love/50 text-white placeholder-white/30 rounded-full py-4 pl-6 pr-32 outline-none transition-all shadow-lg backdrop-blur-md" 
+              placeholder={`Nhắn tin cho ${character?.name || 'người yêu'}...`}
+              type="text"
+            />
+            {/* Input Actions */}
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <button className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors">
+                <Smile className="w-5 h-5" />
+              </button>
+              <button className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors">
+                <Mic className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim() || isSending}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-love text-white shadow-[0_0_15px_rgba(244,37,140,0.4)] hover:bg-love/90 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          
+          {/* Quick replies */}
+          <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide">
+            {['Xin chào! 👋', 'Anh/Em nhớ em/anh 💕', 'Hôm nay thế nào?', 'Kể chuyện đi'].map((text) => (
+              <button
+                key={text}
+                onClick={() => setInputMessage(text)}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-full text-xs font-medium text-white/70 hover:text-white whitespace-nowrap transition-colors"
+              >
+                {text}
+              </button>
+            ))}
+          </div>
+
+          <div className="text-center mt-3">
+            <p className="text-[10px] text-white/20">AI tạo phản hồi dựa trên cuộc trò chuyện của bạn.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Gift Modal */}
+      <AnimatePresence>
+        {showGiftModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
+            onClick={() => !isSendingGift && setShowGiftModal(false)}
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#271b21] border border-[#392830] rounded-t-2xl sm:rounded-2xl p-4 w-full sm:max-w-md max-h-[70vh] overflow-hidden flex flex-col"
+            >
+              {giftSuccess ? (
+                <div className="py-8 text-center">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="w-16 h-16 mx-auto rounded-full gradient-love flex items-center justify-center mb-4"
+                  >
+                    <Check className="w-8 h-8 text-white" />
+                  </motion.div>
+                  <h3 className="text-lg font-bold mb-2">Tặng quà thành công!</h3>
+                  <p className="text-[#ba9cab]">
+                    {character?.name} rất vui khi nhận được quà! 💕
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Gift className="w-5 h-5 text-love" />
+                      Tặng quà cho {character?.name}
+                    </h3>
+                    <button 
+                      onClick={() => setShowGiftModal(false)}
+                      className="p-2 rounded-full hover:bg-[#392830] transition-colors"
+                    >
+                      <X className="w-5 h-5 text-[#ba9cab]" />
+                    </button>
+                  </div>
+
+                  {isLoadingInventory ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-love" />
+                    </div>
+                  ) : inventory.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Gift className="w-12 h-12 mx-auto mb-3 text-[#ba9cab] opacity-50" />
+                      <p className="text-[#ba9cab] mb-4">Bạn chưa có quà nào trong túi đồ</p>
+                      <button 
+                        onClick={() => setShowGiftModal(false)}
+                        className="px-6 py-3 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all"
+                      >
+                        Đi mua quà
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1 overflow-y-auto grid grid-cols-3 gap-2 mb-4">
+                        {inventory.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => setSelectedGift(item)}
+                            className={`p-3 rounded-xl text-center cursor-pointer transition-all ${
+                              selectedGift?.id === item.id 
+                                ? 'bg-love/20 ring-2 ring-love' 
+                                : 'bg-[#392830]/50 hover:bg-[#392830]'
+                            }`}
+                          >
+                            <div className="text-3xl mb-1">{item.gift.emoji}</div>
+                            <p className="text-xs font-medium truncate">{item.gift.name}</p>
+                            <p className="text-xs text-[#ba9cab]">x{item.quantity}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {selectedGift && (
+                        <div className="border-t border-[#392830] pt-4">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="text-4xl">{selectedGift.gift.emoji}</div>
+                            <div className="flex-1">
+                              <p className="font-semibold">{selectedGift.gift.name}</p>
+                              <p className="text-xs text-love flex items-center gap-1">
+                                <Heart className="w-3 h-3 fill-love" />
+                                +{selectedGift.gift.affectionBonus} độ thân mật
+                              </p>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={handleSendGift}
+                            disabled={isSendingGift}
+                            className="w-full h-12 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            {isSendingGift ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Đang tặng...
+                              </>
+                            ) : (
+                              <>
+                                <Gift className="w-4 h-4" />
+                                Tặng cho {character?.name}
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      </div>
+    </AppLayout>
+  );
+}
