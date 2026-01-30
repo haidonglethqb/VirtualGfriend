@@ -1,0 +1,515 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  password          String
+  username          String?   @unique
+  displayName       String?
+  avatar            String?
+  isEmailVerified   Boolean   @default(false)
+  isPremium         Boolean   @default(false)
+  premiumExpiresAt  DateTime?
+  coins             Int       @default(0)
+  gems              Int       @default(0)
+  streak            Int       @default(0)       // Daily login streak
+  lastActiveAt      DateTime?                   // Last activity for streak calculation
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  refreshTokens     RefreshToken[]
+  characters        Character[]
+  messages          Message[]
+  userQuests        UserQuest[]
+  userGifts         UserGift[]
+  giftHistory       GiftHistory[]
+  memories          Memory[]
+  userAchievements  UserAchievement[]
+  notifications     Notification[]
+  settings          UserSettings?
+  dailyRewards      DailyReward[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model UserSettings {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  language              String   @default("vi")
+  theme                 String   @default("dark")
+  notificationsEnabled  Boolean  @default(true)
+  soundEnabled          Boolean  @default(true)
+  musicEnabled          Boolean  @default(true)
+  autoPlayVoice         Boolean  @default(false)
+  chatBubbleStyle       String   @default("modern")
+  fontSize              String   @default("medium")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+// ============================================
+// CHARACTER SYSTEM
+// ============================================
+
+model Character {
+  id                String          @id @default(uuid())
+  userId            String
+  name              String
+  nickname          String?
+  gender            Gender          @default(FEMALE)
+  personality       String          @default("caring") // caring, playful, shy, passionate, intellectual
+  mood              String          @default("happy") // happy, sad, excited, sleepy, romantic
+  level             Int             @default(1)
+  experience        Int             @default(0)
+  affection         Int             @default(0) // 0-1000
+  relationshipStage RelationshipStage @default(STRANGER)
+  birthday          DateTime?
+  bio               String?
+  voiceType         String          @default("soft")
+  
+  // Avatar customization
+  avatarStyle       String          @default("anime")
+  hairStyle         String          @default("long")
+  hairColor         String          @default("#3b1f0a")
+  eyeColor          String          @default("#4a3728")
+  skinTone          String          @default("#f5d0c5")
+  outfit            String          @default("casual")
+  accessories       String[]        @default([])
+  
+  // AI behavior
+  memoryEnabled     Boolean         @default(true)
+  responseStyle     String          @default("romantic") // romantic, friendly, flirty, caring
+  creativityLevel   Float           @default(0.7) // 0-1
+  
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages          Message[]
+  characterFacts    CharacterFact[]
+  scenes            CharacterScene[]
+  receivedGifts     GiftHistory[]
+  memories          Memory[]
+
+  @@map("characters")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum RelationshipStage {
+  STRANGER    // 0-99 affection
+  ACQUAINTANCE // 100-249
+  FRIEND      // 250-449
+  CLOSE_FRIEND // 450-599
+  CRUSH       // 600-749
+  DATING      // 750-899
+  LOVER       // 900-1000
+}
+
+model CharacterFact {
+  id          String   @id @default(uuid())
+  characterId String
+  category    String   // preference, memory, trait, event
+  key         String
+  value       String
+  importance  Int      @default(5) // 1-10
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([characterId, key])
+  @@map("character_facts")
+}
+
+model CharacterScene {
+  id          String   @id @default(uuid())
+  characterId String
+  sceneId     String
+  unlockedAt  DateTime @default(now())
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  scene     Scene     @relation(fields: [sceneId], references: [id])
+
+  @@unique([characterId, sceneId])
+  @@map("character_scenes")
+}
+
+// ============================================
+// CHAT & MESSAGING
+// ============================================
+
+model Message {
+  id          String      @id @default(uuid())
+  userId      String
+  characterId String
+  role        MessageRole
+  content     String      @db.Text
+  messageType MessageType @default(TEXT)
+  metadata    Json?       // For images, voice, special events
+  isRead      Boolean     @default(false)
+  emotion     String?     // happy, sad, love, angry, surprised
+  createdAt   DateTime    @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character   @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([userId, characterId, createdAt])
+  @@map("messages")
+}
+
+enum MessageRole {
+  USER
+  AI
+  SYSTEM
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VOICE
+  GIFT
+  STICKER
+  EVENT
+}
+
+// ============================================
+// QUEST SYSTEM
+// ============================================
+
+model Quest {
+  id              String    @id @default(uuid())
+  title           String
+  description     String
+  type            QuestType
+  category        String    // daily, relationship, special, story
+  requirements    Json      // { action: "send_message", count: 5 }
+  rewardXp        Int       @default(0)
+  rewardCoins     Int       @default(0)
+  rewardGems      Int       @default(0)
+  rewardAffection Int       @default(0)
+  rewardItems     String[]  @default([])
+  unlockLevel     Int       @default(1)
+  sortOrder       Int       @default(0)
+  isActive        Boolean   @default(true)
+  startsAt        DateTime?
+  endsAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  userQuests      UserQuest[]
+
+  @@map("quests")
+}
+
+enum QuestType {
+  DAILY
+  WEEKLY
+  STORY
+  ACHIEVEMENT
+  EVENT
+}
+
+model UserQuest {
+  id          String      @id @default(uuid())
+  userId      String
+  questId     String
+  progress    Int         @default(0)
+  maxProgress Int         @default(1)
+  status      QuestStatus @default(IN_PROGRESS)
+  startedAt   DateTime    @default(now())
+  completedAt DateTime?
+  claimedAt   DateTime?
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quest       Quest       @relation(fields: [questId], references: [id])
+
+  @@unique([userId, questId])
+  @@map("user_quests")
+}
+
+enum QuestStatus {
+  IN_PROGRESS
+  COMPLETED
+  CLAIMED
+  EXPIRED
+}
+
+// ============================================
+// GIFT & SHOP SYSTEM
+// ============================================
+
+model Gift {
+  id              String   @id @default(uuid())
+  name            String
+  description     String
+  imageUrl        String
+  category        String   // flower, jewelry, food, experience, special
+  rarity          Rarity   @default(COMMON)
+  priceCoins      Int      @default(0)
+  priceGems       Int      @default(0)
+  affectionBonus  Int      @default(10)
+  unlockLevel     Int      @default(1)
+  isLimited       Boolean  @default(false)
+  availableFrom   DateTime?
+  availableUntil  DateTime?
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  userGifts       UserGift[]
+  giftHistory     GiftHistory[]
+
+  @@map("gifts")
+}
+
+enum Rarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+model UserGift {
+  id        String   @id @default(uuid())
+  userId    String
+  giftId    String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gift Gift @relation(fields: [giftId], references: [id])
+
+  @@unique([userId, giftId])
+  @@map("user_gifts")
+}
+
+model GiftHistory {
+  id          String   @id @default(uuid())
+  userId      String   // User who sent the gift
+  characterId String
+  giftId      String
+  message     String?
+  reaction    String?  // AI's reaction to the gift
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  gift      Gift      @relation(fields: [giftId], references: [id])
+
+  @@map("gift_history")
+}
+
+// ============================================
+// SCENES & ENVIRONMENTS
+// ============================================
+
+model Scene {
+  id            String   @id @default(uuid())
+  name          String
+  description   String
+  imageUrl      String
+  category      String   // indoor, outdoor, romantic, adventure
+  ambiance      String   // cozy, romantic, energetic, peaceful
+  unlockMethod  String   @default("level") // level, purchase, quest, event
+  unlockValue   Int      @default(1)
+  priceGems     Int      @default(0)
+  isDefault     Boolean  @default(false)
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  characterScenes CharacterScene[]
+
+  @@map("scenes")
+}
+
+// ============================================
+// MEMORIES & GALLERY
+// ============================================
+
+model Memory {
+  id          String     @id @default(uuid())
+  userId      String
+  characterId String?    // Character related to this memory
+  title       String
+  description String?
+  imageUrl    String?
+  type        MemoryType
+  milestone   String?    // first_date, first_kiss, anniversary
+  metadata    Json?
+  isFavorite  Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
+
+  @@map("memories")
+}
+
+enum MemoryType {
+  MILESTONE
+  PHOTO
+  CONVERSATION
+  GIFT
+  EVENT
+  SPECIAL
+  DATE
+  CHAT
+}
+
+// ============================================
+// ACHIEVEMENTS
+// ============================================
+
+model Achievement {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  iconUrl     String?
+  category    String   // chat, gift, quest, relationship, special
+  requirement Json     // { action: "total_messages", count: 100 }
+  rewardXp    Int      @default(0)
+  rewardCoins Int      @default(0)
+  rewardGems  Int      @default(0)
+  points      Int      @default(10)
+  isSecret    Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String
+  achievementId String
+  progress      Int      @default(0)
+  unlockedAt    DateTime?
+  claimedAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  SYSTEM
+  CHAT
+  QUEST
+  ACHIEVEMENT
+  GIFT
+  EVENT
+  REWARD
+}
+
+// ============================================
+// DAILY REWARDS
+// ============================================
+
+model DailyReward {
+  id          String   @id @default(uuid())
+  userId      String
+  day         Int      // 1-7 for weekly cycle
+  rewardType  String   // coins, gems, gift, xp
+  rewardValue Int
+  claimedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("daily_rewards")
+}
+
+// ============================================
+// SYSTEM CONFIGURATIONS
+// ============================================
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
+model AIPromptTemplate {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  personality String   // caring, playful, shy, passionate, intellectual
+  template    String   @db.Text
+  systemRole  String   @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("ai_prompt_templates")
+}

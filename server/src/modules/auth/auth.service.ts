@@ -1,0 +1,274 @@
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
+import { prisma } from '../../lib/prisma';
+import { AppError } from '../../middlewares/error.middleware';
+
+interface RegisterData {
+  email: string;
+  password: string;
+  username?: string;
+  displayName?: string;
+}
+
+interface LoginData {
+  email: string;
+  password: string;
+}
+
+interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+const ACCESS_TOKEN_EXPIRES = 15 * 60; // 15 minutes in seconds
+const REFRESH_TOKEN_EXPIRES = 7 * 24 * 60 * 60; // 7 days in seconds
+
+function generateTokens(userId: string, email: string): AuthTokens {
+  const accessToken = jwt.sign(
+    { userId, email },
+    process.env.JWT_SECRET || 'secret',
+    { expiresIn: ACCESS_TOKEN_EXPIRES }
+  );
+
+  const refreshToken = jwt.sign(
+    { userId, email, tokenId: uuidv4() },
+    process.env.JWT_REFRESH_SECRET || 'refresh-secret',
+    { expiresIn: REFRESH_TOKEN_EXPIRES }
+  );
+
+  return {
+    accessToken,
+    refreshToken,
+    expiresIn: ACCESS_TOKEN_EXPIRES,
+  };
+}
+
+export const authService = {
+  async register(data: RegisterData) {
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      throw new AppError('Email already registered', 400, 'EMAIL_EXISTS');
+    }
+
+    // Check if username already exists
+    if (data.username) {
+      const existingUsername = await prisma.user.findUnique({
+        where: { username: data.username },
+      });
+
+      if (existingUsername) {
+        throw new AppError('Username already taken', 400, 'USERNAME_EXISTS');
+      }
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(data.password, 12);
+
+    // Create user with default settings and character
+    const user = await prisma.user.create({
+      data: {
+        email: data.email,
+        password: hashedPassword,
+        username: data.username,
+        displayName: data.displayName || data.username,
+        coins: 100, // Starting bonus
+        gems: 10,
+        settings: {
+          create: {
+            language: 'vi',
+            theme: 'dark',
+          },
+        },
+        characters: {
+          create: {
+            name: 'Mai',
+            personality: 'caring',
+            mood: 'happy',
+            bio: 'Xin chào! Tôi là Mai, người bạn đồng hành của bạn 💕',
+          },
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        displayName: true,
+        avatar: true,
+        coins: true,
+        gems: true,
+        createdAt: true,
+      },
+    });
+
+    // Generate tokens
+    const tokens = generateTokens(user.id, user.email);
+
+    // Store refresh token
+    await prisma.refreshToken.create({
+      data: {
+        token: tokens.refreshToken,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRES * 1000),
+      },
+    });
+
+    return { user, tokens };
+  },
+
+  async login(data: LoginData) {
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (!user) {
+      throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(data.password, user.password);
+
+    if (!isValidPassword) {
+      throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+    }
+
+    // Update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Generate tokens
+    const tokens = generateTokens(user.id, user.email);
+
+    // Store refresh token
+    await prisma.refreshToken.create({
+      data: {
+        token: tokens.refreshToken,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRES * 1000),
+      },
+    });
+
+    const { password: _, ...userWithoutPassword } = user;
+
+    return { user: userWithoutPassword, tokens };
+  },
+
+  async refreshToken(token: string) {
+    // Verify token
+    let decoded: { userId: string; email: string };
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_REFRESH_SECRET || 'refresh-secret'
+      ) as { userId: string; email: string };
+    } catch {
+      throw new AppError('Invalid refresh token', 401, 'INVALID_REFRESH_TOKEN');
+    }
+
+    // Check if token exists and not revoked
+    const storedToken = await prisma.refreshToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!storedToken || storedToken.isRevoked) {
+      throw new AppError('Invalid refresh token', 401, 'INVALID_REFRESH_TOKEN');
+    }
+
+    if (storedToken.expiresAt < new Date()) {
+      throw new AppError('Refresh token expired', 401, 'REFRESH_TOKEN_EXPIRED');
+    }
+
+    // Revoke old token
+    await prisma.refreshToken.update({
+      where: { id: storedToken.id },
+      data: { isRevoked: true },
+    });
+
+    // Generate new tokens
+    const tokens = generateTokens(decoded.userId, decoded.email);
+
+    // Store new refresh token
+    await prisma.refreshToken.create({
+      data: {
+        token: tokens.refreshToken,
+        userId: decoded.userId,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRES * 1000),
+      },
+    });
+
+    const { password: _, ...userWithoutPassword } = storedToken.user;
+
+    return { user: userWithoutPassword, tokens };
+  },
+
+  async logout(token: string) {
+    await prisma.refreshToken.updateMany({
+      where: { token },
+      data: { isRevoked: true },
+    });
+  },
+
+  async getMe(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        displayName: true,
+        avatar: true,
+        isPremium: true,
+        premiumExpiresAt: true,
+        coins: true,
+        gems: true,
+        lastLoginAt: true,
+        createdAt: true,
+        settings: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    return user;
+  },
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isValidPassword) {
+      throw new AppError('Current password is incorrect', 400, 'INVALID_PASSWORD');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    // Revoke all refresh tokens
+    await prisma.refreshToken.updateMany({
+      where: { userId },
+      data: { isRevoked: true },
+    });
+  },
+};

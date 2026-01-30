@@ -1,0 +1,38 @@
+# Development docker-compose
+# Run with: docker-compose -f docker-compose.dev.yml up -d
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: vgfriend-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vgfriend
+      POSTGRES_PASSWORD: vgfriend123
+      POSTGRES_DB: vgfriend
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: vgfriend-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  # Adminer for database management
+  adminer:
+    image: adminer
+    container_name: vgfriend-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_dev_data:
