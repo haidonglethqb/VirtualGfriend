@@ -41,6 +41,6 @@ RUN chown -R expressjs:nodejs /app
 
 USER expressjs
 
-EXPOSE 4000
+EXPOSE 3001
 
 CMD ["node", "dist/index.js"]

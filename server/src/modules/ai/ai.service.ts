@@ -162,7 +162,7 @@ export const aiService = {
         ...analysis,
       };
     } catch (error) {
-      console.error('AI generation error:', error);
+      console.error('[AI] Generation error:', error);
       
       // Fallback responses
       const fallbacks = [

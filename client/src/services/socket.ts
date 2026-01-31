@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { useChatStore, Message } from '@/store/chat-store';
 import { useCharacterStore } from '@/store/character-store';
 
-const WS_URL = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 class SocketService {
   private socket: Socket | null = null;

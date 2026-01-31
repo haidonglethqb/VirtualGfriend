@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding database...');
+  console.log('[Seed] Starting database seed...');
 
   // Create default scenes
   const scenes = await prisma.scene.createMany({
@@ -60,7 +60,7 @@ async function main() {
     ],
     skipDuplicates: true,
   });
-  console.log(`✅ Created ${scenes.count} scenes`);
+  console.log(`[Seed] Created ${scenes.count} scenes`);
 
   // Create default quests
   const quests = await prisma.quest.createMany({
@@ -173,7 +173,7 @@ async function main() {
     ],
     skipDuplicates: true,
   });
-  console.log(`✅ Created ${quests.count} quests`);
+  console.log(`[Seed] Created ${quests.count} quests`);
 
   // Create default gifts
   const gifts = await prisma.gift.createMany({
@@ -303,7 +303,7 @@ async function main() {
     ],
     skipDuplicates: true,
   });
-  console.log(`✅ Created ${gifts.count} gifts`);
+  console.log(`[Seed] Created ${gifts.count} gifts`);
 
   // Create AI prompt templates
   const templates = await prisma.aIPromptTemplate.createMany({
@@ -341,7 +341,7 @@ async function main() {
     ],
     skipDuplicates: true,
   });
-  console.log(`✅ Created ${templates.count} AI templates`);
+  console.log(`[Seed] Created ${templates.count} AI templates`);
 
   // Create achievements
   const achievements = await prisma.achievement.createMany({
@@ -406,14 +406,14 @@ async function main() {
     ],
     skipDuplicates: true,
   });
-  console.log(`✅ Created ${achievements.count} achievements`);
+  console.log(`[Seed] Created ${achievements.count} achievements`);
 
-  console.log('✅ Seeding completed!');
+  console.log('[Seed] Database seeding completed!');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Seeding failed:', e);
+    console.error('[Seed] Seeding failed:', e);
     process.exit(1);
   })
   .finally(async () => {

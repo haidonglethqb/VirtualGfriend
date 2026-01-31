@@ -76,21 +76,13 @@ export default function ChatPage() {
       socketService.connect(accessToken);
     }
 
-    socketService.on('message:receive', (message: unknown) => {
-      addMessage(message as Parameters<typeof addMessage>[0]);
-      setTyping(false);
-    });
-
-    socketService.on('character:typing', (data: unknown) => {
-      const typingData = data as { isTyping: boolean };
-      setTyping(typingData.isTyping);
-    });
+    // Socket events are handled in socketService.setupEventHandlers()
+    // No need to add listeners here - it causes duplicate messages
 
     return () => {
-      socketService.off('message:receive');
-      socketService.off('character:typing');
+      // Cleanup not needed - socketService handles its own events
     };
-  }, [isAuthenticated, router, fetchMessages, addMessage, setTyping, needsCreation, character, characterLoading, fetchCharacter, accessToken]);
+  }, [isAuthenticated, router, fetchMessages, needsCreation, character, characterLoading, fetchCharacter, accessToken]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
