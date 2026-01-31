@@ -59,19 +59,19 @@ app.use(errorHandler);
 setupSocketHandlers(io);
 
 // Start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3001;
 
 httpServer.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Socket.IO ready`);
+  console.log(`[Server] Running on http://localhost:${PORT}`);
+  console.log('[Server] Socket.IO ready');
 });
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
+  console.log('[Server] SIGTERM received. Shutting down gracefully...');
   await prisma.$disconnect();
   httpServer.close(() => {
-    console.log('Server closed');
+    console.log('[Server] Closed');
     process.exit(0);
   });
 });
