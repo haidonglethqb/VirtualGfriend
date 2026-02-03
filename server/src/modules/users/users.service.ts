@@ -5,6 +5,7 @@ interface UpdateProfileData {
   username?: string;
   displayName?: string;
   avatar?: string;
+  bio?: string;
 }
 
 interface UpdateSettingsData {
@@ -16,6 +17,13 @@ interface UpdateSettingsData {
   autoPlayVoice?: boolean;
   chatBubbleStyle?: string;
   fontSize?: 'small' | 'medium' | 'large';
+  notifications?: boolean;
+}
+
+interface UpdatePrivacyData {
+  profilePublic?: boolean;
+  showActivity?: boolean;
+  allowMessages?: boolean;
 }
 
 export const userService = {
@@ -28,10 +36,12 @@ export const userService = {
         username: true,
         displayName: true,
         avatar: true,
+        bio: true,
         isPremium: true,
         premiumExpiresAt: true,
         coins: true,
         gems: true,
+        streak: true,
         createdAt: true,
       },
     });
@@ -66,6 +76,7 @@ export const userService = {
         username: true,
         displayName: true,
         avatar: true,
+        bio: true,
       },
     });
   },
@@ -161,5 +172,42 @@ export const userService = {
         data: { isRead: true },
       });
     }
+  },
+
+  async getPrivacySettings(userId: string) {
+    let settings = await prisma.userSettings.findUnique({
+      where: { userId },
+      select: {
+        profilePublic: true,
+        showActivity: true,
+        allowMessages: true,
+      },
+    });
+
+    if (!settings) {
+      const created = await prisma.userSettings.create({
+        data: { userId },
+      });
+      settings = {
+        profilePublic: created.profilePublic ?? false,
+        showActivity: created.showActivity ?? false,
+        allowMessages: created.allowMessages ?? true,
+      };
+    }
+
+    return settings;
+  },
+
+  async updatePrivacySettings(userId: string, data: UpdatePrivacyData) {
+    return prisma.userSettings.upsert({
+      where: { userId },
+      update: data,
+      create: { userId, ...data },
+      select: {
+        profilePublic: true,
+        showActivity: true,
+        allowMessages: true,
+      },
+    });
   },
 };

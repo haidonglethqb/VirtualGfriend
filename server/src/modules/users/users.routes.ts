@@ -11,6 +11,8 @@ userRouter.get('/profile', userController.getProfile);
 userRouter.patch('/profile', userController.updateProfile);
 userRouter.get('/settings', userController.getSettings);
 userRouter.patch('/settings', userController.updateSettings);
+userRouter.get('/privacy', userController.getPrivacySettings);
+userRouter.patch('/privacy', userController.updatePrivacySettings);
 userRouter.get('/stats', userController.getStats);
 userRouter.get('/notifications', userController.getNotifications);
 userRouter.post('/notifications/read', userController.markNotificationsRead);

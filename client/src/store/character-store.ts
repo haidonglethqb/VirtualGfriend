@@ -7,6 +7,7 @@ interface Character {
   nickname?: string;
   gender: 'MALE' | 'FEMALE';
   avatar?: string;
+  bio?: string;
   personality: string;
   mood: string;
   level: number;

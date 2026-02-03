@@ -68,31 +68,40 @@ VirtualGfriend/
 ### ⚡ Quick Start (5 phút)
 
 ```bash
-# 1. Clone và cài đặt
+# 1. Clone repository
 git clone https://github.com/haidonglethqb/VirtualGfriend.git
 cd VirtualGfriend
 
-# 2. Start database
+# 2. Start database với Docker
 docker-compose -f docker-compose.dev.yml up -d
+# Đợi 10 giây để database khởi động hoàn toàn
 
-# 3. Setup server
+# 3. Setup Server (Terminal 1)
 cd server
 npm install
 cp .env.example .env
-# ⚠️ MỞ FILE .env VÀ THÊM GROQ_API_KEY (lấy tại https://console.groq.com - MIỄN PHÍ)
-npx prisma generate
-npx prisma migrate dev
-npx prisma db seed
-npm run dev
+# ⚠️ QUAN TRỌNG: Mở file .env và thêm GROQ_API_KEY (miễn phí tại https://console.groq.com)
+# Sau khi sửa .env, chạy:
+npx prisma generate        # Tạo Prisma client
+npx prisma migrate dev     # Chạy migrations
+npx prisma db seed         # Seed dữ liệu mẫu
+npm run dev               # Khởi động server tại http://localhost:3001
 
-# 4. Setup client (terminal mới)
+# 4. Setup Client (Terminal 2 - Terminal mới)
 cd client
 npm install
 cp .env.example .env.local
-npm run dev
+npm run dev               # Khởi động frontend tại http://localhost:3000
 
-# 5. Mở http://localhost:3000 🎉
+# 5. Mở trình duyệt tại http://localhost:3000 🎉
+# Tài khoản test: test@example.com / password123
 ```
+
+**Lưu ý quan trọng:**
+- ✅ Đảm bảo Docker đang chạy trước khi bắt đầu
+- ✅ Đợi database khởi động xong (~10s) trước khi chạy `prisma migrate`
+- ✅ File `.env` server **PHẢI** có `GROQ_API_KEY` thật (không để `your-groq-api-key`)
+- ✅ Nếu gặp lỗi migration, xem phần Troubleshooting bên dưới
 
 ### Yêu cầu
 
@@ -253,36 +262,98 @@ docker-compose exec server npx prisma migrate deploy
 
 ## 🔧 Troubleshooting
 
-### Lỗi "Authentication failed" khi chạy Prisma
+### ❗ Database không kết nối được
 ```bash
-# Kiểm tra Docker đang chạy
+# 1. Kiểm tra Docker đang chạy
 docker ps
 
-# Nếu không thấy vgfriend-db-dev, chạy lại:
+# 2. Nếu không thấy container vgfriend-db-dev
+docker-compose -f docker-compose.dev.yml down
 docker-compose -f docker-compose.dev.yml up -d
 
-# Đợi 5 giây rồi thử lại
+# 3. Kiểm tra logs
+docker-compose -f docker-compose.dev.yml logs -f postgres
+
+# 4. Đợi 10 giây rồi thử lại
 npx prisma migrate dev
 ```
 
-### Lỗi "EADDRINUSE: address already in use"
+### ❗ Lỗi "Prisma schema file not found" hoặc lỗi TypeScript
+```bash
+cd server
+npx prisma generate  # Tạo lại Prisma client
+npm run dev
+```
+
+### ❗ Lỗi "Authentication failed" khi chạy Prisma
+- Database chưa khởi động xong → Đợi thêm 10-15 giây
+- DATABASE_URL trong `.env` không đúng → Kiểm tra lại
+```bash
+# Xem logs database
+docker-compose -f docker-compose.dev.yml logs postgres
+```
+
+### ❗ Lỗi "EADDRINUSE: address already in use :::3001"
 ```bash
 # Windows
 netstat -ano | findstr :3001
-taskkill /PID <PID> /F
+taskkill /PID <PID_NUMBER> /F
 
 # Linux/Mac
-lsof -i :3001
-kill -9 <PID>
+lsof -ti:3001 | xargs kill -9
+
+# Hoặc đổi PORT trong server/.env sang 3002
 ```
 
-### AI không trả lời / dùng fallback
-- Kiểm tra `GROQ_API_KEY` trong `server/.env` có đúng không
-- Restart server sau khi sửa `.env`
+### ❗ AI không trả lời (dùng fallback response)
+1. Kiểm tra `GROQ_API_KEY` trong `server/.env` có đúng không
+2. Key phải bắt đầu bằng `gsk_...`
+3. Lấy key mới tại https://console.groq.com (miễn phí)
+4. Restart server sau khi sửa `.env`
 
-### Tin nhắn bị duplicate
-- Xóa cache: `localStorage.clear()` trong DevTools Console
-- Refresh trang
+```bash
+# Kiểm tra key có được load không
+cd server
+npm run dev
+# Xem console log khi server start
+```
+
+### ❗ Tin nhắn bị duplicate hoặc UI lỗi
+```bash
+# Clear cache và refresh
+# Trong DevTools Console (F12):
+localStorage.clear()
+sessionStorage.clear()
+# Sau đó Ctrl+Shift+R (hard refresh)
+```
+
+### ❗ Migration bị lỗi
+```bash
+cd server
+
+# Option 1: Reset database (XÓA TẤT CẢ DỮ LIỆU)
+npx prisma migrate reset
+npx prisma db seed
+
+# Option 2: Force migration
+npx prisma migrate dev --name force_update
+
+# Option 3: Push schema trực tiếp (dev only)
+npx prisma db push
+```
+
+### ❗ Frontend không kết nối được backend
+1. Kiểm tra server đang chạy: http://localhost:3001/health
+2. Kiểm tra file `client/.env.local`:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_WS_URL=http://localhost:3001
+```
+3. Restart client
+```bash
+cd client
+npm run dev
+```
 
 ## 🖥️ Chuẩn bị VPS
 
