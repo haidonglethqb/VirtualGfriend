@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { 
   Settings, User, Bell, Volume2, Moon, 
   Globe, Shield, LogOut, ChevronRight, Heart, 
-  Palette, Trash2, HelpCircle, Info, Loader2
+  Palette, Trash2, HelpCircle, Info, Loader2, Brain
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -80,7 +80,7 @@ export default function SettingsPage() {
     logout();
     toast({
       title: 'Đã đăng xuất',
-      description: 'Hẹn gặp lại bạn! 👋',
+      description: 'Hẹn gặp lại bạn!',
     });
     router.push('/');
   };
@@ -118,6 +118,12 @@ export default function SettingsPage() {
       label: 'Người yêu ảo của tôi',
       description: 'Xem và chỉnh sửa nhân vật',
       href: '/settings/character',
+    },
+    {
+      icon: <Brain className="w-5 h-5" />,
+      label: 'Quản lý Facts',
+      description: 'Xem và chỉnh sửa thông tin AI đã học',
+      href: '/settings/facts',
     },
   ];
 

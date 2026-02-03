@@ -120,7 +120,7 @@ export const giftService = {
     });
 
     // Generate AI reaction
-    let reaction = `Wow! ${gift.name}! Cảm ơn em nhiều lắm! 💕`;
+    let reaction = `Wow! ${gift.name}! Cảm ơn em nhiều lắm!`;
     
     // Record gift history
     await prisma.giftHistory.create({
@@ -139,7 +139,7 @@ export const giftService = {
         userId,
         characterId: data.characterId,
         role: 'SYSTEM',
-        content: `🎁 Bạn đã tặng ${gift.name}`,
+        content: `Bạn đã tặng ${gift.name}`,
         messageType: 'GIFT',
         metadata: { giftId: data.giftId, giftName: gift.name },
       },

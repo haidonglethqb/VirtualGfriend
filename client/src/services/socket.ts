@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { useChatStore, Message } from '@/store/chat-store';
 import { useCharacterStore } from '@/store/character-store';
+import { useNotificationStore } from '@/store/notification-store';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -58,8 +59,63 @@ class SocketService {
       useCharacterStore.getState().updateMood(mood);
     });
 
-    this.socket.on('character:affection_change', ({ change }: { change: number }) => {
+    this.socket.on('character:affection_change', ({ change, newAffection, newLevel, levelUp, relationshipUpgrade, previousStage, newStage, unlocks, rewards }: { 
+      change: number;
+      newAffection: number;
+      newLevel?: number;
+      levelUp?: boolean;
+      relationshipUpgrade?: boolean;
+      previousStage?: string;
+      newStage?: string;
+      unlocks?: string[];
+      rewards?: { coins?: number; gems?: number; affection?: number };
+    }) => {
+      // Update affection
       useCharacterStore.getState().updateAffection(change);
+      
+      // Show affection popup
+      useNotificationStore.getState().showAffectionChange(change);
+      
+      // Show level up modal if leveled up
+      if (levelUp && newLevel) {
+        useNotificationStore.getState().showLevelUp(newLevel, unlocks || [], rewards);
+      }
+      
+      // Show relationship upgrade modal
+      if (relationshipUpgrade && previousStage && newStage) {
+        useNotificationStore.getState().showRelationshipUpgrade(previousStage, newStage);
+      }
+    });
+
+    // Proactive AI notification (legacy)
+    this.socket.on('notification:ai_message', (data: { 
+      characterId: string;
+      message: string;
+      type: 'morning' | 'night' | 'miss_you' | 'birthday';
+    }) => {
+      useNotificationStore.getState().showAINotification(data);
+    });
+
+    // New proactive notification system
+    this.socket.on('notification:proactive', (data: {
+      characterId: string;
+      characterName: string;
+      type: 'morning_greeting' | 'night_greeting' | 'miss_you' | 'random_thought' | 'anniversary' | 'comeback_message';
+      message: string;
+    }) => {
+      useNotificationStore.getState().showProactiveNotification(data);
+    });
+
+    // Mood update
+    this.socket.on('character:mood_update', (data: {
+      characterId: string;
+      mood: string;
+      moodScore: number;
+      moodEmoji: string;
+      description: string;
+      factors: string[];
+    }) => {
+      useCharacterStore.getState().setMoodInfo(data);
     });
 
     this.socket.on('error', () => {

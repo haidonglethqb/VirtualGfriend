@@ -33,7 +33,7 @@ export default function PrivacySettingsPage() {
     try {
       const response = await api.get('/users/privacy');
       if (response.success && response.data) {
-        setPrivacySettings(response.data);
+        setPrivacySettings(response.data as typeof privacySettings);
       }
     } catch (error) {
       console.error('Failed to fetch privacy settings:', error);

@@ -15,7 +15,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const register = useAuthStore((state) => state.register);
-  
+
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -25,7 +25,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast({
         title: 'Lỗi',
@@ -62,7 +62,7 @@ export default function RegisterPage() {
         description: 'Chào mừng bạn đến với VGfriend 💕',
         variant: 'love',
       });
-      router.push('/dashboard');
+      router.push('/onboarding');
     } catch (error) {
       toast({
         title: 'Đăng ký thất bại',
@@ -121,7 +121,7 @@ export default function RegisterPage() {
                   disabled={isLoading}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Mật khẩu *</label>
                 <div className="relative">

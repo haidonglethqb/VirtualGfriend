@@ -5,16 +5,20 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Heart, Send, Mic, Smile,
-  Gift, Phone, Video, Sparkles, X, Check, Loader2
+  Gift, Phone, Video, Sparkles, X, Check, Loader2, ImageIcon
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
 import { useChatStore } from '@/store/chat-store';
+import { useNotificationStore } from '@/store/notification-store';
 import { socketService } from '@/services/socket';
 import { getMoodEmoji } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
+import { AffectionPopup, LevelUpModal, RelationshipUpgradeModal, ProactiveNotification } from '@/components/ui/notifications';
+import { SceneSelector } from '@/components/ui/scene-selector';
+import { useSceneStore } from '@/store/scene-store';
 
 interface InventoryItem {
   id: string;
@@ -41,6 +45,26 @@ export default function ChatPage() {
     setTyping,
     fetchMessages 
   } = useChatStore();
+  
+  // Notification store
+  const {
+    affectionChange,
+    showAffectionPopup,
+    showLevelUpModal,
+    newLevel,
+    levelUpUnlocks,
+    levelUpRewards,
+    showRelationshipModal,
+    previousStage,
+    newStage,
+    hideLevelUp,
+    hideRelationshipUpgrade,
+    proactiveNotification,
+    hideProactiveNotification,
+  } = useNotificationStore();
+
+  // Scene store
+  const { activeSceneId, getActiveScene, fetchScenes } = useSceneStore();
 
   const [inputMessage, setInputMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -49,6 +73,7 @@ export default function ChatPage() {
   
   // Gift modal state
   const [showGiftModal, setShowGiftModal] = useState(false);
+  const [showSceneSelector, setShowSceneSelector] = useState(false);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isLoadingInventory, setIsLoadingInventory] = useState(false);
   const [selectedGift, setSelectedGift] = useState<InventoryItem | null>(null);
@@ -71,6 +96,7 @@ export default function ChatPage() {
     }
     
     fetchMessages();
+    fetchScenes(); // Load scenes for background selector
 
     if (accessToken) {
       socketService.connect(accessToken);
@@ -173,6 +199,7 @@ export default function ChatPage() {
   }
 
   const affectionLevel = Math.floor((character?.affection || 0) / 100) + 1;
+  const activeScene = getActiveScene();
 
   return (
     <AppLayout>
@@ -218,6 +245,13 @@ export default function ChatPage() {
                 <Video className="w-5 h-5 text-[#ba9cab]" />
               </button>
               <button 
+                onClick={() => setShowSceneSelector(true)}
+                className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center hover:bg-purple-500 hover:text-white text-purple-400 transition-all" 
+                title="Đổi background"
+              >
+                <ImageIcon className="w-5 h-5" />
+              </button>
+              <button 
                 onClick={openGiftModal}
                 className="w-12 h-12 rounded-full bg-love/20 border border-love/30 flex items-center justify-center hover:bg-love hover:text-white text-love transition-all" 
                 title="Tặng quà"
@@ -231,38 +265,60 @@ export default function ChatPage() {
         {/* Right Side: Chat Interface */}
         <div className="flex-1 flex flex-col rounded-2xl bg-[#271b21] border border-[#392830] overflow-hidden">
           {/* Chat Header - Mobile */}
-          <div className="lg:hidden flex items-center justify-between p-4 border-b border-[#392830]">
+          <div className="lg:hidden flex items-center justify-between p-3 border-b border-[#392830] bg-gradient-to-r from-[#271b21] to-[#2d1f26]">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-lg">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(244,37,140,0.3)]">
                   {character?.gender === 'FEMALE' ? '😊' : '😎'}
                 </div>
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[#271b21] rounded-full" />
+                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#271b21] rounded-full animate-pulse" />
               </div>
               <div>
-                <h3 className="font-bold text-sm">{character?.name || 'Người yêu'}</h3>
-                <p className="text-xs text-green-400">Online</p>
+                <h3 className="font-bold text-base">{character?.name || 'Người yêu'}</h3>
+                <p className="text-xs text-green-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                  Đang online
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#181114] border border-[#392830]">
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-gradient-to-r from-love/20 to-pink-500/20 border border-love/30">
                 <Heart className="w-4 h-4 text-love fill-love" />
-                <span className="text-xs font-bold">Lv.{affectionLevel}</span>
+                <span className="text-sm font-bold text-love">Lv.{affectionLevel}</span>
               </div>
               <button 
-                onClick={openGiftModal}
-                className="w-9 h-9 rounded-full bg-love/20 border border-love/30 flex items-center justify-center text-love"
+                onClick={() => setShowSceneSelector(true)}
+                className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 hover:bg-purple-500 hover:text-white transition-all"
+                title="Đổi background"
               >
-                <Gift className="w-4 h-4" />
+                <ImageIcon className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={openGiftModal}
+                className="w-10 h-10 rounded-full bg-love/20 border border-love/30 flex items-center justify-center text-love hover:bg-love hover:text-white transition-all"
+              >
+                <Gift className="w-5 h-5" />
               </button>
             </div>
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col gap-4 scrollbar-hide">
+          <div 
+            className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col gap-4 scrollbar-hide relative"
+            style={activeScene?.imageUrl ? {
+              backgroundImage: `url(${activeScene.imageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            } : undefined}
+          >
+            {/* Background overlay when scene is active */}
+            {activeScene?.imageUrl && (
+              <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+            )}
+          
           {/* Loading state */}
           {messagesLoading && (
-            <div className="flex flex-col items-center justify-center h-full">
+            <div className="relative z-10 flex flex-col items-center justify-center h-full">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 bg-love rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-3 h-3 bg-love rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -274,7 +330,7 @@ export default function ChatPage() {
 
           {/* Welcome message if no messages */}
           {!messagesLoading && messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="relative z-10 flex flex-col items-center justify-center h-full text-center">
               <div className="w-24 h-24 rounded-full gradient-love flex items-center justify-center mb-6 shadow-love-strong">
                 <Sparkles className="w-12 h-12 text-white" />
               </div>
@@ -311,10 +367,10 @@ export default function ChatPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className={`flex ${isUser ? 'flex-col items-end self-end' : 'gap-4 items-end'}`}
+                    className={`relative z-10 flex ${isUser ? 'flex-col items-end self-end' : 'gap-4 items-end'}`}
                   >
                     {!isUser && (
-                      <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1">
+                      <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1 shadow-lg">
                         {character?.gender === 'FEMALE' ? '👩' : '👨'}
                       </div>
                     )}
@@ -322,13 +378,13 @@ export default function ChatPage() {
                       <div
                         className={`px-5 py-3 text-sm md:text-base leading-relaxed ${
                           isUser
-                            ? 'bg-love text-white rounded-2xl rounded-br-sm shadow-[0_4px_20px_rgba(244,37,140,0.25)]'
-                            : 'bg-white/10 backdrop-blur-sm text-white/90 rounded-2xl rounded-bl-sm border border-white/5'
+                            ? 'bg-love text-white rounded-2xl rounded-br-sm shadow-[0_4px_20px_rgba(244,37,140,0.4)]'
+                            : 'bg-[#271b21]/90 backdrop-blur-md text-white rounded-2xl rounded-bl-sm border border-white/10 shadow-lg'
                         }`}
                       >
                         {message.content}
                       </div>
-                      <span className={`text-[10px] text-white/40 ${isUser ? 'pr-1' : 'pl-1'}`}>
+                      <span className={`text-[10px] text-white/60 drop-shadow-md ${isUser ? 'pr-1' : 'pl-1'}`}>
                         {new Date(message.createdAt).toLocaleTimeString('vi-VN', { 
                           hour: '2-digit', 
                           minute: '2-digit' 
@@ -346,16 +402,16 @@ export default function ChatPage() {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex gap-4 items-end"
+              className="relative z-10 flex gap-4 items-end"
             >
-              <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1">
+              <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1 shadow-lg">
                 {character?.gender === 'FEMALE' ? '👩' : '👨'}
               </div>
-              <div className="bg-white/10 backdrop-blur-sm px-4 py-3 rounded-2xl rounded-bl-sm border border-white/5">
+              <div className="bg-[#271b21]/90 backdrop-blur-md px-4 py-3 rounded-2xl rounded-bl-sm border border-white/10 shadow-lg">
                 <div className="flex gap-1.5 items-center h-4">
-                  <span className="w-2 h-2 bg-love/60 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                  <span className="w-2 h-2 bg-love/60 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
-                  <span className="w-2 h-2 bg-love/60 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+                  <span className="w-2 h-2 bg-love rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                  <span className="w-2 h-2 bg-love rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+                  <span className="w-2 h-2 bg-love rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
                 </div>
               </div>
             </motion.div>
@@ -365,7 +421,20 @@ export default function ChatPage() {
         </div>
 
         {/* Input Area */}
-        <div className="p-4 md:p-6 bg-gradient-to-t from-[#181114]/90 to-transparent pt-10">
+        <div className="p-4 md:p-6 bg-gradient-to-t from-[#181114] via-[#181114]/95 to-transparent">
+          {/* Quick replies - Now above input */}
+          <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide">
+            {['Xin chào! 👋', 'Anh/Em nhớ em/anh 💕', 'Hôm nay thế nào?', 'Kể chuyện đi', 'Em đang làm gì?', 'Chúc em ngủ ngon 🌙'].map((text) => (
+              <button
+                key={text}
+                onClick={() => setInputMessage(text)}
+                className="bg-[#392830]/60 hover:bg-love/20 border border-[#4a3640] hover:border-love/50 px-4 py-2 rounded-full text-xs font-medium text-white/80 hover:text-white whitespace-nowrap transition-all shadow-sm"
+              >
+                {text}
+              </button>
+            ))}
+          </div>
+          
           <div className="relative group">
             <input 
               ref={inputRef}
@@ -373,7 +442,7 @@ export default function ChatPage() {
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               disabled={isSending}
-              className="w-full bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 focus:border-love/50 text-white placeholder-white/30 rounded-full py-4 pl-6 pr-32 outline-none transition-all shadow-lg backdrop-blur-md" 
+              className="w-full bg-[#392830]/40 hover:bg-[#392830]/60 focus:bg-[#392830]/60 border border-[#4a3640] focus:border-love/50 text-white placeholder-white/40 rounded-full py-4 pl-6 pr-32 outline-none transition-all shadow-lg backdrop-blur-md" 
               placeholder={`Nhắn tin cho ${character?.name || 'người yêu'}...`}
               type="text"
             />
@@ -393,19 +462,6 @@ export default function ChatPage() {
                 <Send className="w-5 h-5" />
               </button>
             </div>
-          </div>
-          
-          {/* Quick replies */}
-          <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide">
-            {['Xin chào! 👋', 'Anh/Em nhớ em/anh 💕', 'Hôm nay thế nào?', 'Kể chuyện đi'].map((text) => (
-              <button
-                key={text}
-                onClick={() => setInputMessage(text)}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-full text-xs font-medium text-white/70 hover:text-white whitespace-nowrap transition-colors"
-              >
-                {text}
-              </button>
-            ))}
           </div>
 
           <div className="text-center mt-3">
@@ -534,6 +590,47 @@ export default function ChatPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Affection Change Popup */}
+      <AffectionPopup 
+        change={affectionChange} 
+        isVisible={showAffectionPopup} 
+      />
+
+      {/* Level Up Modal */}
+      <LevelUpModal
+        isOpen={showLevelUpModal}
+        onClose={hideLevelUp}
+        newLevel={newLevel}
+        characterName={character?.name || 'Người yêu'}
+        unlocks={levelUpUnlocks}
+        rewards={levelUpRewards}
+      />
+
+      {/* Relationship Upgrade Modal */}
+      <RelationshipUpgradeModal
+        isOpen={showRelationshipModal}
+        onClose={hideRelationshipUpgrade}
+        previousStage={previousStage}
+        newStage={newStage}
+        characterName={character?.name || 'Người yêu'}
+      />
+
+      {/* Proactive AI Notification */}
+      <ProactiveNotification
+        notification={proactiveNotification}
+        onDismiss={hideProactiveNotification}
+        onReply={() => {
+          hideProactiveNotification();
+          inputRef.current?.focus();
+        }}
+      />
+
+      {/* Scene Selector */}
+      <SceneSelector
+        isOpen={showSceneSelector}
+        onClose={() => setShowSceneSelector(false)}
+      />
       </div>
     </AppLayout>
   );
