@@ -8,6 +8,7 @@ interface User {
   username?: string;
   displayName?: string;
   avatar?: string;
+  bio?: string;
   isPremium: boolean;
   coins: number;
   gems: number;

@@ -19,7 +19,7 @@ export default function CharacterSettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
+    bio: '',
     personality: '',
   });
 
@@ -32,7 +32,7 @@ export default function CharacterSettingsPage() {
     if (character) {
       setFormData({
         name: character.name || '',
-        description: character.description || '',
+        bio: character.bio || '',
         personality: character.personality || '',
       });
     }
@@ -50,7 +50,7 @@ export default function CharacterSettingsPage() {
 
     try {
       setIsLoading(true);
-      const response = await api.patch(`/characters/${character?.id}`, formData);
+      const response = await api.patch('/character', formData);
       if (response.success) {
         toast({
           title: 'Thành công',
@@ -136,8 +136,8 @@ export default function CharacterSettingsPage() {
               Mô tả
             </label>
             <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              value={formData.bio}
+              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
               placeholder="Viết mô tả về nhân vật..."
               className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#ba9cab] px-4 py-3 focus:outline-none focus:border-love transition-colors resize-none h-24"
             />

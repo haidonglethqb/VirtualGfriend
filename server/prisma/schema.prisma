@@ -21,6 +21,7 @@ model User {
   username          String?   @unique
   displayName       String?
   avatar            String?
+  bio               String?   @db.Text
   isEmailVerified   Boolean   @default(false)
   isPremium         Boolean   @default(false)
   premiumExpiresAt  DateTime?
@@ -72,6 +73,12 @@ model UserSettings {
   autoPlayVoice         Boolean  @default(false)
   chatBubbleStyle       String   @default("modern")
   fontSize              String   @default("medium")
+  
+  // Privacy settings
+  profilePublic         Boolean  @default(false)
+  showActivity          Boolean  @default(false)
+  allowMessages         Boolean  @default(true)
+  
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

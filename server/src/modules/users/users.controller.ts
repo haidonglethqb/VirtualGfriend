@@ -7,6 +7,7 @@ const updateProfileSchema = z.object({
   username: z.string().min(3).optional(),
   displayName: z.string().optional(),
   avatar: z.string().url().optional(),
+  bio: z.string().max(500).optional(),
 });
 
 const updateSettingsSchema = z.object({
@@ -18,6 +19,13 @@ const updateSettingsSchema = z.object({
   autoPlayVoice: z.boolean().optional(),
   chatBubbleStyle: z.string().optional(),
   fontSize: z.enum(['small', 'medium', 'large']).optional(),
+  notifications: z.boolean().optional(),
+});
+
+const updatePrivacySchema = z.object({
+  profilePublic: z.boolean().optional(),
+  showActivity: z.boolean().optional(),
+  allowMessages: z.boolean().optional(),
 });
 
 export const userController = {
@@ -57,6 +65,28 @@ export const userController = {
       const data = updateSettingsSchema.parse(req.body);
       const settings = await userService.updateSettings(req.user!.id, data);
       res.json({ success: true, data: settings });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));
+      }
+      next(error);
+    }
+  },
+
+  async getPrivacySettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const privacy = await userService.getPrivacySettings(req.user!.id);
+      res.json({ success: true, data: privacy });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async updatePrivacySettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = updatePrivacySchema.parse(req.body);
+      const privacy = await userService.updatePrivacySettings(req.user!.id, data);
+      res.json({ success: true, data: privacy });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));
