@@ -10,6 +10,8 @@ const createCharacterSchema = z.object({
   personality: z.enum(['caring', 'playful', 'shy', 'passionate', 'intellectual']).optional(),
   birthday: z.string().optional(),
   bio: z.string().max(500).optional(),
+  age: z.number().min(18).max(30).optional(),
+  occupation: z.enum(['student', 'office_worker', 'teacher', 'nurse', 'artist', 'developer', 'sales', 'freelancer']).optional(),
 });
 
 const updateCharacterSchema = z.object({
@@ -50,8 +52,11 @@ export const characterController = {
 
   async createCharacter(req: Request, res: Response, next: NextFunction) {
     try {
+      console.log('[CharacterController] Received request body:', req.body);
       const data = createCharacterSchema.parse(req.body);
+      console.log('[CharacterController] Validated data:', data);
       const character = await characterService.createCharacter(req.user!.id, data);
+      console.log('[CharacterController] Character created:', character.id);
       res.status(201).json({ success: true, data: character });
     } catch (error) {
       if (error instanceof z.ZodError) {

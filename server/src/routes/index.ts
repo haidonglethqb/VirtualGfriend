@@ -8,6 +8,7 @@ import { giftRouter } from '../modules/gift/gift.routes';
 import { sceneRouter } from '../modules/scene/scene.routes';
 import { memoryRouter } from '../modules/memory/memory.routes';
 import { gameRouter } from '../modules/game/game.routes';
+import analyticsRouter from '../modules/analytics/analytics.routes';
 
 export const router = Router();
 
@@ -22,6 +23,7 @@ router.use('/shop', giftRouter); // Alias for gift shop
 router.use('/scenes', sceneRouter);
 router.use('/memories', memoryRouter);
 router.use('/game', gameRouter);
+router.use('/analytics', analyticsRouter);
 
 // API info
 router.get('/', (_: Request, res: Response) => {
@@ -39,6 +41,7 @@ router.get('/', (_: Request, res: Response) => {
       '/api/scenes',
       '/api/memories',
       '/api/game',
+      '/api/analytics',
     ],
   });
 });

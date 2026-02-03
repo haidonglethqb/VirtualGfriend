@@ -2,6 +2,8 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { chatService } from '../modules/chat/chat.service';
+import { proactiveNotificationService } from '../modules/ai/proactive-notification.service';
+import { moodService } from '../modules/character/mood.service';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -49,6 +51,43 @@ export function setupSocketHandlers(io: Server) {
     // Join user's room
     socket.join(`user:${userId}`);
 
+    // Check for proactive notifications on connection
+    (async () => {
+      try {
+        const characters = await prisma.character.findMany({
+          where: { userId },
+          select: { id: true, name: true },
+        });
+
+        for (const character of characters) {
+          const result = await proactiveNotificationService.checkAndSendNotification(character.id);
+          if (result.shouldSend && result.notification) {
+            socket.emit('notification:proactive', {
+              characterId: character.id,
+              characterName: character.name,
+              type: result.notification.type,
+              message: result.notification.message,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[Socket] Proactive notification error:', err);
+      }
+    })();
+
+    // Handle mood check request
+    socket.on('character:mood_check', async (data: { characterId: string }) => {
+      try {
+        const mood = await moodService.getCurrentMood(data.characterId);
+        socket.emit('character:mood_update', {
+          characterId: data.characterId,
+          ...mood,
+        });
+      } catch (err) {
+        console.error('[Socket] Mood check error:', err);
+      }
+    });
+
     // Handle sending messages
     socket.on('message:send', async (data: {
       characterId: string;
@@ -89,16 +128,39 @@ export function setupSocketHandlers(io: Server) {
             });
           }
 
-          // Emit affection update
-          if (result.affectionChange) {
+          // Emit enhanced affection update with level up and relationship info
+          if (result.affectionChange !== undefined) {
             socket.emit('character:affection_change', {
               characterId: data.characterId,
               change: result.affectionChange,
+              newAffection: result.newAffection,
+              newLevel: result.newLevel,
+              levelUp: result.levelUp,
+              relationshipUpgrade: result.relationshipUpgrade,
+              previousStage: result.previousStage,
+              newStage: result.newStage,
+              unlocks: result.unlocks,
+              rewards: result.rewards,
+            });
+          }
+
+          // Emit quest completion notifications
+          if (result.questsCompleted && result.questsCompleted.length > 0) {
+            result.questsCompleted.forEach(quest => {
+              socket.emit('quest:completed', quest);
+            });
+          }
+
+          // Emit milestone unlocks
+          if (result.milestonesUnlocked && result.milestonesUnlocked.length > 0) {
+            result.milestonesUnlocked.forEach(milestone => {
+              socket.emit('milestone:unlocked', { milestone });
             });
           }
         }, 1000 + Math.random() * 2000); // 1-3 seconds delay
 
       } catch (error) {
+        console.error('[Socket] Error sending message:', error);
         socket.emit('error', { message: 'Failed to send message' });
       }
     });

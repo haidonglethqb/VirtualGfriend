@@ -105,6 +105,8 @@ model Character {
   relationshipStage RelationshipStage @default(STRANGER)
   birthday          DateTime?
   bio               String?
+  age               Int             @default(22) // 18-30
+  occupation        String          @default("student") // student, office_worker, teacher, nurse, artist, developer, sales, freelancer
   voiceType         String          @default("soft")
   
   // Avatar customization
@@ -244,6 +246,7 @@ model Quest {
 
   userQuests      UserQuest[]
 
+  @@unique([title, type]) // Prevent duplicate quests
   @@map("quests")
 }
 

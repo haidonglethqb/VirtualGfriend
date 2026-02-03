@@ -14,6 +14,8 @@ interface Character {
   experience: number;
   affection: number;
   relationshipStage: string;
+  age: number;
+  occupation: string;
   avatarStyle: string;
   hairStyle: string;
   hairColor: string;
@@ -22,18 +24,34 @@ interface Character {
   outfit: string;
 }
 
+interface MoodInfo {
+  mood: string;
+  moodScore: number;
+  moodEmoji: string;
+  description: string;
+  factors: string[];
+}
+
 interface CharacterState {
   character: Character | null;
   isLoading: boolean;
   needsCreation: boolean;
-  
+  moodInfo: MoodInfo | null;
+
   // Actions
   setCharacter: (character: Character) => void;
   fetchCharacter: () => Promise<void>;
-  createCharacter: (data: { name: string; gender?: 'MALE' | 'FEMALE'; personality?: string }) => Promise<void>;
+  createCharacter: (data: {
+    name: string;
+    gender?: 'MALE' | 'FEMALE';
+    personality?: string;
+    age?: number;
+    occupation?: string;
+  }) => Promise<void>;
   updateMood: (mood: string) => void;
   updateAffection: (change: number) => void;
   addExperience: (xp: number) => void;
+  setMoodInfo: (info: MoodInfo) => void;
   clear: () => void;
 }
 
@@ -41,6 +59,7 @@ export const useCharacterStore = create<CharacterState>((set) => ({
   character: null,
   isLoading: true,
   needsCreation: false,
+  moodInfo: null,
 
   setCharacter: (character: Character) => {
     set({ character, isLoading: false, needsCreation: false });
@@ -110,7 +129,11 @@ export const useCharacterStore = create<CharacterState>((set) => ({
     });
   },
 
+  setMoodInfo: (info: MoodInfo) => {
+    set({ moodInfo: info });
+  },
+
   clear: () => {
-    set({ character: null, isLoading: true, needsCreation: false });
+    set({ character: null, isLoading: true, needsCreation: false, moodInfo: null });
   },
 }));

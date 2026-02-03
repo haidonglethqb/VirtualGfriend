@@ -9,9 +9,9 @@ import { questService } from '../quest/quest.service';
 import { characterService } from '../character/character.service';
 
 // Action types that can trigger quest progress
-export type GameAction = 
+export type GameAction =
   | 'SEND_MESSAGE'
-  | 'RECEIVE_MESSAGE' 
+  | 'RECEIVE_MESSAGE'
   | 'SEND_GIFT'
   | 'DAILY_LOGIN'
   | 'FIRST_MESSAGE_TODAY'
@@ -66,7 +66,7 @@ export const gameEventService = {
     newMemories: string[];
   }> {
     const { userId, characterId, action, metadata } = data;
-    
+
     const result = {
       questsUpdated: 0,
       questsCompleted: [] as QuestCompletionResult[],
@@ -158,12 +158,13 @@ export const gameEventService = {
     let updated = 0;
 
     // Map actions to quest requirement actions
+    // Enhanced to support time-based and special quest types
     const actionMapping: Record<GameAction, string[]> = {
       'SEND_MESSAGE': ['send_message', 'chat'],
       'RECEIVE_MESSAGE': ['receive_message'],
-      'SEND_GIFT': ['send_gift', 'gift'],
+      'SEND_GIFT': ['send_gift', 'gift', 'first_gift'],
       'DAILY_LOGIN': ['daily_login', 'login'],
-      'FIRST_MESSAGE_TODAY': ['first_message', 'morning_greeting'],
+      'FIRST_MESSAGE_TODAY': ['first_message', 'morning_greeting', 'goodnight_message'],
       'REACH_AFFECTION_LEVEL': ['reach_affection'],
       'COMPLETE_QUEST': ['complete_quest'],
       'UNLOCK_SCENE': ['unlock_scene'],
@@ -171,6 +172,23 @@ export const gameEventService = {
     };
 
     const matchingActions = actionMapping[action] || [action.toLowerCase()];
+
+    // NEW: Check for time-based quest matching
+    const currentHour = new Date().getHours();
+    const isMorning = currentHour >= 6 && currentHour < 10;
+    const isEvening = currentHour >= 21 && currentHour <= 24;
+
+    // Add time-specific actions
+    if (action === 'SEND_MESSAGE' || action === 'FIRST_MESSAGE_TODAY') {
+      if (isMorning) matchingActions.push('morning_greeting');
+      if (isEvening) matchingActions.push('goodnight_message');
+    }
+
+    // Check for romantic message content
+    const messageContent = (metadata?.content as string)?.toLowerCase() || '';
+    if (messageContent.includes('yêu') || messageContent.includes('thương') || messageContent.includes('nhớ')) {
+      matchingActions.push('romantic_message');
+    }
 
     // Find all in-progress quests
     const userQuests = await prisma.userQuest.findMany({
@@ -183,7 +201,7 @@ export const gameEventService = {
 
     for (const uq of userQuests) {
       const requirements = uq.quest.requirements as { action?: string; count?: number };
-      
+
       if (requirements.action && matchingActions.includes(requirements.action)) {
         const increment = (metadata?.count as number) || 1;
         const newProgress = Math.min(uq.progress + increment, uq.maxProgress);
@@ -466,20 +484,20 @@ export const gameEventService = {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const lastActive = user.lastActiveAt ? new Date(user.lastActiveAt) : null;
-    const lastActiveDay = lastActive 
+    const lastActiveDay = lastActive
       ? new Date(lastActive.getFullYear(), lastActive.getMonth(), lastActive.getDate())
       : null;
 
     // Check if this is first activity today
     const isNewDay = !lastActiveDay || today.getTime() > lastActiveDay.getTime();
-    
+
     if (isNewDay) {
       // Check if streak continues or resets
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      
+
       const streakContinues = lastActiveDay && lastActiveDay.getTime() === yesterday.getTime();
-      
+
       await prisma.user.update({
         where: { id: userId },
         data: {

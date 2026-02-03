@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { 
+import {
   Heart, MessageCircle, Gift, Star, Target,
   Calendar, Sparkles, ImageIcon
 } from 'lucide-react';
@@ -13,6 +13,22 @@ import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
 import { formatNumber, getRelationshipLabel, getMoodEmoji } from '@/lib/utils';
 import api from '@/services/api';
+
+// Helper function to format occupation label
+function getOccupationLabel(occupation: string): string {
+  const labels: Record<string, string> = {
+    student: 'Sinh viên',
+    office_worker: 'Nhân viên văn phòng',
+    teacher: 'Giáo viên',
+    nurse: 'Y tá',
+    artist: 'Nghệ sĩ',
+    developer: 'Lập trình viên',
+    sales: 'Nhân viên bán hàng',
+    freelancer: 'Freelancer',
+  };
+  return labels[occupation] || occupation;
+}
+
 
 interface DailyQuest {
   id: string;
@@ -129,32 +145,19 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, router, fetchCharacter, fetchDashboardData, user]);
 
-  // Auto-create default character if needed
+  // Redirect to onboarding if no character
   useEffect(() => {
-    const autoCreateCharacter = async () => {
-      if (needsCreation && !isCreating && user) {
-        setIsCreating(true);
-        try {
-          await createCharacter({
-            name: 'Mai',
-            gender: 'FEMALE',
-            personality: 'caring'
-          });
-        } catch (error) {
-          console.error('Failed to create character:', error);
-        }
-        setIsCreating(false);
-      }
-    };
-    autoCreateCharacter();
-  }, [needsCreation, isCreating, user, createCharacter]);
+    if (needsCreation && !characterLoading && user) {
+      router.push('/onboarding');
+    }
+  }, [needsCreation, characterLoading, user, router]);
 
   if (!isAuthenticated || !user) {
     return null;
   }
 
-  // Show loading while creating character
-  if (characterLoading || isCreating) {
+  // Show loading while fetching character
+  if (characterLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#181114]">
         <div className="text-center">
@@ -162,7 +165,7 @@ export default function DashboardPage() {
             <div className="w-20 h-20 rounded-full bg-love shadow-[0_0_30px_rgba(244,37,140,0.5)] mx-auto" />
           </div>
           <p className="text-[#ba9cab]">
-            {isCreating ? 'Đang tạo người yêu ảo cho bạn...' : 'Đang tải...'}
+            Đang tải...
           </p>
         </div>
       </div>
@@ -216,6 +219,13 @@ export default function DashboardPage() {
                 <div className="text-center mb-6">
                   <h2 className="text-2xl font-bold text-white">{character?.name || 'Người yêu của bạn'}</h2>
                   <p className="text-love">{getRelationshipLabel(character?.relationshipStage || 'STRANGER')}</p>
+
+                  {/* Character Info */}
+                  <div className="mt-3 flex items-center justify-center gap-4 text-sm text-[#ba9cab]">
+                    <span>{character?.age || 22} tuổi</span>
+                    <span>•</span>
+                    <span className="capitalize">{getOccupationLabel(character?.occupation || 'student')}</span>
+                  </div>
                 </div>
 
                 {/* Affection progress */}
@@ -228,8 +238,8 @@ export default function DashboardPage() {
                     </span>
                   </div>
                   <div className="w-full bg-[#392830] rounded-full h-2.5 overflow-hidden">
-                    <div 
-                      className="bg-gradient-to-r from-love to-pink-400 h-full rounded-full transition-all duration-500" 
+                    <div
+                      className="bg-gradient-to-r from-love to-pink-400 h-full rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(affectionPercentage, 100)}%` }}
                     />
                   </div>
@@ -261,26 +271,35 @@ export default function DashboardPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="grid sm:grid-cols-3 gap-4"
             >
-              <StatCard
-                icon={<MessageCircle className="w-5 h-5" />}
-                label="Tin nhắn hôm nay"
-                value={stats.messagesToday}
-                trend={`~ ${stats.messagesToday}`}
-              />
-              <StatCard
-                icon={<Calendar className="w-5 h-5" />}
-                label="Ngày liên tiếp"
-                value={stats.streak}
-                trend={`~ Ngày ${stats.streak}`}
-              />
-              <StatCard
-                icon={<Gift className="w-5 h-5" />}
-                label="Quà đã tặng"
-                value={stats.giftsGiven}
-                trend={`~ ${stats.giftsGiven} quà`}
-              />
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-white/60">Thống kê</h3>
+                <Link href="/analytics">
+                  <span className="text-sm text-[#ba9cab] hover:text-love transition-colors">
+                    Xem chi tiết →
+                  </span>
+                </Link>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-4">
+                <StatCard
+                  icon={<MessageCircle className="w-5 h-5" />}
+                  label="Tin nhắn hôm nay"
+                  value={stats.messagesToday}
+                  trend={`~ ${stats.messagesToday}`}
+                />
+                <StatCard
+                  icon={<Calendar className="w-5 h-5" />}
+                  label="Ngày liên tiếp"
+                  value={stats.streak}
+                  trend={`~ Ngày ${stats.streak}`}
+                />
+                <StatCard
+                  icon={<Gift className="w-5 h-5" />}
+                  label="Quà đã tặng"
+                  value={stats.giftsGiven}
+                  trend={`~ ${stats.giftsGiven} quà`}
+                />
+              </div>
             </motion.div>
 
             {/* Daily Quests */}
@@ -390,15 +409,15 @@ export default function DashboardPage() {
   );
 }
 
-function StatCard({ 
-  icon, 
-  label, 
-  value, 
-  trend 
-}: { 
-  icon: React.ReactNode; 
-  label: string; 
-  value: string | number; 
+function StatCard({
+  icon,
+  label,
+  value,
+  trend
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
   trend: string;
 }) {
   return (
@@ -419,17 +438,17 @@ function StatCard({
   );
 }
 
-function QuestItem({ 
-  title, 
-  description, 
-  progress, 
-  reward, 
-  completed 
-}: { 
-  title: string; 
-  description: string; 
-  progress: number; 
-  reward: number; 
+function QuestItem({
+  title,
+  description,
+  progress,
+  reward,
+  completed
+}: {
+  title: string;
+  description: string;
+  progress: number;
+  reward: number;
   completed?: boolean;
 }) {
   return (
@@ -449,7 +468,7 @@ function QuestItem({
       {!completed && (
         <div className="flex items-center gap-3 mt-3">
           <div className="flex-1 bg-[#392830] rounded-full h-1.5 overflow-hidden">
-            <div 
+            <div
               className="bg-gradient-to-r from-love to-pink-400 h-full rounded-full transition-all"
               style={{ width: `${progress}%` }}
             />

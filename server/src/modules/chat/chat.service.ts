@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middlewares/error.middleware';
 import { aiService } from '../ai/ai.service';
+import { factsLearningService } from '../ai/facts-learning.service';
 import { characterService } from '../character/character.service';
 import { gameEventService } from '../game/game-event.service';
 import { MessageType } from '@prisma/client';
@@ -101,6 +102,11 @@ export const chatService = {
       select: { displayName: true, username: true },
     });
 
+    console.log('[Chat] === SEND MESSAGE START ===');
+    console.log('[Chat] User:', userId);
+    console.log('[Chat] Character:', data.characterId);
+    console.log('[Chat] Content:', data.content);
+
     // Save user message
     const userMessage = await prisma.message.create({
       data: {
@@ -112,6 +118,7 @@ export const chatService = {
         metadata: data.metadata as object | undefined,
       },
     });
+    console.log('[Chat] User message saved:', userMessage.id);
 
     // Get recent messages for context
     const recentMessages = await prisma.message.findMany({
@@ -127,12 +134,16 @@ export const chatService = {
       mood: character.mood as 'happy' | 'sad' | 'excited' | 'sleepy' | 'romantic' | 'neutral',
       relationshipStage: character.relationshipStage,
       affection: character.affection,
+      level: character.level,
+      age: character.age,
+      occupation: character.occupation,
       recentMessages: recentMessages.reverse(),
       facts: character.characterFacts,
       userName: user?.displayName || user?.username || 'bạn',
       characterName: character.name,
       userMessage: data.content,
     });
+    console.log('[Chat] AI response generated:', aiResponse.content.substring(0, 50));
 
     // Save AI message
     const aiMessage = await prisma.message.create({
@@ -145,6 +156,7 @@ export const chatService = {
         emotion: aiResponse.emotion,
       },
     });
+    console.log('[Chat] AI message saved:', aiMessage.id);
 
     // Update character mood if changed
     if (aiResponse.moodChange) {
@@ -154,20 +166,74 @@ export const chatService = {
       });
     }
 
+    // Track level/relationship changes
+    let levelUp = false;
+    let relationshipUpgrade = false;
+    let previousStage = character.relationshipStage;
+    let newStage = character.relationshipStage;
+    let newLevel = character.level;
+    let newAffection = character.affection;
+    let unlocks: string[] = [];
+    let rewards: { coins?: number; gems?: number; affection?: number } | undefined;
+
     // Update affection
     if (aiResponse.affectionChange) {
-      await characterService.updateAffection(character.id, aiResponse.affectionChange);
+      const affectionResult = await characterService.updateAffection(character.id, aiResponse.affectionChange);
+      newAffection = affectionResult.affection;
+      if (affectionResult.stageChanged) {
+        relationshipUpgrade = true;
+        previousStage = affectionResult.previousStage;
+        newStage = affectionResult.relationshipStage;
+      }
     }
 
     // Add XP for chatting
-    await characterService.addExperience(character.id, 1);
+    const xpResult = await characterService.addExperience(character.id, 1);
+    if (xpResult.leveledUp) {
+      levelUp = true;
+      newLevel = xpResult.newLevel;
+      if (xpResult.milestoneReward) {
+        unlocks = xpResult.milestoneReward.unlocks;
+        rewards = {
+          coins: xpResult.milestoneReward.coins,
+          gems: xpResult.milestoneReward.gems,
+          affection: xpResult.milestoneReward.affection,
+        };
+      }
+    }
 
     // Process game event for quest progress and milestones
     const gameResult = await gameEventService.processAction({
       userId,
       characterId: data.characterId,
       action: 'SEND_MESSAGE',
-      metadata: { messageId: userMessage.id },
+      metadata: { messageId: userMessage.id, content: data.content },
+    });
+
+    // Auto-extract facts from conversation periodically
+    const totalMessages = await prisma.message.count({
+      where: { userId, characterId: data.characterId },
+    });
+    
+    if (factsLearningService.shouldExtractFacts(totalMessages)) {
+      // Run in background, don't block response
+      factsLearningService.extractAndSaveFacts(data.characterId, recentMessages)
+        .then(facts => {
+          if (facts.length > 0) {
+            console.log('[Chat] Auto-extracted', facts.length, 'facts');
+          }
+        })
+        .catch(err => console.error('[Chat] Facts extraction error:', err));
+    }
+
+    console.log('[Chat] === SEND MESSAGE END ===');
+    console.log('[Chat] Returning:', {
+      userMessageId: userMessage.id,
+      aiMessageId: aiMessage.id,
+      affectionChange: aiResponse.affectionChange,
+      levelUp,
+      relationshipUpgrade,
+      questsCompleted: gameResult.questsCompleted.length,
     });
 
     return {
@@ -176,6 +242,14 @@ export const chatService = {
       emotion: aiResponse.emotion,
       moodChange: aiResponse.moodChange,
       affectionChange: aiResponse.affectionChange,
+      newAffection,
+      newLevel,
+      levelUp,
+      relationshipUpgrade,
+      previousStage,
+      newStage,
+      unlocks,
+      rewards,
       questsCompleted: gameResult.questsCompleted,
       milestonesUnlocked: gameResult.milestonesUnlocked,
     };
