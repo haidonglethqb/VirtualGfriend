@@ -36,11 +36,15 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Rate limiting (higher limit for development)
+// Rate limiting (skip for Playwright tests)
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute
   max: parseInt(process.env.RATE_LIMIT_MAX || '1000'), // 1000 requests per minute in dev
   message: { error: 'Too many requests, please try again later.' },
+  skip: (req: Request) => {
+    // Skip rate limiting for Playwright E2E tests
+    return req.headers['x-playwright-test'] === 'true';
+  },
 });
 app.use('/api/', limiter);
 

@@ -523,3 +523,19 @@ model AIPromptTemplate {
 
   @@map("ai_prompt_templates")
 }
+
+// ============================================
+// PASSWORD RESET & OTP
+// ============================================
+
+model PasswordResetOTP {
+  id        String   @id @default(uuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("password_reset_otps")
+}
