@@ -62,12 +62,18 @@ class ApiClient {
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, config);
 
+    const data: ApiResponse<T> = await response.json();
+
+    // Check if response is not ok, throw with backend message
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'An error occurred' }));
-      throw new Error(error.error?.message || error.message || 'Request failed');
+      throw new Error(data.error?.message || data.message || 'Request failed');
     }
 
-    const data: ApiResponse<T> = await response.json();
+    // Also check success field in response body (for 200 responses with success: false)
+    if ('success' in data && !data.success) {
+      throw new Error(data.message || 'Request failed');
+    }
+
     return data;
   }
 

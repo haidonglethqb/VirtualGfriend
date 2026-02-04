@@ -14,6 +14,9 @@ out/
 .env.local
 .env.*.local
 
+# E2E environment (but keep example)
+e2e/.env
+
 # IDE
 .idea/
 .vscode/
@@ -37,6 +40,12 @@ pnpm-debug.log*
 coverage/
 .nyc_output/
 
+# E2E Testing (Playwright)
+e2e/test-results/
+e2e/playwright-report/
+e2e/.env
+e2e/node_modules/
+
 # TypeScript
 *.tsbuildinfo
 
@@ -49,4 +58,14 @@ coverage/
 .docker/
 
 # Prisma
+prisma/dev.db
 prisma/migrations/**/migration_lock.toml
+
+# Docker volumes  
+data/postgres/
+data/redis/
+
+# Runtime files
+*.pid
+*.seed
+*.pid.lock
