@@ -1,24 +1,25 @@
-'use client';
+'use client'
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Heart, Send, Mic, Smile,
   Gift, Phone, Video, Sparkles, X, Check, Loader2, ImageIcon
-} from 'lucide-react';
-import { AppLayout } from '@/components/layout/app-layout';
-import { useAuthStore } from '@/store/auth-store';
-import { useCharacterStore } from '@/store/character-store';
-import { useChatStore } from '@/store/chat-store';
-import { useNotificationStore } from '@/store/notification-store';
-import { socketService } from '@/services/socket';
-import { getMoodEmoji } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
-import api from '@/services/api';
-import { AffectionPopup, LevelUpModal, RelationshipUpgradeModal, ProactiveNotification } from '@/components/ui/notifications';
-import { SceneSelector } from '@/components/ui/scene-selector';
-import { useSceneStore } from '@/store/scene-store';
+} from 'lucide-react'
+import { AppLayout } from '@/components/layout/app-layout'
+import { useAuthStore } from '@/store/auth-store'
+import { useCharacterStore } from '@/store/character-store'
+import { useChatStore } from '@/store/chat-store'
+import { useNotificationStore } from '@/store/notification-store'
+import { socketService } from '@/services/socket'
+import { crossTabSync } from '@/services/cross-tab-sync'
+import { getMoodEmoji } from '@/lib/utils'
+import { useToast } from '@/hooks/use-toast'
+import api from '@/services/api'
+import { AffectionPopup, LevelUpModal, RelationshipUpgradeModal, ProactiveNotification } from '@/components/ui/notifications'
+import { SceneSelector } from '@/components/ui/scene-selector'
+import { useSceneStore } from '@/store/scene-store'
 
 interface InventoryItem {
   id: string;
@@ -77,29 +78,58 @@ export default function ChatPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isLoadingInventory, setIsLoadingInventory] = useState(false);
   const [selectedGift, setSelectedGift] = useState<InventoryItem | null>(null);
-  const [isSendingGift, setIsSendingGift] = useState(false);
-  const [giftSuccess, setGiftSuccess] = useState(false);
+  const [isSendingGift, setIsSendingGift] = useState(false)
+  const [giftSuccess, setGiftSuccess] = useState(false)
+
+  // Memoize fetchMessages for useCallback
+  const handleFetchMessages = useCallback(() => {
+    fetchMessages()
+  }, [fetchMessages])
+
+  // Initialize cross-tab sync
+  useEffect(() => {
+    crossTabSync.initialize()
+    // Don't destroy on unmount - keep sync active across page navigations
+  }, [])
+
+  // Handle tab visibility for sync
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Tab became active, request sync from other tabs
+        crossTabSync.requestStateFromOtherTabs()
+        // Also fetch from server to ensure we have latest
+        handleFetchMessages()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [handleFetchMessages])
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/auth/login');
-      return;
+      router.push('/auth/login')
+      return
     }
 
     if (needsCreation) {
-      router.push('/dashboard');
-      return;
+      router.push('/dashboard')
+      return
     }
 
     if (!character && !characterLoading) {
-      fetchCharacter();
+      fetchCharacter()
     }
     
-    fetchMessages();
-    fetchScenes(); // Load scenes for background selector
+    fetchMessages()
+    fetchScenes() // Load scenes for background selector
 
     if (accessToken) {
-      socketService.connect(accessToken);
+      socketService.connect(accessToken)
     }
 
     // Socket events are handled in socketService.setupEventHandlers()
@@ -107,8 +137,8 @@ export default function ChatPage() {
 
     return () => {
       // Cleanup not needed - socketService handles its own events
-    };
-  }, [isAuthenticated, router, fetchMessages, needsCreation, character, characterLoading, fetchCharacter, accessToken]);
+    }
+  }, [isAuthenticated, router, fetchMessages, needsCreation, character, characterLoading, fetchCharacter, accessToken])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
