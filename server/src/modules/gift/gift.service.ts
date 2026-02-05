@@ -64,25 +64,30 @@ export const giftService = {
       );
     }
 
-    // Deduct balance
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        [data.paymentMethod]: { decrement: totalPrice },
-      },
-    });
+    // Use transaction for atomicity
+    const result = await prisma.$transaction(async (tx) => {
+      // Deduct balance
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          [data.paymentMethod]: { decrement: totalPrice },
+        },
+      });
 
-    // Add to inventory
-    const userGift = await prisma.userGift.upsert({
-      where: { userId_giftId: { userId, giftId: data.giftId } },
-      update: { quantity: { increment: data.quantity } },
-      create: { userId, giftId: data.giftId, quantity: data.quantity },
-      include: { gift: true },
+      // Add to inventory
+      const userGift = await tx.userGift.upsert({
+        where: { userId_giftId: { userId, giftId: data.giftId } },
+        update: { quantity: { increment: data.quantity } },
+        create: { userId, giftId: data.giftId, quantity: data.quantity },
+        include: { gift: true },
+      });
+
+      return userGift;
     });
 
     return {
       purchase: {
-        gift: userGift.gift,
+        gift: result.gift,
         quantity: data.quantity,
         totalPrice,
         paymentMethod: data.paymentMethod,
@@ -113,50 +118,55 @@ export const giftService = {
 
     const gift = userGift.gift;
 
-    // Deduct from inventory
-    await prisma.userGift.update({
-      where: { id: userGift.id },
-      data: { quantity: { decrement: 1 } },
-    });
-
     // Generate AI reaction
-    let reaction = `Wow! ${gift.name}! Cảm ơn em nhiều lắm!`;
-    
-    // Record gift history
-    await prisma.giftHistory.create({
-      data: {
-        userId,
-        characterId: data.characterId,
-        giftId: data.giftId,
-        message: data.message,
-        reaction,
-      },
+    const reaction = `Wow! ${gift.name}! Cảm ơn em nhiều lắm!`;
+
+    // Use transaction for atomicity - all or nothing
+    const result = await prisma.$transaction(async (tx) => {
+      // Deduct from inventory
+      await tx.userGift.update({
+        where: { id: userGift.id },
+        data: { quantity: { decrement: 1 } },
+      });
+
+      // Record gift history
+      await tx.giftHistory.create({
+        data: {
+          userId,
+          characterId: data.characterId,
+          giftId: data.giftId,
+          message: data.message,
+          reaction,
+        },
+      });
+
+      // Save as message
+      await tx.message.create({
+        data: {
+          userId,
+          characterId: data.characterId,
+          role: 'SYSTEM',
+          content: `Bạn đã tặng ${gift.name}`,
+          messageType: 'GIFT',
+          metadata: { giftId: data.giftId, giftName: gift.name },
+        },
+      });
+
+      await tx.message.create({
+        data: {
+          userId,
+          characterId: data.characterId,
+          role: 'AI',
+          content: reaction,
+          messageType: 'TEXT',
+          emotion: 'love',
+        },
+      });
+
+      return { success: true };
     });
 
-    // Save as message
-    await prisma.message.create({
-      data: {
-        userId,
-        characterId: data.characterId,
-        role: 'SYSTEM',
-        content: `Bạn đã tặng ${gift.name}`,
-        messageType: 'GIFT',
-        metadata: { giftId: data.giftId, giftName: gift.name },
-      },
-    });
-
-    await prisma.message.create({
-      data: {
-        userId,
-        characterId: data.characterId,
-        role: 'AI',
-        content: reaction,
-        messageType: 'TEXT',
-        emotion: 'love',
-      },
-    });
-
-    // Update affection
+    // Update affection (outside transaction as it has its own logic)
     const updatedCharacter = await characterService.updateAffection(data.characterId, gift.affectionBonus);
 
     // Process game event for quest progress and milestones

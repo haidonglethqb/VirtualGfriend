@@ -125,6 +125,15 @@ export const questService = {
       throw new AppError('Quest already completed', 400, 'QUEST_ALREADY_COMPLETED');
     }
 
+    // Verify progress meets requirement before allowing completion
+    if (userQuest.progress < userQuest.maxProgress) {
+      throw new AppError(
+        `Quest not completed yet. Progress: ${userQuest.progress}/${userQuest.maxProgress}`,
+        400,
+        'QUEST_PROGRESS_INCOMPLETE'
+      );
+    }
+
     return prisma.userQuest.update({
       where: { id: userQuest.id },
       data: {

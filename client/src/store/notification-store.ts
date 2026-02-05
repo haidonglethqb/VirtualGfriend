@@ -13,6 +13,34 @@ interface ProactiveNotification {
   message: string
 }
 
+interface QuestCompletedNotification {
+  questId: string
+  questName: string
+  rewards: {
+    coins?: number
+    gems?: number
+    xp?: number
+    affection?: number
+  }
+}
+
+interface MilestoneNotification {
+  milestoneId: string
+  milestoneName: string
+  description?: string
+  rewards?: {
+    coins?: number
+    gems?: number
+  }
+}
+
+interface GeneralNotification {
+  type: string
+  title: string
+  message: string
+  data?: Record<string, unknown>
+}
+
 interface NotificationState {
   // Affection popup
   affectionChange: number
@@ -36,6 +64,17 @@ interface NotificationState {
   // Proactive notification (new)
   proactiveNotification: ProactiveNotification | null
 
+  // Quest completed notification
+  questCompleted: QuestCompletedNotification | null
+  showQuestCompletedModal: boolean
+
+  // Milestone unlocked notification
+  milestoneUnlocked: MilestoneNotification | null
+  showMilestoneModal: boolean
+
+  // General notification
+  generalNotification: GeneralNotification | null
+
   // Actions
   showAffectionChange: (change: number) => void
   hideAffectionPopup: () => void
@@ -47,6 +86,12 @@ interface NotificationState {
   hideAINotification: () => void
   showProactiveNotification: (data: ProactiveNotification) => void
   hideProactiveNotification: () => void
+  showQuestCompleted: (data: QuestCompletedNotification) => void
+  hideQuestCompleted: () => void
+  showMilestoneUnlocked: (data: MilestoneNotification) => void
+  hideMilestoneUnlocked: () => void
+  showGeneralNotification: (data: GeneralNotification) => void
+  hideGeneralNotification: () => void
 }
 
 export const useNotificationStore = create<NotificationState>((set) => ({
@@ -63,6 +108,11 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   aiNotification: null,
   showAINotificationToast: false,
   proactiveNotification: null,
+  questCompleted: null,
+  showQuestCompletedModal: false,
+  milestoneUnlocked: null,
+  showMilestoneModal: false,
+  generalNotification: null,
 
   // Actions
   showAffectionChange: (change: number) => {
@@ -116,5 +166,33 @@ export const useNotificationStore = create<NotificationState>((set) => ({
 
   hideProactiveNotification: () => {
     set({ proactiveNotification: null })
+  },
+
+  showQuestCompleted: (data: QuestCompletedNotification) => {
+    set({ questCompleted: data, showQuestCompletedModal: true })
+  },
+
+  hideQuestCompleted: () => {
+    set({ showQuestCompletedModal: false, questCompleted: null })
+  },
+
+  showMilestoneUnlocked: (data: MilestoneNotification) => {
+    set({ milestoneUnlocked: data, showMilestoneModal: true })
+  },
+
+  hideMilestoneUnlocked: () => {
+    set({ showMilestoneModal: false, milestoneUnlocked: null })
+  },
+
+  showGeneralNotification: (data: GeneralNotification) => {
+    set({ generalNotification: data })
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      set({ generalNotification: null })
+    }, 5000)
+  },
+
+  hideGeneralNotification: () => {
+    set({ generalNotification: null })
   },
 }))

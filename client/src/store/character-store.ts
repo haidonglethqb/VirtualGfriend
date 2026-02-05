@@ -50,6 +50,7 @@ interface CharacterState {
   }) => Promise<void>;
   updateMood: (mood: string) => void;
   updateAffection: (change: number) => void;
+  setAffection: (affection: number) => void;
   addExperience: (xp: number) => void;
   setMoodInfo: (info: MoodInfo) => void;
   clear: () => void;
@@ -110,6 +111,15 @@ export const useCharacterStore = create<CharacterState>((set) => ({
       if (!state.character) return state;
       const newAffection = Math.max(0, Math.min(1000, state.character.affection + change));
       return { character: { ...state.character, affection: newAffection } };
+    });
+  },
+
+  // Set absolute affection value (used for cross-tab sync to prevent double updates)
+  setAffection: (affection: number) => {
+    set((state) => {
+      if (!state.character) return state;
+      const clampedAffection = Math.max(0, Math.min(1000, affection));
+      return { character: { ...state.character, affection: clampedAffection } };
     });
   },
 
