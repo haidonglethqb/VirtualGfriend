@@ -98,10 +98,10 @@ npm run dev               # Khởi động frontend tại http://localhost:3000
 ```
 
 **Lưu ý quan trọng:**
-- ✅ Đảm bảo Docker đang chạy trước khi bắt đầu
-- ✅ Đợi database khởi động xong (~10s) trước khi chạy `prisma migrate`
-- ✅ File `.env` server **PHẢI** có `GROQ_API_KEY` thật (không để `your-groq-api-key`)
-- ✅ Nếu gặp lỗi migration, xem phần Troubleshooting bên dưới
+-  Đảm bảo Docker đang chạy trước khi bắt đầu
+-  Đợi database khởi động xong (~10s) trước khi chạy `prisma migrate`
+-  File `.env` server **PHẢI** có `GROQ_API_KEY` thật (không để `your-groq-api-key`)
+-  Nếu gặp lỗi migration, xem phần Troubleshooting bên dưới
 
 ### Yêu cầu
 
@@ -133,7 +133,7 @@ npx prisma db seed
 npm run dev
 ```
 
-> ⚠️ **Quan trọng**: Mở file `server/.env` và thay `GROQ_API_KEY=your-groq-api-key` bằng key thật từ https://console.groq.com (miễn phí)
+>  **Quan trọng**: Mở file `server/.env` và thay `GROQ_API_KEY=your-groq-api-key` bằng key thật từ https://console.groq.com (miễn phí)
 
 4. **Setup Client**
 ```bash
@@ -260,9 +260,9 @@ docker-compose exec server npx prisma migrate deploy
 - `GET /api/gifts` - Danh sách quà
 - `POST /api/gifts/:id/send` - Tặng quà
 
-## 🔧 Troubleshooting
+##  Troubleshooting
 
-### ❗ Database không kết nối được
+###  Database không kết nối được
 ```bash
 # 1. Kiểm tra Docker đang chạy
 docker ps
@@ -278,14 +278,14 @@ docker-compose -f docker-compose.dev.yml logs -f postgres
 npx prisma migrate dev
 ```
 
-### ❗ Lỗi "Prisma schema file not found" hoặc lỗi TypeScript
+###  Lỗi "Prisma schema file not found" hoặc lỗi TypeScript
 ```bash
 cd server
 npx prisma generate  # Tạo lại Prisma client
 npm run dev
 ```
 
-### ❗ Lỗi "Authentication failed" khi chạy Prisma
+###  Lỗi "Authentication failed" khi chạy Prisma
 - Database chưa khởi động xong → Đợi thêm 10-15 giây
 - DATABASE_URL trong `.env` không đúng → Kiểm tra lại
 ```bash
@@ -293,7 +293,7 @@ npm run dev
 docker-compose -f docker-compose.dev.yml logs postgres
 ```
 
-### ❗ Lỗi "EADDRINUSE: address already in use :::3001"
+###  Lỗi "EADDRINUSE: address already in use :::3001"
 ```bash
 # Windows
 netstat -ano | findstr :3001
@@ -305,7 +305,7 @@ lsof -ti:3001 | xargs kill -9
 # Hoặc đổi PORT trong server/.env sang 3002
 ```
 
-### ❗ AI không trả lời (dùng fallback response)
+###  AI không trả lời (dùng fallback response)
 1. Kiểm tra `GROQ_API_KEY` trong `server/.env` có đúng không
 2. Key phải bắt đầu bằng `gsk_...`
 3. Lấy key mới tại https://console.groq.com (miễn phí)
@@ -318,7 +318,7 @@ npm run dev
 # Xem console log khi server start
 ```
 
-### ❗ Tin nhắn bị duplicate hoặc UI lỗi
+###  Tin nhắn bị duplicate hoặc UI lỗi
 ```bash
 # Clear cache và refresh
 # Trong DevTools Console (F12):
@@ -327,7 +327,7 @@ sessionStorage.clear()
 # Sau đó Ctrl+Shift+R (hard refresh)
 ```
 
-### ❗ Migration bị lỗi
+###  Migration bị lỗi
 ```bash
 cd server
 
@@ -342,7 +342,7 @@ npx prisma migrate dev --name force_update
 npx prisma db push
 ```
 
-### ❗ Frontend không kết nối được backend
+###  Frontend không kết nối được backend
 1. Kiểm tra server đang chạy: http://localhost:3001/health
 2. Kiểm tra file `client/.env.local`:
 ```env
@@ -355,7 +355,7 @@ cd client
 npm run dev
 ```
 
-## 🖥️ Chuẩn bị VPS
+##  Chuẩn bị VPS
 
 ```bash
 # 1. Cài Docker
@@ -381,4 +381,4 @@ MIT License - see [LICENSE](LICENSE) file.
 
 ---
 
-Made with 💕 by VGfriend Team
+Made with  by VGfriend Team
