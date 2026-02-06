@@ -1,6 +1,9 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middlewares/error.middleware';
 import { RelationshipStage, Gender } from '@prisma/client';
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('Character');
 
 interface CreateCharacterData {
   name: string;
@@ -147,7 +150,7 @@ export const characterService = {
       data: { isActive: false },
     });
 
-    console.log('[Character] Creating character with data:', {
+    log.debug('Creating character with data:', {
       userId,
       name: data.name,
       age: data.age,
@@ -170,7 +173,7 @@ export const characterService = {
       },
     });
 
-    console.log('[Character] Character created:', {
+    log.debug('Character created:', {
       id: character.id,
       name: character.name,
       age: character.age,

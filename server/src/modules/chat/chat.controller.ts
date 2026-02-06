@@ -3,6 +3,9 @@ import { chatService } from './chat.service';
 import { z } from 'zod';
 import { AppError } from '../../middlewares/error.middleware';
 import { prisma } from '../../lib/prisma';
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('ChatController');
 
 const sendMessageSchema = z.object({
   characterId: z.string().uuid().optional(),
@@ -43,12 +46,12 @@ export const chatController = {
 
   async sendMessage(req: Request, res: Response, next: NextFunction) {
     try {
-      console.log('[ChatController] === SEND MESSAGE REQUEST ===' );
-      console.log('[ChatController] User ID:', req.user!.id);
-      console.log('[ChatController] Request body:', req.body);
+      log.debug('=== SEND MESSAGE REQUEST ===');
+      log.debug('User ID:', req.user!.id);
+      log.debug('Request body:', req.body);
       
       const data = sendMessageSchema.parse(req.body);
-      console.log('[ChatController] Validated data:', data);
+      log.debug('Validated data:', data);
       
       // If no characterId provided, get user's active character
       let characterId = data.characterId;
@@ -57,20 +60,20 @@ export const chatController = {
           where: { userId: req.user!.id, isActive: true },
         });
         if (!character) {
-          console.error('[ChatController] No active character found for user:', req.user!.id);
+          log.error('No active character found for user:', req.user!.id);
           return next(new AppError('No active character found', 400, 'NO_CHARACTER'));
         }
         characterId = character.id;
-        console.log('[ChatController] Using active character:', characterId);
+        log.debug('Using active character:', characterId);
       }
       
-      console.log('[ChatController] Calling chatService.sendMessage...');
+      log.debug('Calling chatService.sendMessage...');
       const result = await chatService.sendMessage(req.user!.id, {
         ...data,
         characterId,
       });
-      console.log('[ChatController] === SEND MESSAGE SUCCESS ===' );
-      console.log('[ChatController] AI Response:', result.aiMessage?.content?.substring(0, 100));
+      log.debug('=== SEND MESSAGE SUCCESS ===');
+      log.debug('AI Response:', result.aiMessage?.content?.substring(0, 100));
       res.json({ success: true, data: result });
     } catch (error) {
       if (error instanceof z.ZodError) {

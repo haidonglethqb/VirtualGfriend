@@ -5,6 +5,9 @@ import { factsLearningService } from '../ai/facts-learning.service';
 import { characterService } from '../character/character.service';
 import { gameEventService } from '../game/game-event.service';
 import { MessageType } from '@prisma/client';
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('Chat');
 
 interface SendMessageData {
   characterId: string;
@@ -102,10 +105,10 @@ export const chatService = {
       select: { displayName: true, username: true },
     });
 
-    console.log('[Chat] === SEND MESSAGE START ===');
-    console.log('[Chat] User:', userId);
-    console.log('[Chat] Character:', data.characterId);
-    console.log('[Chat] Content:', data.content);
+    log.debug('=== SEND MESSAGE START ===');
+    log.debug('User:', userId);
+    log.debug('Character:', data.characterId);
+    log.debug('Content:', data.content);
 
     // Save user message
     const userMessage = await prisma.message.create({
@@ -118,7 +121,7 @@ export const chatService = {
         metadata: data.metadata as object | undefined,
       },
     });
-    console.log('[Chat] User message saved:', userMessage.id);
+    log.debug('User message saved:', userMessage.id);
 
     // Get recent messages for context
     const recentMessages = await prisma.message.findMany({
@@ -143,7 +146,7 @@ export const chatService = {
       characterName: character.name,
       userMessage: data.content,
     });
-    console.log('[Chat] AI response generated:', aiResponse.content.substring(0, 50));
+    log.debug('AI response generated:', aiResponse.content.substring(0, 50));
 
     // Save AI message
     const aiMessage = await prisma.message.create({
@@ -156,7 +159,7 @@ export const chatService = {
         emotion: aiResponse.emotion,
       },
     });
-    console.log('[Chat] AI message saved:', aiMessage.id);
+    log.debug('AI message saved:', aiMessage.id);
 
     // Update character mood if changed
     if (aiResponse.moodChange) {
@@ -220,14 +223,14 @@ export const chatService = {
       factsLearningService.extractAndSaveFacts(data.characterId, recentMessages)
         .then(facts => {
           if (facts.length > 0) {
-            console.log('[Chat] Auto-extracted', facts.length, 'facts');
+            log.info('Auto-extracted ' + facts.length + ' facts');
           }
         })
-        .catch(err => console.error('[Chat] Facts extraction error:', err));
+        .catch(err => log.error('Facts extraction error:', err));
     }
 
-    console.log('[Chat] === SEND MESSAGE END ===');
-    console.log('[Chat] Returning:', {
+    log.debug('=== SEND MESSAGE END ===');
+    log.debug('Returning:', {
       userMessageId: userMessage.id,
       aiMessageId: aiMessage.id,
       affectionChange: aiResponse.affectionChange,

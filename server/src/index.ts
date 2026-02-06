@@ -11,6 +11,9 @@ import { router } from './routes';
 import { errorHandler } from './middlewares/error.middleware';
 import { setupSocketHandlers } from './sockets';
 import { prisma } from './lib/prisma';
+import { createModuleLogger } from './lib/logger';
+
+const log = createModuleLogger('Server');
 
 const app = express();
 const httpServer = createServer(app);
@@ -66,16 +69,16 @@ setupSocketHandlers(io);
 const PORT = process.env.PORT || 3001;
 
 httpServer.listen(PORT, () => {
-  console.log(`[Server] Running on http://localhost:${PORT}`);
-  console.log('[Server] Socket.IO ready');
+  log.info(`Running on http://localhost:${PORT}`);
+  log.info('Socket.IO ready');
 });
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('[Server] SIGTERM received. Shutting down gracefully...');
+  log.info('SIGTERM received. Shutting down gracefully...');
   await prisma.$disconnect();
   httpServer.close(() => {
-    console.log('[Server] Closed');
+    log.info('Closed');
     process.exit(0);
   });
 });

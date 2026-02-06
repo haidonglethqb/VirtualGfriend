@@ -4,6 +4,9 @@ import { prisma } from '../lib/prisma'
 import { chatService } from '../modules/chat/chat.service'
 import { proactiveNotificationService } from '../modules/ai/proactive-notification.service'
 import { moodService } from '../modules/character/mood.service'
+import { createModuleLogger } from '../lib/logger'
+
+const log = createModuleLogger('Socket')
 
 interface AuthenticatedSocket extends Socket {
   userId?: string
@@ -74,7 +77,7 @@ export function setupSocketHandlers(io: Server) {
           }
         }
       } catch (err) {
-        console.error('[Socket] Proactive notification error:', err)
+        log.error('Proactive notification error:', err)
       }
     })()
 
@@ -89,7 +92,7 @@ export function setupSocketHandlers(io: Server) {
           sourceSocketId: socket.id,
         })
       } catch (err) {
-        console.error('[Socket] Mood check error:', err)
+        log.error('Mood check error:', err)
       }
     })
 
@@ -195,7 +198,7 @@ export function setupSocketHandlers(io: Server) {
         }, 1000 + Math.random() * 2000) // 1-3 seconds delay
 
       } catch (error) {
-        console.error('[Socket] Error sending message:', error)
+        log.error('Error sending message:', error)
         socket.emit('error', { message: 'Failed to send message' })
       }
     })

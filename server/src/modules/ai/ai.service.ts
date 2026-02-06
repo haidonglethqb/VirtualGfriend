@@ -1,5 +1,8 @@
 import OpenAI from 'openai';
 import { Message, CharacterFact, RelationshipStage } from '@prisma/client';
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('AI');
 
 // Groq API is compatible with OpenAI SDK
 const openai = new OpenAI({
@@ -563,8 +566,8 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
     };
   } catch (error) {
     // Fallback: If AI doesn't return JSON, use old logic
-    console.warn('[AI] Failed to parse JSON response, using fallback:', error);
-    console.warn('[AI] Raw response was:', rawResponse);
+    log.warn('Failed to parse JSON response, using fallback:', error);
+    log.warn('Raw response was:', rawResponse);
 
     // Use simple heuristics as fallback
     let affectionChange = 1;
@@ -629,9 +632,9 @@ function detectMoodChange(userMessage: string): Mood | undefined {
 export const aiService = {
   async generateResponse(context: AIContext): Promise<AIResponse> {
     try {
-      console.log('[AI] === GENERATE RESPONSE START ===');
-      console.log('[AI] User message:', context.userMessage);
-      console.log('[AI] Affection:', context.affection, 'Level:', context.level);
+      log.debug('=== GENERATE RESPONSE START ===');
+      log.debug('User message:', context.userMessage);
+      log.debug('Affection: ' + context.affection + ' Level: ' + context.level);
 
       const systemPrompt = buildSystemPrompt(context);
       const conversationHistory = buildConversationHistory(context.recentMessages);
@@ -653,17 +656,17 @@ export const aiService = {
       });
 
       const rawContent = completion.choices[0]?.message?.content || '{"message":"Ừm... mình không biết nói gì cả 😅","evaluation":{"quality_score":5,"affection_change":1,"reason":"Default response"}}';
-      console.log('[AI] Raw response:', rawContent.substring(0, 100));
+      log.debug('Raw response:', rawContent.substring(0, 100));
 
       // Parse JSON response from AI
       const parsed = parseAIJsonResponse(rawContent, context);
-      console.log('[AI] Parsed - Message:', parsed.message.substring(0, 50), 'Affection:', parsed.affection_change);
+      log.debug('Parsed - Message:', parsed.message.substring(0, 50) + ' Affection: ' + parsed.affection_change);
 
       // Detect emotion and mood from AI's message
       const emotion = detectEmotion(parsed.message);
       const moodChange = detectMoodChange(context.userMessage);
 
-      console.log('[AI] === GENERATE RESPONSE END ===');
+      log.debug('=== GENERATE RESPONSE END ===');
       return {
         content: parsed.message,
         emotion,
@@ -671,7 +674,7 @@ export const aiService = {
         moodChange,
       };
     } catch (error) {
-      console.error('[AI] Generation error:', error);
+      log.error('Generation error:', error);
 
       // Enhanced fallback responses based on affection level
       const affectionTier = getAffectionBehavior(context.affection);

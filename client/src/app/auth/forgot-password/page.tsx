@@ -40,10 +40,11 @@ export default function ForgotPasswordPage() {
         // Navigate to verify OTP page with email
         router.push(`/auth/verify-otp?email=${encodeURIComponent(email)}`);
       }
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể gửi mã OTP. Vui lòng thử lại.';
       toast({
         title: 'Lỗi',
-        description: error.message || 'Không thể gửi mã OTP. Vui lòng thử lại.',
+        description: message,
         variant: 'destructive',
       });
     } finally {

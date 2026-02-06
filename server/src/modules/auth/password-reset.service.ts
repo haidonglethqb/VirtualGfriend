@@ -2,6 +2,9 @@ import { prisma } from '../../lib/prisma';
 import { emailService } from '../../lib/email';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('PasswordReset');
 
 export const passwordResetService = {
   /**
@@ -69,7 +72,7 @@ export const passwordResetService = {
    * Verify OTP
    */
   async verifyOTP(email: string, otp: string): Promise<{ success: boolean; message: string; token?: string }> {
-    console.log('[Password Reset] Verify OTP attempt:', { email, otp });
+    log.debug('Verify OTP attempt:', { email, otp });
 
     const otpRecord = await prisma.passwordResetOTP.findFirst({
       where: {
@@ -82,7 +85,7 @@ export const passwordResetService = {
       },
     });
 
-    console.log('[Password Reset] OTP record found:', otpRecord ? 'YES' : 'NO');
+    log.debug('OTP record found:', otpRecord ? 'YES' : 'NO');
 
     if (!otpRecord) {
       // Debug: Check if OTP exists but is used or wrong email
@@ -92,7 +95,7 @@ export const passwordResetService = {
       });
       
       if (usedOtp) {
-        console.log('[Password Reset] OTP already used:', usedOtp.email);
+        log.debug('OTP already used:', usedOtp.email);
         return {
           success: false,
           message: 'Mã OTP đã được sử dụng. Vui lòng yêu cầu mã mới.',
@@ -107,7 +110,7 @@ export const passwordResetService = {
 
     // Check if expired
     if (new Date() > otpRecord.expiresAt) {
-      console.log('[Password Reset] OTP expired');
+      log.debug('OTP expired');
       return {
         success: false,
         message: 'Mã OTP đã hết hạn',
