@@ -161,25 +161,27 @@ export const questService = {
 
     const quest = userQuest.quest;
 
-    // Update user quest to claimed
-    await prisma.userQuest.update({
-      where: { id: userQuest.id },
-      data: {
-        status: 'CLAIMED',
-        claimedAt: new Date(),
-      },
-    });
+    // Use transaction to ensure atomicity of claim + reward
+    await prisma.$transaction([
+      // Update user quest to claimed
+      prisma.userQuest.update({
+        where: { id: userQuest.id },
+        data: {
+          status: 'CLAIMED',
+          claimedAt: new Date(),
+        },
+      }),
+      // Give currency rewards
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          coins: { increment: quest.rewardCoins },
+          gems: { increment: quest.rewardGems },
+        },
+      }),
+    ]);
 
-    // Give rewards
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        coins: { increment: quest.rewardCoins },
-        gems: { increment: quest.rewardGems },
-      },
-    });
-
-    // Update character
+    // Update character XP/affection (outside transaction as these are non-critical)
     const character = await prisma.character.findFirst({
       where: { userId, isActive: true },
     });

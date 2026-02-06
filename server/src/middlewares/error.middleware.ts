@@ -1,4 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
+import { createModuleLogger } from '../lib/logger';
+
+const log = createModuleLogger('ErrorHandler');
 
 export class AppError extends Error {
   statusCode: number;
@@ -21,7 +24,7 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  console.error('[Error]', err.message || err);
+  log.error(err.message || String(err));
 
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({

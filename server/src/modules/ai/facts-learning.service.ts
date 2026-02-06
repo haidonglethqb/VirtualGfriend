@@ -6,6 +6,9 @@
 import { prisma } from '../../lib/prisma';
 import { aiService } from '../ai/ai.service';
 import { Message } from '@prisma/client';
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('FactsLearning');
 
 // How often to trigger fact extraction (every N messages)
 const FACT_EXTRACTION_INTERVAL = 10;
@@ -41,17 +44,17 @@ export const factsLearningService = {
         return [];
       }
 
-      console.log('[FactsLearning] Extracting facts from', recentMessages.length, 'messages');
+      log.debug('Extracting facts from ' + recentMessages.length + ' messages');
 
       // Use AI to extract facts
       const extractedFacts = await aiService.extractFacts(recentMessages);
 
       if (!extractedFacts || extractedFacts.length === 0) {
-        console.log('[FactsLearning] No facts extracted');
+        log.debug('No facts extracted');
         return [];
       }
 
-      console.log('[FactsLearning] Extracted', extractedFacts.length, 'facts');
+      log.debug('Extracted ' + extractedFacts.length + ' facts');
 
       // Save facts to database
       const savedFacts: ExtractedFact[] = [];
@@ -97,14 +100,14 @@ export const factsLearningService = {
             importance,
           });
         } catch (error) {
-          console.error('[FactsLearning] Error saving fact:', fact, error);
+          log.error('Error saving fact:', { fact, error });
         }
       }
 
-      console.log('[FactsLearning] Saved', savedFacts.length, 'facts');
+      log.info('Saved ' + savedFacts.length + ' facts');
       return savedFacts;
     } catch (error) {
-      console.error('[FactsLearning] Error extracting facts:', error);
+      log.error('Error extracting facts:', error);
       return [];
     }
   },
@@ -181,7 +184,7 @@ export const factsLearningService = {
       },
     });
 
-    console.log('[FactsLearning] Decayed', result.count, 'old facts');
+    log.info('Decayed ' + result.count + ' old facts');
     return result.count;
   },
 };

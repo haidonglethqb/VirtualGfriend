@@ -1,4 +1,7 @@
 import nodemailer from 'nodemailer';
+import { createModuleLogger } from './logger';
+
+const log = createModuleLogger('Email');
 
 interface SendEmailOptions {
   to: string;
@@ -28,15 +31,15 @@ class EmailService {
     // Only initialize if credentials are provided
     if (emailConfig.auth.user && emailConfig.auth.pass) {
       this.transporter = nodemailer.createTransport(emailConfig);
-      console.log('[Email] Service initialized');
+      log.info('Service initialized');
     } else {
-      console.warn('[Email] Service not configured - email sending disabled');
+      log.warn('Service not configured - email sending disabled');
     }
   }
 
   async sendEmail({ to, subject, html, text }: SendEmailOptions): Promise<boolean> {
     if (!this.transporter) {
-      console.error('[Email] Cannot send email - service not configured');
+      log.error('Cannot send email - service not configured');
       return false;
     }
 
@@ -49,10 +52,10 @@ class EmailService {
         html,
       });
 
-      console.log('[Email] Message sent:', info.messageId);
+      log.info('Message sent:', info.messageId);
       return true;
     } catch (error) {
-      console.error('[Email] Error sending email:', error);
+      log.error('Error sending email:', error);
       return false;
     }
   }

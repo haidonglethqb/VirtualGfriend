@@ -74,10 +74,11 @@ function ResetPasswordContent() {
           router.push('/auth/login');
         }, 2000);
       }
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể đặt lại mật khẩu. Vui lòng thử lại.';
       toast({
         title: 'Lỗi',
-        description: error.message || 'Không thể đặt lại mật khẩu. Vui lòng thử lại.',
+        description: message,
         variant: 'destructive',
       });
     } finally {

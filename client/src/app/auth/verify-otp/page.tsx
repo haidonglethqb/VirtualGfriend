@@ -95,7 +95,7 @@ function VerifyOTPContent() {
       });
 
       // Token can be in response.data.token OR response.token (at root level)
-      const token = (response.data as any)?.token || (response as any).token;
+      const token = response.data?.token || (response as unknown as Record<string, string>).token;
       
       if (token) {
         toast({
@@ -115,11 +115,12 @@ function VerifyOTPContent() {
           variant: 'destructive',
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('OTP Verification Error:', error);
+      const message = error instanceof Error ? error.message : 'Mã OTP không hợp lệ hoặc đã hết hạn';
       toast({
         title: 'Lỗi',
-        description: error.message || 'Mã OTP không hợp lệ hoặc đã hết hạn',
+        description: message,
         variant: 'destructive',
       });
       setOtp(['', '', '', '', '', '']);
@@ -145,10 +146,11 @@ function VerifyOTPContent() {
         setOtp(['', '', '', '', '', '']);
         document.getElementById('otp-0')?.focus();
       }
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể gửi lại mã OTP';
       toast({
         title: 'Lỗi',
-        description: error.message || 'Không thể gửi lại mã OTP',
+        description: message,
         variant: 'destructive',
       });
     } finally {

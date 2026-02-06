@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import { characterService } from './character.service';
 import { z } from 'zod';
 import { AppError } from '../../middlewares/error.middleware';
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('CharacterController');
 
 const createCharacterSchema = z.object({
   name: z.string().min(1).max(50),
@@ -52,11 +55,11 @@ export const characterController = {
 
   async createCharacter(req: Request, res: Response, next: NextFunction) {
     try {
-      console.log('[CharacterController] Received request body:', req.body);
+      log.debug('Received request body:', req.body);
       const data = createCharacterSchema.parse(req.body);
-      console.log('[CharacterController] Validated data:', data);
+      log.debug('Validated data:', data);
       const character = await characterService.createCharacter(req.user!.id, data);
-      console.log('[CharacterController] Character created:', character.id);
+      log.debug('Character created:', character.id);
       res.status(201).json({ success: true, data: character });
     } catch (error) {
       if (error instanceof z.ZodError) {

@@ -52,7 +52,7 @@ export default function OnboardingPage() {
             await createCharacter({
                 name: formData.name || 'Mai',
                 gender: 'FEMALE',
-                personality: formData.personality as any,
+                personality: formData.personality as 'caring' | 'playful' | 'shy' | 'passionate' | 'intellectual',
                 age: formData.age,
                 occupation: formData.occupation,
             });

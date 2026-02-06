@@ -128,6 +128,13 @@ export const sceneService = {
     }
 
     // Could store active scene in character or user settings
-    // For now, just return success
+    // Persist active scene to user settings
+    await prisma.userSettings.upsert({
+      where: { userId },
+      update: { activeSceneId: sceneId },
+      create: { userId, activeSceneId: sceneId },
+    });
+
+    return { scene, active: true };
   },
 };
