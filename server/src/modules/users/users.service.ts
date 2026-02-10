@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 
 interface UpdateProfileData {
@@ -67,7 +68,7 @@ export const userService = {
       }
     }
 
-    return prisma.user.update({
+    const updated = await prisma.user.update({
       where: { id: userId },
       data,
       select: {
@@ -79,28 +80,46 @@ export const userService = {
         bio: true,
       },
     });
+
+    // Invalidate user caches
+    await cache.del(CacheKeys.user(userId), CacheKeys.userAuth(userId));
+
+    return updated;
   },
 
   async getSettings(userId: string) {
-    let settings = await prisma.userSettings.findUnique({
-      where: { userId },
-    });
+    const cacheKey = CacheKeys.userSettings(userId);
 
-    if (!settings) {
-      settings = await prisma.userSettings.create({
-        data: { userId },
-      });
-    }
+    return cache.getOrSet(
+      cacheKey,
+      async () => {
+        let settings = await prisma.userSettings.findUnique({
+          where: { userId },
+        });
 
-    return settings;
+        if (!settings) {
+          settings = await prisma.userSettings.create({
+            data: { userId },
+          });
+        }
+
+        return settings;
+      },
+      CacheTTL.SETTINGS
+    );
   },
 
   async updateSettings(userId: string, data: UpdateSettingsData) {
-    return prisma.userSettings.upsert({
+    const result = await prisma.userSettings.upsert({
       where: { userId },
       update: data,
       create: { userId, ...data },
     });
+
+    // Invalidate cache
+    await cache.del(CacheKeys.userSettings(userId));
+
+    return result;
   },
 
   async getStats(userId: string) {
@@ -115,7 +134,7 @@ export const userService = {
       prisma.userQuest.count({ where: { userId } }),
       prisma.userQuest.count({ where: { userId, status: 'CLAIMED' } }),
       prisma.giftHistory.count({
-        where: { character: { userId } },
+        where: { userId },
       }),
       prisma.character.findFirst({
         where: { userId, isActive: true },
@@ -139,14 +158,15 @@ export const userService = {
   },
 
   async getNotifications(userId: string, page: number, limit: number) {
-    const skip = (page - 1) * limit;
+    const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
+    const skip = (page - 1) * safeLimit;
 
     const [notifications, total] = await Promise.all([
       prisma.notification.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: limit,
+        take: safeLimit,
       }),
       prisma.notification.count({ where: { userId } }),
     ]);
@@ -155,7 +175,7 @@ export const userService = {
       items: notifications,
       total,
       page,
-      pageSize: limit,
+      pageSize: safeLimit,
       hasMore: skip + notifications.length < total,
     };
   },
@@ -199,7 +219,7 @@ export const userService = {
   },
 
   async updatePrivacySettings(userId: string, data: UpdatePrivacyData) {
-    return prisma.userSettings.upsert({
+    const result = await prisma.userSettings.upsert({
       where: { userId },
       update: data,
       create: { userId, ...data },
@@ -209,5 +229,10 @@ export const userService = {
         allowMessages: true,
       },
     });
+
+    // Invalidate settings cache
+    await cache.del(CacheKeys.userSettings(userId));
+
+    return result;
   },
 };

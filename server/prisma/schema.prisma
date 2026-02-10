@@ -59,6 +59,7 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, expiresAt, isRevoked])
   @@map("refresh_tokens")
 }
 
@@ -137,6 +138,7 @@ model Character {
   receivedGifts     GiftHistory[]
   memories          Memory[]
 
+  @@index([userId, isActive])
   @@map("characters")
 }
 
@@ -278,6 +280,7 @@ model UserQuest {
 
   @@unique([userId, questId])
   @@index([userId, status])
+  @@index([userId, questId, startedAt])
   @@map("user_quests")
 }
 
@@ -314,6 +317,7 @@ model Gift {
   userGifts       UserGift[]
   giftHistory     GiftHistory[]
 
+  @@unique([name, rarity])
   @@map("gifts")
 }
 
@@ -337,6 +341,7 @@ model UserGift {
   gift Gift @relation(fields: [giftId], references: [id])
 
   @@unique([userId, giftId])
+  @@index([userId, quantity])
   @@map("user_gifts")
 }
 
@@ -354,6 +359,7 @@ model GiftHistory {
   gift      Gift      @relation(fields: [giftId], references: [id])
 
   @@index([userId, createdAt])
+  @@index([characterId, createdAt])
   @@map("gift_history")
 }
 
@@ -379,6 +385,7 @@ model Scene {
 
   characterScenes CharacterScene[]
 
+  @@unique([name])
   @@map("scenes")
 }
 
@@ -403,6 +410,7 @@ model Memory {
   character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
 
   @@index([userId, characterId, createdAt])
+  @@index([userId, type])
   @@map("memories")
 }
 
@@ -439,6 +447,7 @@ model Achievement {
 
   userAchievements UserAchievement[]
 
+  @@unique([name])
   @@map("achievements")
 }
 
@@ -502,6 +511,7 @@ model DailyReward {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, claimedAt])
   @@map("daily_rewards")
 }
 

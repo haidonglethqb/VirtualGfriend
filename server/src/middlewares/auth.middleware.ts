@@ -1,10 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
+import { cache, CacheKeys, CacheTTL } from '../lib/redis';
 import { AppError } from './error.middleware';
 
 interface JwtPayload {
   userId: string;
+  email: string;
+}
+
+interface CachedUser {
+  id: string;
   email: string;
 }
 
@@ -17,6 +23,29 @@ declare global {
       };
     }
   }
+}
+
+/**
+ * Fetch user from cache or DB (cache-aside pattern)
+ */
+async function getUserFromCacheOrDb(userId: string): Promise<CachedUser | null> {
+  // Try cache first
+  const cacheKey = CacheKeys.userAuth(userId);
+  const cached = await cache.get<CachedUser>(cacheKey);
+  if (cached) return cached;
+
+  // Cache miss — query DB
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true },
+  });
+
+  // Store in cache (TTL = access token lifetime)
+  if (user) {
+    await cache.set(cacheKey, user, CacheTTL.USER_AUTH);
+  }
+
+  return user;
 }
 
 export const authenticate = async (
@@ -38,10 +67,7 @@ export const authenticate = async (
       process.env.JWT_SECRET || 'secret'
     ) as JwtPayload;
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { id: true, email: true },
-    });
+    const user = await getUserFromCacheOrDb(decoded.userId);
 
     if (!user) {
       throw new AppError('User not found', 401, 'USER_NOT_FOUND');
@@ -81,10 +107,7 @@ export const optionalAuth = async (
       process.env.JWT_SECRET || 'secret'
     ) as JwtPayload;
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { id: true, email: true },
-    });
+    const user = await getUserFromCacheOrDb(decoded.userId);
 
     if (user) {
       req.user = user;

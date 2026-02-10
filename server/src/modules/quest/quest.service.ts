@@ -1,26 +1,26 @@
 import { prisma } from '../../lib/prisma';
+import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { characterService } from '../character/character.service';
 
 export const questService = {
   async getAllQuests() {
-    return prisma.quest.findMany({
-      where: { isActive: true },
-      orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
-    });
+    return cache.getOrSet(
+      CacheKeys.quests(),
+      () => prisma.quest.findMany({
+        where: { isActive: true },
+        orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
+      }),
+      CacheTTL.QUESTS
+    );
   },
 
   async getAllQuestsWithProgress(userId: string) {
-    // Get all active quests
-    const quests = await prisma.quest.findMany({
-      where: { isActive: true },
-      orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
-    });
-
-    // Get all user's quest progress
-    const userQuests = await prisma.userQuest.findMany({
-      where: { userId },
-    });
+    // Get quests from cache, user quests from DB (parallel)
+    const [quests, userQuests] = await Promise.all([
+      this.getAllQuests(),
+      prisma.userQuest.findMany({ where: { userId } }),
+    ]);
 
     const userQuestMap = new Map(userQuests.map((uq) => [uq.questId, uq]));
 
@@ -208,7 +208,7 @@ export const questService = {
   },
 
   async updateQuestProgress(userId: string, action: string, increment: number = 1) {
-    // Find all in-progress quests matching this action
+    // Find all in-progress quests matching this action (single query)
     const userQuests = await prisma.userQuest.findMany({
       where: {
         userId,
@@ -217,13 +217,15 @@ export const questService = {
       include: { quest: true },
     });
 
-    for (const uq of userQuests) {
-      const requirements = uq.quest.requirements as { action?: string; count?: number };
-      
-      if (requirements.action === action) {
+    // Collect updates for matching quests
+    const updates = userQuests
+      .filter((uq) => {
+        const requirements = uq.quest.requirements as { action?: string; count?: number };
+        return requirements.action === action;
+      })
+      .map((uq) => {
         const newProgress = Math.min(uq.progress + increment, uq.maxProgress);
-        
-        await prisma.userQuest.update({
+        return prisma.userQuest.update({
           where: { id: uq.id },
           data: {
             progress: newProgress,
@@ -231,7 +233,11 @@ export const questService = {
             completedAt: newProgress >= uq.maxProgress ? new Date() : null,
           },
         });
-      }
+      });
+
+    // Batch execute all updates in a single transaction
+    if (updates.length > 0) {
+      await prisma.$transaction(updates);
     }
   },
 };

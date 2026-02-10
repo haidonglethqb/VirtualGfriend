@@ -1,21 +1,31 @@
 import { prisma } from '../../lib/prisma';
+import { cache } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
+
+// Scenes rarely change, cache for 1 hour
+const SCENE_CACHE_TTL = 3600;
 
 export const sceneService = {
   async getAllScenes(userId: string) {
-    const character = await prisma.character.findFirst({
-      where: { userId, isActive: true },
-      include: {
-        scenes: { select: { sceneId: true } },
-      },
-    });
+    // Parallel: get character + all scenes at the same time
+    const [character, scenes] = await Promise.all([
+      prisma.character.findFirst({
+        where: { userId, isActive: true },
+        include: {
+          scenes: { select: { sceneId: true } },
+        },
+      }),
+      cache.getOrSet(
+        'scenes:all_active',
+        () => prisma.scene.findMany({
+          where: { isActive: true },
+          orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
+        }),
+        SCENE_CACHE_TTL,
+      ),
+    ]);
 
     const unlockedSceneIds = new Set(character?.scenes.map((s) => s.sceneId) || []);
-
-    const scenes = await prisma.scene.findMany({
-      where: { isActive: true },
-      orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
-    });
 
     return scenes.map((scene) => ({
       ...scene,
@@ -26,24 +36,24 @@ export const sceneService = {
   async getUnlockedScenes(userId: string) {
     const character = await prisma.character.findFirst({
       where: { userId, isActive: true },
+      select: { id: true },
     });
 
     if (!character) {
       throw new AppError('No active character found', 404, 'NO_CHARACTER');
     }
 
-    const [defaultScenes, unlockedScenes] = await Promise.all([
-      prisma.scene.findMany({ where: { isDefault: true, isActive: true } }),
-      prisma.characterScene.findMany({
-        where: { characterId: character.id },
-        include: { scene: true },
-      }),
-    ]);
-
-    return [
-      ...defaultScenes,
-      ...unlockedScenes.map((us) => us.scene),
-    ];
+    // Single query with OR: default scenes OR unlocked scenes
+    return prisma.scene.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { isDefault: true },
+          { characterScenes: { some: { characterId: character.id } } },
+        ],
+      },
+      orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
+    });
   },
 
   async unlockScene(userId: string, sceneId: string) {

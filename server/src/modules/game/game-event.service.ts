@@ -5,8 +5,15 @@
  */
 
 import { prisma } from '../../lib/prisma';
+import { cache } from '../../lib/redis';
 import { questService } from '../quest/quest.service';
 import { characterService } from '../character/character.service';
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('GameEvent');
+
+// Recursion guard: max depth for processAction calls
+const MAX_RECURSION_DEPTH = 3;
 
 // Action types that can trigger quest progress
 export type GameAction =
@@ -59,7 +66,7 @@ export const gameEventService = {
   /**
    * Process a game action - updates quests, checks milestones, creates memories
    */
-  async processAction(data: GameEventData): Promise<{
+  async processAction(data: GameEventData, _depth: number = 0): Promise<{
     questsUpdated: number;
     questsCompleted: QuestCompletionResult[];
     milestonesUnlocked: string[];
@@ -74,7 +81,13 @@ export const gameEventService = {
       newMemories: [] as string[],
     };
 
-    // 1. Auto-start daily quests if not started
+    // Recursion guard — prevent unbounded meta-quest cascading
+    if (_depth >= MAX_RECURSION_DEPTH) {
+      log.warn(`Recursion depth ${_depth} reached for action ${action}, skipping`);
+      return result;
+    }
+
+    // 1. Auto-start daily quests (debounced via Redis)
     await this.autoStartDailyQuests(userId);
 
     // 2. Update quest progress based on action
@@ -82,10 +95,10 @@ export const gameEventService = {
     result.questsUpdated = questUpdates.updated;
     result.questsCompleted = questUpdates.completed;
 
-    // 3. Auto-claim completed quests and give rewards
-    for (const completed of result.questsCompleted) {
-      await this.autoClaimQuest(userId, completed.questId);
-    }
+    // 3. Auto-claim completed quests and give rewards (parallel)
+    await Promise.all(
+      result.questsCompleted.map((completed) => this.autoClaimQuest(userId, completed.questId, _depth))
+    );
 
     // 4. Check for milestones
     if (characterId) {
@@ -102,39 +115,58 @@ export const gameEventService = {
 
   /**
    * Auto-start all daily quests for the user at the beginning of each day
+   * Optimized: batch queries instead of per-quest DB calls
    */
   async autoStartDailyQuests(userId: string): Promise<void> {
+    // Debounce: check Redis flag to avoid running on every action
+    const cacheKey = `daily_quests_started:${userId}`;
+    const alreadyStarted = await cache.get<boolean>(cacheKey);
+    if (alreadyStarted) return;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Get all daily quests
+    // Get all daily quests (single query)
     const dailyQuests = await prisma.quest.findMany({
       where: { type: 'DAILY', isActive: true },
     });
 
-    for (const quest of dailyQuests) {
-      // Check if already started today
-      const existing = await prisma.userQuest.findFirst({
+    if (dailyQuests.length === 0) return;
+
+    const dailyQuestIds = dailyQuests.map((q) => q.id);
+
+    // Get all existing user quests for daily quests today (single query)
+    const existingToday = await prisma.userQuest.findMany({
+      where: {
+        userId,
+        questId: { in: dailyQuestIds },
+        startedAt: { gte: today },
+      },
+    });
+
+    const alreadyStartedIds = new Set(existingToday.map((uq) => uq.questId));
+
+    // Find quests that need to be started
+    const questsToStart = dailyQuests.filter((q) => !alreadyStartedIds.has(q.id));
+
+    if (questsToStart.length === 0) return;
+
+    const questIdsToStart = questsToStart.map((q) => q.id);
+
+    // Batch: delete old daily quest progress + create new in a single transaction
+    await prisma.$transaction([
+      // Delete old daily quest progress for quests that need restart
+      prisma.userQuest.deleteMany({
         where: {
           userId,
-          questId: quest.id,
-          startedAt: { gte: today },
+          questId: { in: questIdsToStart },
+          startedAt: { lt: today },
         },
-      });
-
-      if (!existing) {
-        // Delete old daily quest progress
-        await prisma.userQuest.deleteMany({
-          where: {
-            userId,
-            questId: quest.id,
-            startedAt: { lt: today },
-          },
-        });
-
-        // Create new progress for today
+      }),
+      // Create new progress for today (batch create)
+      ...questsToStart.map((quest) => {
         const requirements = quest.requirements as { count?: number };
-        await prisma.userQuest.create({
+        return prisma.userQuest.create({
           data: {
             userId,
             questId: quest.id,
@@ -142,12 +174,19 @@ export const gameEventService = {
             status: 'IN_PROGRESS',
           },
         });
-      }
-    }
+      }),
+    ]);
+
+    // Set Redis flag — TTL = seconds until midnight
+    const midnight = new Date(today);
+    midnight.setDate(midnight.getDate() + 1);
+    const ttlSeconds = Math.max(1, Math.floor((midnight.getTime() - Date.now()) / 1000));
+    await cache.set(cacheKey, true, ttlSeconds);
   },
 
   /**
    * Update quest progress based on action
+   * Optimized: batches DB updates instead of individual queries per quest
    */
   async updateQuestProgress(
     userId: string,
@@ -158,7 +197,6 @@ export const gameEventService = {
     let updated = 0;
 
     // Map actions to quest requirement actions
-    // Enhanced to support time-based and special quest types
     const actionMapping: Record<GameAction, string[]> = {
       'SEND_MESSAGE': ['send_message', 'chat'],
       'RECEIVE_MESSAGE': ['receive_message'],
@@ -173,24 +211,22 @@ export const gameEventService = {
 
     const matchingActions = actionMapping[action] || [action.toLowerCase()];
 
-    // NEW: Check for time-based quest matching
+    // Check for time-based quest matching
     const currentHour = new Date().getHours();
     const isMorning = currentHour >= 6 && currentHour < 10;
     const isEvening = currentHour >= 21 && currentHour <= 24;
 
-    // Add time-specific actions
     if (action === 'SEND_MESSAGE' || action === 'FIRST_MESSAGE_TODAY') {
       if (isMorning) matchingActions.push('morning_greeting');
       if (isEvening) matchingActions.push('goodnight_message');
     }
 
-    // Check for romantic message content
     const messageContent = (metadata?.content as string)?.toLowerCase() || '';
     if (messageContent.includes('yêu') || messageContent.includes('thương') || messageContent.includes('nhớ')) {
       matchingActions.push('romantic_message');
     }
 
-    // Find all in-progress quests
+    // Find all in-progress quests (single query)
     const userQuests = await prisma.userQuest.findMany({
       where: {
         userId,
@@ -198,6 +234,9 @@ export const gameEventService = {
       },
       include: { quest: true },
     });
+
+    // Collect batch updates
+    const batchUpdates: { id: string; progress: number; isCompleted: boolean; quest: typeof userQuests[0]['quest'] }[] = [];
 
     for (const uq of userQuests) {
       const requirements = uq.quest.requirements as { action?: string; count?: number };
@@ -207,15 +246,7 @@ export const gameEventService = {
         const newProgress = Math.min(uq.progress + increment, uq.maxProgress);
         const isCompleted = newProgress >= uq.maxProgress;
 
-        await prisma.userQuest.update({
-          where: { id: uq.id },
-          data: {
-            progress: newProgress,
-            status: isCompleted ? 'COMPLETED' : 'IN_PROGRESS',
-            completedAt: isCompleted ? new Date() : null,
-          },
-        });
-
+        batchUpdates.push({ id: uq.id, progress: newProgress, isCompleted, quest: uq.quest });
         updated++;
 
         if (isCompleted) {
@@ -233,13 +264,29 @@ export const gameEventService = {
       }
     }
 
+    // Execute batch updates in a single transaction
+    if (batchUpdates.length > 0) {
+      await prisma.$transaction(
+        batchUpdates.map((update) =>
+          prisma.userQuest.update({
+            where: { id: update.id },
+            data: {
+              progress: update.progress,
+              status: update.isCompleted ? 'COMPLETED' : 'IN_PROGRESS',
+              completedAt: update.isCompleted ? new Date() : null,
+            },
+          })
+        )
+      );
+    }
+
     return { updated, completed };
   },
 
   /**
    * Auto-claim a completed quest and distribute rewards
    */
-  async autoClaimQuest(userId: string, questId: string): Promise<void> {
+  async autoClaimQuest(userId: string, questId: string, _depth: number = 0): Promise<void> {
     const userQuest = await prisma.userQuest.findUnique({
       where: { userId_questId: { userId, questId } },
       include: { quest: true },
@@ -289,7 +336,7 @@ export const gameEventService = {
       characterId: character?.id,
       action: 'COMPLETE_QUEST',
       metadata: { questId, questType: quest.type },
-    });
+    }, _depth + 1);
   },
 
   /**
@@ -306,24 +353,23 @@ export const gameEventService = {
 
     const character = await prisma.character.findUnique({
       where: { id: characterId },
+      select: { id: true, name: true, affection: true, level: true, userId: true },
     });
 
     if (!character) return { unlocked, memories };
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
+      select: { id: true, streak: true },
     });
 
     if (!user) return { unlocked, memories };
 
-    // Get user stats
-    const messageCount = await prisma.message.count({
-      where: { userId, role: 'USER' },
-    });
-
-    const giftCount = await prisma.giftHistory.count({
-      where: { userId },
-    });
+    // Get user stats in parallel (batch instead of sequential)
+    const [messageCount, giftCount] = await Promise.all([
+      prisma.message.count({ where: { userId, role: 'USER' } }),
+      prisma.giftHistory.count({ where: { userId } }),
+    ]);
 
     // Check various milestones
     const milestonesToCheck: { type: MilestoneType; condition: boolean; title: string; description: string }[] = [
@@ -389,45 +435,45 @@ export const gameEventService = {
       },
     ];
 
-    for (const milestone of milestonesToCheck) {
-      if (milestone.condition) {
-        // Check if already unlocked
-        const existing = await prisma.memory.findFirst({
-          where: {
+    // Batch-load all existing milestones for this user (single query)
+    const existingMilestones = await prisma.memory.findMany({
+      where: {
+        userId,
+        type: 'MILESTONE',
+      },
+      select: { milestone: true },
+    });
+    const existingMilestoneTypes = new Set(existingMilestones.map((m) => m.milestone));
+
+    // Filter milestones that are triggered AND not yet unlocked
+    const newMilestones = milestonesToCheck.filter(
+      (m) => m.condition && !existingMilestoneTypes.has(m.type)
+    );
+
+    // Create all new milestone memories and give rewards in parallel
+    await Promise.all(
+      newMilestones.map(async (milestone) => {
+        const memory = await prisma.memory.create({
+          data: {
             userId,
+            characterId,
             type: 'MILESTONE',
+            title: milestone.title,
+            description: milestone.description,
+            milestone: milestone.type,
             metadata: {
-              path: ['milestoneType'],
-              equals: milestone.type,
+              milestoneType: milestone.type,
+              unlockedAt: new Date().toISOString(),
             },
           },
         });
 
-        if (!existing) {
-          // Create memory for this milestone
-          const memory = await prisma.memory.create({
-            data: {
-              userId,
-              characterId,
-              type: 'MILESTONE',
-              title: milestone.title,
-              description: milestone.description,
-              milestone: milestone.type,
-              metadata: {
-                milestoneType: milestone.type,
-                unlockedAt: new Date().toISOString(),
-              },
-            },
-          });
+        unlocked.push(milestone.type);
+        memories.push(memory.id);
 
-          unlocked.push(milestone.type);
-          memories.push(memory.id);
-
-          // Give bonus rewards for milestones
-          await this.giveMilestoneReward(userId, characterId, milestone.type);
-        }
-      }
-    }
+        await this.giveMilestoneReward(userId, characterId, milestone.type);
+      })
+    );
 
     return { unlocked, memories };
   },
@@ -473,10 +519,25 @@ export const gameEventService = {
 
   /**
    * Update user stats (streak, last active, etc.)
+   * Debounced: only checks new day logic once per minute via Redis
    */
   async updateUserStats(userId: string, action: GameAction): Promise<void> {
+    // Debounce: skip if we checked within the last 60 seconds
+    const debounceKey = `user_stats_check:${userId}`;
+    const recentlyChecked = await cache.get<boolean>(debounceKey);
+    
+    if (recentlyChecked) {
+      // Just update lastActiveAt (cheap operation)
+      await prisma.user.update({
+        where: { id: userId },
+        data: { lastActiveAt: new Date() },
+      });
+      return;
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
+      select: { id: true, streak: true, lastActiveAt: true },
     });
 
     if (!user) return;
@@ -492,10 +553,8 @@ export const gameEventService = {
     const isNewDay = !lastActiveDay || today.getTime() > lastActiveDay.getTime();
 
     if (isNewDay) {
-      // Check if streak continues or resets
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-
       const streakContinues = lastActiveDay && lastActiveDay.getTime() === yesterday.getTime();
 
       await prisma.user.update({
@@ -506,22 +565,19 @@ export const gameEventService = {
         },
       });
 
-      // Process daily login action
+      // Process daily login action (only on new day, not recursively)
       if (action !== 'DAILY_LOGIN') {
-        await this.processAction({
-          userId,
-          action: 'DAILY_LOGIN',
-        });
+        await this.processAction({ userId, action: 'DAILY_LOGIN' }, MAX_RECURSION_DEPTH - 1);
       }
     } else {
-      // Just update last active
       await prisma.user.update({
         where: { id: userId },
-        data: {
-          lastActiveAt: now,
-        },
+        data: { lastActiveAt: now },
       });
     }
+
+    // Set debounce flag for 60 seconds
+    await cache.set(debounceKey, true, 60);
   },
 
   /**
@@ -542,7 +598,7 @@ export const gameEventService = {
         type: type as any,
         title,
         description,
-        metadata: metadata ? JSON.stringify(metadata) : undefined,
+        metadata: (metadata || undefined) as any,
       },
     });
 
@@ -563,39 +619,36 @@ export const gameEventService = {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    // Get today's completed quests
-    const completedQuests = await prisma.userQuest.count({
-      where: {
-        userId,
-        status: { in: ['COMPLETED', 'CLAIMED'] },
-        completedAt: { gte: today },
-      },
-    });
-
-    const totalDailyQuests = await prisma.quest.count({
-      where: { type: 'DAILY', isActive: true },
-    });
-
-    // Get today's messages
-    const messagesSent = await prisma.message.count({
-      where: {
-        userId,
-        role: 'USER',
-        createdAt: { gte: today },
-      },
-    });
-
-    // Get today's gifts
-    const giftsSent = await prisma.giftHistory.count({
-      where: {
-        userId,
-        createdAt: { gte: today },
-      },
-    });
+    // Run all independent queries in parallel
+    const [user, completedQuests, totalDailyQuests, messagesSent, giftsSent] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { streak: true },
+      }),
+      prisma.userQuest.count({
+        where: {
+          userId,
+          status: { in: ['COMPLETED', 'CLAIMED'] },
+          completedAt: { gte: today },
+        },
+      }),
+      prisma.quest.count({
+        where: { type: 'DAILY', isActive: true },
+      }),
+      prisma.message.count({
+        where: {
+          userId,
+          role: 'USER',
+          createdAt: { gte: today },
+        },
+      }),
+      prisma.giftHistory.count({
+        where: {
+          userId,
+          createdAt: { gte: today },
+        },
+      }),
+    ]);
 
     return {
       questsCompleted: completedQuests,
