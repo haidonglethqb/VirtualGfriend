@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { characterService } from '../character/character.service';
 import { aiService } from '../ai/ai.service';
@@ -18,21 +19,29 @@ interface SendGiftData {
 
 export const giftService = {
   async getGifts(category?: string) {
-    return prisma.gift.findMany({
-      where: {
-        isActive: true,
-        ...(category && { category }),
-      },
-      orderBy: [{ rarity: 'asc' }, { sortOrder: 'asc' }],
-    });
+    return cache.getOrSet(
+      CacheKeys.gifts(category),
+      () => prisma.gift.findMany({
+        where: {
+          isActive: true,
+          ...(category && { category }),
+        },
+        orderBy: [{ rarity: 'asc' }, { sortOrder: 'asc' }],
+      }),
+      CacheTTL.GIFTS
+    );
   },
 
   async getInventory(userId: string) {
-    return prisma.userGift.findMany({
-      where: { userId, quantity: { gt: 0 } },
-      include: { gift: true },
-      orderBy: { updatedAt: 'desc' },
-    });
+    return cache.getOrSet(
+      CacheKeys.giftInventory(userId),
+      () => prisma.userGift.findMany({
+        where: { userId, quantity: { gt: 0 } },
+        include: { gift: true },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      CacheTTL.INVENTORY
+    );
   },
 
   async buyGift(userId: string, data: BuyGiftData) {
@@ -84,6 +93,9 @@ export const giftService = {
 
       return userGift;
     });
+
+    // Invalidate inventory cache
+    await cache.del(CacheKeys.giftInventory(userId));
 
     return {
       purchase: {
@@ -169,6 +181,9 @@ export const giftService = {
     // Update affection (outside transaction as it has its own logic)
     const updatedCharacter = await characterService.updateAffection(data.characterId, gift.affectionBonus);
 
+    // Invalidate inventory cache
+    await cache.del(CacheKeys.giftInventory(userId));
+
     // Process game event for quest progress and milestones
     const gameResult = await gameEventService.processAction({
       userId,
@@ -188,27 +203,29 @@ export const giftService = {
   },
 
   async getGiftHistory(userId: string, page: number, limit: number) {
-    const skip = (page - 1) * limit;
+    const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
+    const skip = (page - 1) * safeLimit;
 
+    // Use direct userId filter instead of nested relation filter
     const [history, total] = await Promise.all([
       prisma.giftHistory.findMany({
-        where: { character: { userId } },
+        where: { userId },
         include: {
           gift: true,
           character: { select: { name: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: limit,
+        take: safeLimit,
       }),
-      prisma.giftHistory.count({ where: { character: { userId } } }),
+      prisma.giftHistory.count({ where: { userId } }),
     ]);
 
     return {
       items: history,
       total,
       page,
-      pageSize: limit,
+      pageSize: safeLimit,
       hasMore: skip + history.length < total,
     };
   },

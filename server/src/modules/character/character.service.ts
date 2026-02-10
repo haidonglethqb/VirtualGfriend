@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { RelationshipStage, Gender } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
@@ -81,13 +82,13 @@ function getXpRequiredForLevel(level: number): number {
   return 100 + (level - 1) * 50;
 }
 
-// NEW: Calculate total XP needed to reach a level from level 1
+// NEW: Calculate total XP needed to reach a level from level 1 (O(1) formula)
 function getTotalXpForLevel(level: number): number {
-  let total = 0;
-  for (let i = 1; i < level; i++) {
-    total += getXpRequiredForLevel(i);
-  }
-  return total;
+  // Arithmetic series: sum(100 + (i-1)*50) for i=1 to level-1
+  // = 100*(level-1) + 50*(level-1)*(level-2)/2
+  const n = level - 1;
+  if (n <= 0) return 0;
+  return 100 * n + 25 * n * (n - 1);
 }
 
 function calculateRelationshipStage(affection: number): RelationshipStage {
@@ -113,6 +114,11 @@ function getUnlockedFeatures(level: number): string[] {
 
 export const characterService = {
   async getActiveCharacter(userId: string) {
+    // Try cache first
+    const cacheKey = CacheKeys.character(userId);
+    const cached = await cache.get<any>(cacheKey);
+    if (cached) return cached;
+
     const character = await prisma.character.findFirst({
       where: { userId, isActive: true },
       include: {
@@ -130,17 +136,22 @@ export const characterService = {
       throw new AppError('No active character found', 404, 'NO_CHARACTER');
     }
 
-    // NEW: Add unlocked features to response
+    // Add unlocked features to response
     const unlockedFeatures = getUnlockedFeatures(character.level);
     const xpForNextLevel = getXpRequiredForLevel(character.level);
     const progressPercent = Math.round((character.experience / xpForNextLevel) * 100);
 
-    return {
+    const result = {
       ...character,
       unlockedFeatures,
       xpForNextLevel,
       progressPercent,
     };
+
+    // Cache result
+    await cache.set(cacheKey, result, CacheTTL.CHARACTER);
+
+    return result;
   },
 
   async createCharacter(userId: string, data: CreateCharacterData) {
@@ -180,6 +191,9 @@ export const characterService = {
       occupation: character.occupation,
     });
 
+    // Invalidate cache for this user's active character
+    await cache.del(CacheKeys.character(userId));
+
     return character;
   },
 
@@ -192,10 +206,15 @@ export const characterService = {
       throw new AppError('No active character found', 404, 'NO_CHARACTER');
     }
 
-    return prisma.character.update({
+    const updated = await prisma.character.update({
       where: { id: character.id },
       data,
     });
+
+    // Invalidate cache
+    await cache.del(CacheKeys.character(userId));
+
+    return updated;
   },
 
   async customizeCharacter(userId: string, data: CustomizeCharacterData) {
@@ -207,10 +226,15 @@ export const characterService = {
       throw new AppError('No active character found', 404, 'NO_CHARACTER');
     }
 
-    return prisma.character.update({
+    const updated = await prisma.character.update({
       where: { id: character.id },
       data,
     });
+
+    // Invalidate cache
+    await cache.del(CacheKeys.character(userId));
+
+    return updated;
   },
 
   async getFacts(userId: string) {
@@ -323,6 +347,9 @@ export const characterService = {
       },
     });
 
+    // Invalidate character cache
+    await cache.del(CacheKeys.character(character.userId), CacheKeys.characterById(characterId));
+
     return {
       ...updated,
       stageChanged,
@@ -330,7 +357,7 @@ export const characterService = {
     };
   },
 
-  // NEW: Enhanced addExperience with XP scaling and level-up rewards
+  // Enhanced addExperience with XP scaling and level-up rewards
   async addExperience(characterId: string, xp: number): Promise<{
     character: any;
     leveledUp: boolean;
@@ -340,7 +367,6 @@ export const characterService = {
   }> {
     const character = await prisma.character.findUnique({
       where: { id: characterId },
-      include: { user: true },
     });
 
     if (!character) {
@@ -376,7 +402,7 @@ export const characterService = {
     });
 
     // If leveled up and hit a milestone, give rewards
-    if (milestoneReward && character.user) {
+    if (milestoneReward && character.userId) {
       await prisma.user.update({
         where: { id: character.userId },
         data: {
@@ -414,6 +440,9 @@ export const characterService = {
         },
       });
     }
+
+    // Invalidate character cache
+    await cache.del(CacheKeys.character(character.userId), CacheKeys.characterById(characterId));
 
     return {
       character: updatedCharacter,

@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { cache } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { aiService } from '../ai/ai.service';
 import { factsLearningService } from '../ai/facts-learning.service';
@@ -18,14 +19,15 @@ interface SendMessageData {
 
 export const chatService = {
   async getHistory(userId: string, page: number, limit: number) {
-    const skip = (page - 1) * limit;
+    const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
+    const skip = (page - 1) * safeLimit;
 
     const [messages, total] = await Promise.all([
       prisma.message.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: limit,
+        take: safeLimit,
         include: {
           character: {
             select: {
@@ -43,7 +45,7 @@ export const chatService = {
       messages: messages.reverse(),
       total,
       page,
-      pageSize: limit,
+      pageSize: safeLimit,
       hasMore: skip + messages.length < total,
     };
   },
@@ -63,6 +65,8 @@ export const chatService = {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
+    const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
+
     const messages = await prisma.message.findMany({
       where: {
         userId,
@@ -70,10 +74,10 @@ export const chatService = {
         ...(cursor && { id: { lt: cursor } }),
       },
       orderBy: { createdAt: 'desc' },
-      take: limit + 1,
+      take: safeLimit + 1,
     });
 
-    const hasMore = messages.length > limit;
+    const hasMore = messages.length > safeLimit;
     if (hasMore) messages.pop();
 
     return {
@@ -84,26 +88,26 @@ export const chatService = {
   },
 
   async sendMessage(userId: string, data: SendMessageData) {
-    // Verify character belongs to user
-    const character = await prisma.character.findFirst({
-      where: { id: data.characterId, userId },
-      include: {
-        characterFacts: {
-          orderBy: { importance: 'desc' },
-          take: 10,
+    // Parallel: verify character + get user info at the same time
+    const [character, user] = await Promise.all([
+      prisma.character.findFirst({
+        where: { id: data.characterId, userId },
+        include: {
+          characterFacts: {
+            orderBy: { importance: 'desc' },
+            take: 10,
+          },
         },
-      },
-    });
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { displayName: true, username: true },
+      }),
+    ]);
 
     if (!character) {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
-
-    // Get user info
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { displayName: true, username: true },
-    });
 
     log.debug('=== SEND MESSAGE START ===');
     log.debug('User:', userId);
@@ -214,9 +218,11 @@ export const chatService = {
     });
 
     // Auto-extract facts from conversation periodically
-    const totalMessages = await prisma.message.count({
-      where: { userId, characterId: data.characterId },
-    });
+    // Use Redis counter instead of COUNT(*) to avoid full table scan
+    const msgCounterKey = `msg_count:${userId}:${data.characterId}`;
+    const cachedCount = await cache.get<number>(msgCounterKey);
+    const totalMessages = cachedCount !== null ? cachedCount + 1 : 1;
+    await cache.set(msgCounterKey, totalMessages, 86400); // 24h TTL
     
     if (factsLearningService.shouldExtractFacts(totalMessages)) {
       // Run in background, don't block response
@@ -273,6 +279,7 @@ export const chatService = {
   },
 
   async searchMessages(userId: string, query: string, limit: number) {
+    const safeLimit = Math.min(Math.max(1, limit), 50); // Cap at 50
     return prisma.message.findMany({
       where: {
         userId,
@@ -282,7 +289,7 @@ export const chatService = {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: safeLimit,
       include: {
         character: {
           select: {

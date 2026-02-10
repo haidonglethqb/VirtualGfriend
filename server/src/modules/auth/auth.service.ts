@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../../lib/prisma';
+import { cache, CacheKeys } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 
 interface RegisterData {
@@ -122,7 +123,7 @@ export const authService = {
   },
 
   async login(data: LoginData) {
-    // Find user
+    // Find user - need password for verification
     const user = await prisma.user.findUnique({
       where: { email: data.email },
     });
@@ -138,24 +139,25 @@ export const authService = {
       throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
     }
 
-    // Update last login
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
-
     // Generate tokens
     const tokens = generateTokens(user.id, user.email);
 
-    // Store refresh token
-    await prisma.refreshToken.create({
-      data: {
-        token: tokens.refreshToken,
-        userId: user.id,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRES * 1000),
-      },
-    });
+    // Update last login + store refresh token in parallel
+    await Promise.all([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      }),
+      prisma.refreshToken.create({
+        data: {
+          token: tokens.refreshToken,
+          userId: user.id,
+          expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRES * 1000),
+        },
+      }),
+    ]);
 
+    // Return user data without password (select specific fields)
     const { password: _, ...userWithoutPassword } = user;
 
     return { user: userWithoutPassword, tokens };
@@ -176,7 +178,28 @@ export const authService = {
     // Check if token exists and not revoked
     const storedToken = await prisma.refreshToken.findUnique({
       where: { token },
-      include: { user: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            displayName: true,
+            avatar: true,
+            bio: true,
+            isEmailVerified: true,
+            isPremium: true,
+            premiumExpiresAt: true,
+            coins: true,
+            gems: true,
+            streak: true,
+            lastActiveAt: true,
+            lastLoginAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
     });
 
     if (!storedToken || storedToken.isRevoked) {
@@ -205,7 +228,7 @@ export const authService = {
       },
     });
 
-    const { password: _, ...userWithoutPassword } = storedToken.user;
+    const { password: _, ...userWithoutPassword } = storedToken.user as any;
 
     return { user: userWithoutPassword, tokens };
   },
@@ -270,5 +293,8 @@ export const authService = {
       where: { userId },
       data: { isRevoked: true },
     });
+
+    // Invalidate auth cache
+    await cache.del(CacheKeys.userAuth(userId), CacheKeys.user(userId));
   },
 };

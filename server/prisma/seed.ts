@@ -6,6 +6,24 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('[Seed] Starting database seed...');
 
+  // ============================================
+  // CLEANUP: Remove old seed data to prevent duplicates
+  // Only delete "system" data (not user-generated content)
+  // ============================================
+  console.log('[Seed] Cleaning up old seed data...');
+  await prisma.$transaction([
+    prisma.characterScene.deleteMany({}),
+    prisma.scene.deleteMany({}),
+    prisma.userQuest.deleteMany({}),
+    prisma.quest.deleteMany({}),
+    prisma.userGift.deleteMany({}),
+    prisma.giftHistory.deleteMany({}),
+    prisma.gift.deleteMany({}),
+    prisma.userAchievement.deleteMany({}),
+    prisma.achievement.deleteMany({}),
+    prisma.aIPromptTemplate.deleteMany({}),
+  ]);
+
   // Create default scenes
   const scenes = await prisma.scene.createMany({
     data: [

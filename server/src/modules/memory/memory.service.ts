@@ -13,7 +13,8 @@ interface CreateMemoryData {
 
 export const memoryService = {
   async getMemories(userId: string, page: number, limit: number, type?: string) {
-    const skip = (page - 1) * limit;
+    const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
+    const skip = (page - 1) * safeLimit;
 
     const where = {
       userId,
@@ -25,7 +26,7 @@ export const memoryService = {
         where,
         orderBy: { createdAt: 'desc' },
         skip,
-        take: limit,
+        take: safeLimit,
       }),
       prisma.memory.count({ where }),
     ]);
@@ -34,7 +35,7 @@ export const memoryService = {
       items: memories,
       total,
       page,
-      pageSize: limit,
+      pageSize: safeLimit,
       hasMore: skip + memories.length < total,
     };
   },

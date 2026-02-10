@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io'
 import jwt from 'jsonwebtoken'
 import { prisma } from '../lib/prisma'
+import { cache, CacheKeys, CacheTTL } from '../lib/redis'
 import { chatService } from '../modules/chat/chat.service'
 import { proactiveNotificationService } from '../modules/ai/proactive-notification.service'
 import { moodService } from '../modules/character/mood.service'
@@ -32,10 +33,19 @@ export function setupSocketHandlers(io: Server) {
         process.env.JWT_SECRET || 'secret'
       ) as JwtPayload
 
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        select: { id: true },
-      })
+      // Use cache-aside pattern (same as auth middleware) instead of raw DB query
+      const cacheKey = CacheKeys.userAuth(decoded.userId)
+      let user = await cache.get<{ id: string }>(cacheKey)
+      if (!user) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: decoded.userId },
+          select: { id: true, email: true },
+        })
+        if (dbUser) {
+          await cache.set(cacheKey, dbUser, CacheTTL.USER_AUTH)
+          user = dbUser
+        }
+      }
 
       if (!user) {
         return next(new Error('User not found'))
@@ -55,9 +65,13 @@ export function setupSocketHandlers(io: Server) {
     // Join user's room for cross-tab sync
     socket.join(userRoom)
 
-    // Check for proactive notifications on connection
+    // Check for proactive notifications (debounced per user — once per 5 minutes)
     ;(async () => {
       try {
+        const notifDebounceKey = `proactive_notif:${userId}`
+        const recentlyChecked = await cache.get<boolean>(notifDebounceKey)
+        if (recentlyChecked) return
+
         const characters = await prisma.character.findMany({
           where: { userId },
           select: { id: true, name: true },
@@ -76,6 +90,9 @@ export function setupSocketHandlers(io: Server) {
             })
           }
         }
+
+        // Set debounce flag for 5 minutes
+        await cache.set(notifDebounceKey, true, 300)
       } catch (err) {
         log.error('Proactive notification error:', err)
       }
