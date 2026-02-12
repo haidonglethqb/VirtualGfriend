@@ -6,12 +6,9 @@ import { motion } from 'framer-motion';
 import { 
   Settings, User, Bell, Volume2, Moon, 
   Globe, Shield, LogOut, ChevronRight, Heart, 
-  Palette, Trash2, HelpCircle, Info, Loader2, Brain
+  Palette, Trash2, HelpCircle, Info, Brain
 } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
@@ -28,7 +25,7 @@ interface SettingItem {
 }
 
 interface UserSettings {
-  notifications: boolean;
+  notificationsEnabled: boolean;
   soundEnabled: boolean;
   theme: string;
   language: string;
@@ -42,7 +39,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   
   const [settings, setSettings] = useState<UserSettings>({
-    notifications: true,
+    notificationsEnabled: true,
     soundEnabled: true,
     theme: 'dark',
     language: 'vi',
@@ -63,7 +60,7 @@ export default function SettingsPage() {
       if (response.success && response.data) {
         const s = response.data;
         setSettings({
-          notifications: s.notifications ?? true,
+          notificationsEnabled: s.notificationsEnabled ?? true,
           soundEnabled: s.soundEnabled ?? true,
           theme: s.theme || 'dark',
           language: s.language || 'vi',
@@ -134,8 +131,8 @@ export default function SettingsPage() {
       description: 'Nhận thông báo từ người yêu',
       rightElement: (
         <ToggleSwitch
-          checked={settings.notifications}
-          onChange={() => handleToggle('notifications')}
+          checked={settings.notificationsEnabled}
+          onChange={() => handleToggle('notificationsEnabled')}
         />
       ),
     },
@@ -160,7 +157,11 @@ export default function SettingsPage() {
           onChange={() => {
             const newTheme = settings.theme === 'dark' ? 'light' : 'dark';
             setSettings((prev) => ({ ...prev, theme: newTheme }));
-            api.patch('/users/settings', { theme: newTheme }).catch(console.error);
+            api.patch('/users/settings', { theme: newTheme }).catch(() => {
+              // Revert on error
+              setSettings((prev) => ({ ...prev, theme: settings.theme }));
+              toast({ title: 'Lỗi', description: 'Không thể thay đổi chế độ tối', variant: 'destructive' });
+            });
           }}
         />
       ),

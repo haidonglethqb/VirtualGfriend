@@ -34,6 +34,12 @@ async function getClient(): Promise<import('ioredis').default | null> {
       },
       lazyConnect: true,
       connectTimeout: 5000,
+      // Performance: keep connection alive
+      keepAlive: 30000,
+      // Enable offline queue so commands don't fail during brief disconnects
+      enableOfflineQueue: true,
+      // Connection pool — ioredis uses a single connection with pipelining by default
+      // which is more efficient than multiple connections for most cases
     });
 
     redisClient.on('connect', () => {
@@ -181,15 +187,19 @@ export const CacheKeys = {
   gifts: (category?: string) => category ? `gifts:${category}` : 'gifts:all',
   giftInventory: (userId: string) => `gifts:inventory:${userId}`,
   userSettings: (userId: string) => `settings:${userId}`,
+  conversations: (userId: string) => `conversations:${userId}`,
+  leaderboard: (category: string) => `leaderboard:${category}`,
 };
 
 // TTL constants (in seconds)
 export const CacheTTL = {
-  USER_AUTH: 15 * 60,     // 15 minutes (matches access token)
-  USER_PROFILE: 60 * 60,  // 1 hour
-  CHARACTER: 30 * 60,      // 30 minutes
-  QUESTS: 60 * 60,         // 1 hour
-  GIFTS: 60 * 60,          // 1 hour
-  INVENTORY: 5 * 60,       // 5 minutes (changes frequently)
-  SETTINGS: 30 * 60,       // 30 minutes
+  USER_AUTH: 15 * 60,       // 15 minutes (matches access token)
+  USER_PROFILE: 60 * 60,    // 1 hour
+  CHARACTER: 30 * 60,        // 30 minutes
+  QUESTS: 60 * 60,           // 1 hour
+  GIFTS: 60 * 60,            // 1 hour
+  INVENTORY: 5 * 60,         // 5 minutes (changes frequently)
+  SETTINGS: 30 * 60,         // 30 minutes
+  CONVERSATIONS: 60,         // 1 minute (DM list, changes often)
+  LEADERBOARD: 5 * 60,       // 5 minutes
 };

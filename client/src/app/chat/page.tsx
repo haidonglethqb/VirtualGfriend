@@ -144,19 +144,28 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
+  const sendingRef = useRef(false)
+
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isSending || !character) return;
+    if (!inputMessage.trim() || sendingRef.current || isSending || !character) return;
 
     const content = inputMessage.trim();
+    const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     setInputMessage('');
     setIsSending(true);
+    sendingRef.current = true;
 
     socketService.emit('message:send', { 
       content,
-      characterId: character.id 
+      characterId: character.id,
+      clientId,
     });
 
-    setIsSending(false);
+    // Re-enable after a short delay to prevent rapid double sends
+    setTimeout(() => {
+      setIsSending(false);
+      sendingRef.current = false;
+    }, 500);
     inputRef.current?.focus();
   };
 
@@ -249,7 +258,7 @@ export default function ChatPage() {
             <h2 className="text-xl font-bold mb-1">{character?.name || 'Người yêu'}</h2>
             <p className="text-sm text-green-400 flex items-center gap-1 mb-4">
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              Online • {getMoodEmoji(character?.mood || 'NEUTRAL')} Đang vui
+              Online • {getMoodEmoji(character?.mood || 'neutral')} Đang vui
             </p>
 
             {/* Affection Level */}
@@ -268,10 +277,10 @@ export default function ChatPage() {
 
             {/* Quick Actions */}
             <div className="flex items-center gap-3 mt-4">
-              <button className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title="Gọi thoại">
+              <button onClick={() => toast({ title: 'Sắp ra mắt', description: 'Tính năng gọi thoại sẽ có trong bản cập nhật tới!' })} className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title="Gọi thoại (Sắp ra mắt)">
                 <Phone className="w-5 h-5 text-[#ba9cab]" />
               </button>
-              <button className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title="Gọi video">
+              <button onClick={() => toast({ title: 'Sắp ra mắt', description: 'Tính năng gọi video sẽ có trong bản cập nhật tới!' })} className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title="Gọi video (Sắp ra mắt)">
                 <Video className="w-5 h-5 text-[#ba9cab]" />
               </button>
               <button 
@@ -374,7 +383,7 @@ export default function ChatPage() {
           {/* Message list */}
           <AnimatePresence>
             {messages.map((message, index) => {
-              const isUser = message.role === 'USER';
+              const isUser = message.role === 'USER' || (message.role === 'SYSTEM' && message.messageType === 'GIFT');
               const showTimestamp = index === 0 || 
                 new Date(messages[index - 1].createdAt).toDateString() !== new Date(message.createdAt).toDateString();
               
@@ -470,7 +479,7 @@ export default function ChatPage() {
               ref={inputRef}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               disabled={isSending}
               className="w-full bg-[#392830]/40 hover:bg-[#392830]/60 focus:bg-[#392830]/60 border border-[#4a3640] focus:border-love/50 text-white placeholder-white/40 rounded-full py-4 pl-6 pr-32 outline-none transition-all shadow-lg backdrop-blur-md" 
               placeholder={`Nhắn tin cho ${character?.name || 'người yêu'}...`}
@@ -478,10 +487,10 @@ export default function ChatPage() {
             />
             {/* Input Actions */}
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <button className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors">
+              <button onClick={() => toast({ title: 'Sắp ra mắt', description: 'Bộ chọn emoji sẽ có trong bản cập nhật tới!' })} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors" title="Emoji (Sắp ra mắt)">
                 <Smile className="w-5 h-5" />
               </button>
-              <button className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors">
+              <button onClick={() => toast({ title: 'Sắp ra mắt', description: 'Tính năng ghi âm sẽ có trong bản cập nhật tới!' })} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors" title="Ghi âm (Sắp ra mắt)">
                 <Mic className="w-5 h-5" />
               </button>
               <button 
@@ -555,7 +564,7 @@ export default function ChatPage() {
                       <Gift className="w-12 h-12 mx-auto mb-3 text-[#ba9cab] opacity-50" />
                       <p className="text-[#ba9cab] mb-4">Bạn chưa có quà nào trong túi đồ</p>
                       <button 
-                        onClick={() => setShowGiftModal(false)}
+                        onClick={() => { setShowGiftModal(false); router.push('/shop'); }}
                         className="px-6 py-3 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all"
                       >
                         Đi mua quà

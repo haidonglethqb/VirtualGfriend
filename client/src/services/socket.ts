@@ -144,21 +144,23 @@ class SocketService {
     // Quest completed notification
     this.socket.on('quest:completed', (data: {
       questId: string
-      name: string
-      rewardCoins: number
-      rewardGems: number
-      rewardXp: number
-      rewardAffection: number
+      questTitle: string
+      rewards: {
+        coins: number
+        gems: number
+        xp: number
+        affection: number
+      }
       sourceSocketId?: string
     }) => {
       useNotificationStore.getState().showQuestCompleted({
         questId: data.questId,
-        questName: data.name,
+        questName: data.questTitle,
         rewards: {
-          coins: data.rewardCoins,
-          gems: data.rewardGems,
-          xp: data.rewardXp,
-          affection: data.rewardAffection,
+          coins: data.rewards.coins,
+          gems: data.rewards.gems,
+          xp: data.rewards.xp,
+          affection: data.rewards.affection,
         },
       })
     })
@@ -225,11 +227,13 @@ class SocketService {
   }
 
   // Generic event handlers
-  on(event: string, callback: (...args: unknown[]) => void) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  on(event: string, callback: (...args: any[]) => void) {
     this.socket?.on(event, callback)
   }
 
-  off(event: string, callback?: (...args: unknown[]) => void) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  off(event: string, callback?: (...args: any[]) => void) {
     if (callback) {
       this.socket?.off(event, callback)
     } else {

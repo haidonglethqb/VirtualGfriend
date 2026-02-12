@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import { prisma } from '../lib/prisma'
 import { cache, CacheKeys, CacheTTL } from '../lib/redis'
 import { chatService } from '../modules/chat/chat.service'
+import { dmService } from '../modules/dm/dm.service'
 import { proactiveNotificationService } from '../modules/ai/proactive-notification.service'
 import { moodService } from '../modules/character/mood.service'
 import { createModuleLogger } from '../lib/logger'
@@ -30,7 +31,7 @@ export function setupSocketHandlers(io: Server) {
 
       const decoded = jwt.verify(
         token,
-        process.env.JWT_SECRET || 'secret'
+        process.env.JWT_SECRET!
       ) as JwtPayload
 
       // Use cache-aside pattern (same as auth middleware) instead of raw DB query
@@ -118,6 +119,7 @@ export function setupSocketHandlers(io: Server) {
       characterId: string
       content: string
       messageType?: string
+      clientId?: string
     }) => {
       try {
         // Input validation
@@ -135,6 +137,17 @@ export function setupSocketHandlers(io: Server) {
         if (content.length > 2000) {
           socket.emit('error', { message: 'Message too long (max 2000 characters)' })
           return
+        }
+
+        // Idempotency check — prevent duplicate processing
+        if (data.clientId) {
+          const dedupKey = `dedup:${userId}:${data.clientId}`
+          const alreadyProcessed = await cache.get<boolean>(dedupKey)
+          if (alreadyProcessed) {
+            log.debug('Duplicate message blocked:', data.clientId)
+            return
+          }
+          await cache.set(dedupKey, true, 60) // 60s TTL
         }
 
         // Broadcast typing indicator to ALL user's tabs
@@ -254,6 +267,68 @@ export function setupSocketHandlers(io: Server) {
         typing: data.typing,
         sourceSocketId: socket.id,
       })
+    })
+
+    // ── Direct Message socket handlers ──
+    socket.on('dm:send', async (data: {
+      conversationId: string
+      content: string
+      clientId?: string
+    }) => {
+      try {
+        if (!data.content?.trim() || !data.conversationId) {
+          socket.emit('error', { message: 'conversationId and content required' })
+          return
+        }
+
+        // Idempotency
+        if (data.clientId) {
+          const dedupKey = `dedup_dm:${userId}:${data.clientId}`
+          const dup = await cache.get<boolean>(dedupKey)
+          if (dup) return
+          await cache.set(dedupKey, true, 60)
+        }
+
+        const message = await dmService.sendMessage(userId, data.conversationId, data.content)
+
+        // Get conversation members to broadcast
+        const members = await prisma.conversationMember.findMany({
+          where: { conversationId: data.conversationId, isActive: true },
+          select: { userId: true },
+        })
+
+        // Broadcast to all members' rooms
+        members.forEach(member => {
+          io.to(`user:${member.userId}`).emit('dm:receive', {
+            ...message,
+            conversationId: data.conversationId,
+          })
+        })
+      } catch (error) {
+        log.error('DM send error:', error)
+        socket.emit('error', { message: 'Failed to send message' })
+      }
+    })
+
+    socket.on('dm:typing', (data: { conversationId: string }) => {
+      // Broadcast typing to other members
+      prisma.conversationMember.findMany({
+        where: { conversationId: data.conversationId, isActive: true, userId: { not: userId } },
+        select: { userId: true },
+      }).then(members => {
+        members.forEach(member => {
+          io.to(`user:${member.userId}`).emit('dm:typing', {
+            conversationId: data.conversationId,
+            userId,
+          })
+        })
+      }).catch(() => {})
+    })
+
+    socket.on('dm:read', async (data: { conversationId: string }) => {
+      try {
+        await dmService.markRead(userId, data.conversationId)
+      } catch {}
     })
 
     // Handle disconnection

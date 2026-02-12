@@ -76,10 +76,23 @@ export const questService = {
 
     const userQuestMap = new Map(userQuests.map((uq) => [uq.questId, uq]));
 
-    return dailyQuests.map((quest) => ({
-      ...quest,
-      userProgress: userQuestMap.get(quest.id) || null,
-    }));
+    return dailyQuests.map((quest) => {
+      const userProgress = userQuestMap.get(quest.id);
+      return {
+        ...quest,
+        userProgress: userProgress
+          ? {
+              id: userProgress.id,
+              progress: userProgress.progress,
+              maxProgress: userProgress.maxProgress,
+              completed: userProgress.status === 'COMPLETED' || userProgress.status === 'CLAIMED',
+              claimed: userProgress.status === 'CLAIMED',
+              completedAt: userProgress.completedAt,
+              claimedAt: userProgress.claimedAt,
+            }
+          : null,
+      };
+    });
   },
 
   async startQuest(userId: string, questId: string) {

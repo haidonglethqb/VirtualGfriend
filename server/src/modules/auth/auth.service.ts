@@ -27,15 +27,19 @@ const ACCESS_TOKEN_EXPIRES = 15 * 60; // 15 minutes in seconds
 const REFRESH_TOKEN_EXPIRES = 7 * 24 * 60 * 60; // 7 days in seconds
 
 function generateTokens(userId: string, email: string): AuthTokens {
+  if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
+    throw new Error('JWT_SECRET and JWT_REFRESH_SECRET environment variables are required');
+  }
+
   const accessToken = jwt.sign(
     { userId, email },
-    process.env.JWT_SECRET || 'secret',
+    process.env.JWT_SECRET,
     { expiresIn: ACCESS_TOKEN_EXPIRES }
   );
 
   const refreshToken = jwt.sign(
     { userId, email, tokenId: uuidv4() },
-    process.env.JWT_REFRESH_SECRET || 'refresh-secret',
+    process.env.JWT_REFRESH_SECRET,
     { expiresIn: REFRESH_TOKEN_EXPIRES }
   );
 
@@ -101,8 +105,11 @@ export const authService = {
         username: true,
         displayName: true,
         avatar: true,
+        isPremium: true,
         coins: true,
         gems: true,
+        streak: true,
+        bio: true,
         createdAt: true,
       },
     });
@@ -169,7 +176,7 @@ export const authService = {
     try {
       decoded = jwt.verify(
         token,
-        process.env.JWT_REFRESH_SECRET || 'refresh-secret'
+        process.env.JWT_REFRESH_SECRET!
       ) as { userId: string; email: string };
     } catch {
       throw new AppError('Invalid refresh token', 401, 'INVALID_REFRESH_TOKEN');
@@ -253,6 +260,8 @@ export const authService = {
         premiumExpiresAt: true,
         coins: true,
         gems: true,
+        streak: true,
+        bio: true,
         lastLoginAt: true,
         createdAt: true,
         settings: true,

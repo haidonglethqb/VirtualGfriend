@@ -130,8 +130,28 @@ export const giftService = {
 
     const gift = userGift.gift;
 
-    // Generate AI reaction
-    const reaction = `Wow! ${gift.name}! Cảm ơn em nhiều lắm!`;
+    // Generate AI reaction for gift (with fallback)
+    let reaction: string;
+    try {
+      const aiResponse = await aiService.generateResponse({
+        characterId: data.characterId,
+        personality: character.personality as any,
+        mood: (character.mood as string) || 'happy',
+        relationshipStage: character.relationshipStage,
+        affection: character.affection,
+        level: character.level,
+        age: character.age,
+        occupation: character.occupation || 'student',
+        recentMessages: [],
+        facts: [],
+        userName: '',
+        characterName: character.name,
+        userMessage: `[SYSTEM: User just gifted you "${gift.name}" (${gift.description || 'a special gift'}). React naturally and sweetly in 1-2 short Vietnamese sentences. Express gratitude in your unique personality.]`,
+      });
+      reaction = aiResponse.content;
+    } catch {
+      reaction = `Wow! ${gift.name}! Cảm ơn em nhiều lắm! 💕`;
+    }
 
     // Use transaction for atomicity - all or nothing
     const result = await prisma.$transaction(async (tx) => {

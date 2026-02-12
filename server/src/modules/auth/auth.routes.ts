@@ -9,7 +9,7 @@ export const authRouter = Router();
 // Rate limiters for sensitive endpoints
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
+  max: process.env.NODE_ENV === 'production' ? 5 : 100, // 5 in prod, 100 in dev
   message: { success: false, message: 'Too many login attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,

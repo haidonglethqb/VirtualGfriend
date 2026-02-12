@@ -18,13 +18,15 @@ interface SendMessageData {
 }
 
 export const chatService = {
-  async getHistory(userId: string, page: number, limit: number) {
+  async getHistory(userId: string, characterId: string, page: number, limit: number) {
     const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
     const skip = (page - 1) * safeLimit;
 
+    const where = { userId, characterId };
+
     const [messages, total] = await Promise.all([
       prisma.message.findMany({
-        where: { userId },
+        where,
         orderBy: { createdAt: 'desc' },
         skip,
         take: safeLimit,
@@ -38,7 +40,7 @@ export const chatService = {
           },
         },
       }),
-      prisma.message.count({ where: { userId } }),
+      prisma.message.count({ where }),
     ]);
 
     return {
@@ -67,11 +69,20 @@ export const chatService = {
 
     const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
 
+    // Use createdAt-based cursor instead of UUID (UUIDs are not sequential)
+    let cursorFilter = {};
+    if (cursor) {
+      const cursorDate = new Date(cursor);
+      if (!isNaN(cursorDate.getTime())) {
+        cursorFilter = { createdAt: { lt: cursorDate } };
+      }
+    }
+
     const messages = await prisma.message.findMany({
       where: {
         userId,
         characterId,
-        ...(cursor && { id: { lt: cursor } }),
+        ...cursorFilter,
       },
       orderBy: { createdAt: 'desc' },
       take: safeLimit + 1,
@@ -83,7 +94,7 @@ export const chatService = {
     return {
       messages: messages.reverse(),
       hasMore,
-      nextCursor: hasMore ? messages[0]?.id : undefined,
+      nextCursor: hasMore ? messages[0]?.createdAt?.toISOString() : undefined,
     };
   },
 

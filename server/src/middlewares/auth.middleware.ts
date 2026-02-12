@@ -64,7 +64,7 @@ export const authenticate = async (
     
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || 'secret'
+      process.env.JWT_SECRET!
     ) as JwtPayload;
 
     const user = await getUserFromCacheOrDb(decoded.userId);
@@ -104,7 +104,7 @@ export const optionalAuth = async (
     
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || 'secret'
+      process.env.JWT_SECRET!
     ) as JwtPayload;
 
     const user = await getUserFromCacheOrDb(decoded.userId);

@@ -174,8 +174,8 @@ export const passwordResetService = {
       };
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    // Hash new password (12 rounds, consistent with auth.service)
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     // Update user password
     await prisma.user.update({
