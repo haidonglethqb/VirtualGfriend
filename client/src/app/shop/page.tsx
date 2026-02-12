@@ -8,7 +8,6 @@ import {
   Sparkles, Clock, Check, X, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/app-layout';
@@ -27,7 +26,7 @@ interface ShopItem {
   priceGems: number;
   affectionBonus: number;
   rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
-  category: 'FLOWER' | 'FOOD' | 'JEWELRY' | 'TOY' | 'SPECIAL';
+  category: 'flower' | 'food' | 'jewelry' | 'toy' | 'special';
 }
 
 const rarityColors = {
@@ -89,7 +88,7 @@ export default function ShopPage() {
 
   const filteredItems = activeTab === 'all' 
     ? items 
-    : items.filter((item) => item.category === activeTab.toUpperCase());
+    : items.filter((item) => item.category === activeTab);
 
   const handlePurchase = async () => {
     if (!selectedItem || !user) return;
@@ -138,10 +137,10 @@ export default function ShopPage() {
         }, 2000);
       }
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
+      const message = error instanceof Error ? error.message : 'Không thể mua quà';
       toast({
         title: 'Lỗi',
-        description: err.response?.data?.message || 'Không thể mua quà',
+        description: message,
         variant: 'destructive',
       });
     } finally {

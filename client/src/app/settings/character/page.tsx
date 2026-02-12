@@ -52,6 +52,9 @@ export default function CharacterSettingsPage() {
       setIsLoading(true);
       const response = await api.patch('/character', formData);
       if (response.success) {
+        // Refresh character store to avoid stale state
+        const { fetchCharacter: refetch } = useCharacterStore.getState();
+        refetch();
         toast({
           title: 'Thành công',
           description: 'Thông tin nhân vật đã được cập nhật',

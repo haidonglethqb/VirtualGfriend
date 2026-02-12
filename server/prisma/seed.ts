@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import Redis from 'ioredis';
 
 const prisma = new PrismaClient();
 
@@ -418,6 +419,7 @@ async function main() {
       {
         name: 'Hoa hồng',
         description: 'Một bông hoa hồng tươi thắm',
+        emoji: '🌹',
         imageUrl: '/gifts/rose.png',
         category: 'flower',
         rarity: 'COMMON',
@@ -429,6 +431,7 @@ async function main() {
       {
         name: 'Socola',
         description: 'Hộp socola ngọt ngào',
+        emoji: '🍫',
         imageUrl: '/gifts/chocolate.png',
         category: 'food',
         rarity: 'COMMON',
@@ -440,8 +443,9 @@ async function main() {
       {
         name: 'Gấu bông nhỏ',
         description: 'Gấu bông dễ thương',
+        emoji: '🧸',
         imageUrl: '/gifts/teddy-small.png',
-        category: 'special',
+        category: 'toy',
         rarity: 'COMMON',
         priceCoins: 100,
         priceGems: 10,
@@ -451,8 +455,9 @@ async function main() {
       {
         name: 'Thiệp yêu thương',
         description: 'Tấm thiệp với lời yêu thương',
+        emoji: '💌',
         imageUrl: '/gifts/love-card.png',
-        category: 'special',
+        category: 'toy',
         rarity: 'COMMON',
         priceCoins: 30,
         priceGems: 3,
@@ -463,6 +468,7 @@ async function main() {
       {
         name: 'Bó hoa tulip',
         description: 'Bó hoa tulip rực rỡ',
+        emoji: '🌷',
         imageUrl: '/gifts/tulips.png',
         category: 'flower',
         rarity: 'UNCOMMON',
@@ -475,6 +481,7 @@ async function main() {
       {
         name: 'Bánh kem',
         description: 'Bánh kem đặc biệt',
+        emoji: '🎂',
         imageUrl: '/gifts/cake.png',
         category: 'food',
         rarity: 'UNCOMMON',
@@ -487,8 +494,9 @@ async function main() {
       {
         name: 'Gấu bông lớn',
         description: 'Gấu bông khổng lồ ôm ấm áp',
+        emoji: '🐻',
         imageUrl: '/gifts/teddy-large.png',
-        category: 'special',
+        category: 'toy',
         rarity: 'UNCOMMON',
         priceCoins: 280,
         priceGems: 28,
@@ -500,6 +508,7 @@ async function main() {
       {
         name: 'Vòng tay bạc',
         description: 'Vòng tay bạc tinh tế',
+        emoji: '📿',
         imageUrl: '/gifts/bracelet.png',
         category: 'jewelry',
         rarity: 'RARE',
@@ -512,8 +521,9 @@ async function main() {
       {
         name: 'Bữa tối lãng mạn',
         description: 'Trải nghiệm bữa tối lãng mạn',
+        emoji: '🍷',
         imageUrl: '/gifts/dinner.png',
-        category: 'experience',
+        category: 'special',
         rarity: 'RARE',
         priceCoins: 600,
         priceGems: 60,
@@ -524,8 +534,9 @@ async function main() {
       {
         name: 'Hộp nhạc',
         description: 'Hộp nhạc phát giai điệu yêu thương',
+        emoji: '🎵',
         imageUrl: '/gifts/music-box.png',
-        category: 'special',
+        category: 'toy',
         rarity: 'RARE',
         priceCoins: 550,
         priceGems: 55,
@@ -537,6 +548,7 @@ async function main() {
       {
         name: 'Dây chuyền vàng',
         description: 'Dây chuyền vàng lấp lánh',
+        emoji: '📿',
         imageUrl: '/gifts/necklace.png',
         category: 'jewelry',
         rarity: 'EPIC',
@@ -549,8 +561,9 @@ async function main() {
       {
         name: 'Chuyến du lịch',
         description: 'Chuyến du lịch hai người',
+        emoji: '✈️',
         imageUrl: '/gifts/travel.png',
-        category: 'experience',
+        category: 'special',
         rarity: 'EPIC',
         priceCoins: 1500,
         priceGems: 150,
@@ -561,6 +574,7 @@ async function main() {
       {
         name: 'Album kỷ niệm',
         description: 'Album ảnh chứa đựng kỷ niệm đẹp',
+        emoji: '📸',
         imageUrl: '/gifts/photo-album.png',
         category: 'special',
         rarity: 'EPIC',
@@ -574,6 +588,7 @@ async function main() {
       {
         name: 'Nhẫn kim cương',
         description: 'Nhẫn kim cương hoàn hảo',
+        emoji: '💍',
         imageUrl: '/gifts/diamond-ring.png',
         category: 'jewelry',
         rarity: 'LEGENDARY',
@@ -586,8 +601,9 @@ async function main() {
       {
         name: 'Kỳ nghỉ thiên đường',
         description: 'Kỳ nghỉ tại resort sang trọng',
+        emoji: '🏝️',
         imageUrl: '/gifts/paradise-vacation.png',
-        category: 'experience',
+        category: 'special',
         rarity: 'LEGENDARY',
         priceCoins: 8000,
         priceGems: 800,
@@ -767,6 +783,16 @@ async function main() {
   console.log(`[Seed] Created test user: ${testUser.email}`);
 
   console.log('[Seed] Database seeding completed!');
+
+  // Flush Redis cache to prevent stale data after re-seed
+  try {
+    const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    await redis.flushdb();
+    console.log('[Seed] Redis cache flushed');
+    redis.disconnect();
+  } catch {
+    console.log('[Seed] Redis not available, skipping cache flush');
+  }
 }
 
 main()

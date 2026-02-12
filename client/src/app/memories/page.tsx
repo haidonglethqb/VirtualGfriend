@@ -8,7 +8,6 @@ import {
   Trash2, Loader2, Search, Flame, Clock, Plus,
   Grid3X3, Flag
 } from 'lucide-react';
-import Link from 'next/link';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
@@ -139,7 +138,11 @@ export default function MemoriesPage() {
         }
       }
     } catch {
-      // Handle error silently
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể cập nhật yêu thích',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -206,7 +209,7 @@ export default function MemoriesPage() {
     }
     const matchesSearch = searchQuery === '' || 
       m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (m.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 

@@ -21,11 +21,23 @@ const log = createModuleLogger('Server');
 const app = express();
 const httpServer = createServer(app);
 
-// Socket.IO setup
+// Socket.IO setup — optimized for high concurrency
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
     credentials: true,
+  },
+  // Performance tuning
+  pingTimeout: 30000,        // 30s before considering connection dead
+  pingInterval: 25000,       // 25s between pings
+  maxHttpBufferSize: 1e6,    // 1MB max message size
+  connectTimeout: 10000,     // 10s connection timeout
+  // Allow websocket upgrade from polling
+  allowUpgrades: true,
+  transports: ['websocket', 'polling'],
+  // Compress data for lower bandwidth
+  perMessageDeflate: {
+    threshold: 1024,         // Only compress messages > 1KB
   },
 });
 
@@ -44,13 +56,14 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Rate limiting (skip for Playwright tests)
+// Rate limiting (skip for Playwright tests only in non-production)
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute
   max: parseInt(process.env.RATE_LIMIT_MAX || '1000'), // 1000 requests per minute in dev
   message: { error: 'Too many requests, please try again later.' },
   skip: (req: Request) => {
-    // Skip rate limiting for Playwright E2E tests
+    // Skip rate limiting for Playwright E2E tests — only in non-production
+    if (process.env.NODE_ENV === 'production') return false;
     return req.headers['x-playwright-test'] === 'true';
   },
 });
@@ -139,6 +152,35 @@ setInterval(async () => {
     log.error('Token cleanup failed:', err);
   }
 }, TOKEN_CLEANUP_INTERVAL);
+
+// Periodic cleanup: remove old deleted DM messages every 24 hours
+const DM_CLEANUP_INTERVAL = 24 * 60 * 60 * 1000;
+setInterval(async () => {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const result = await prisma.directMessage.deleteMany({
+      where: {
+        isDeleted: true,
+        updatedAt: { lt: thirtyDaysAgo },
+      },
+    });
+    if (result.count > 0) {
+      log.info(`Cleaned up ${result.count} soft-deleted DM messages`);
+    }
+  } catch (err) {
+    log.error('DM cleanup failed:', err);
+  }
+}, DM_CLEANUP_INTERVAL);
+
+// Periodic: clear leaderboard cache every 5 minutes to keep it fresh
+const LEADERBOARD_REFRESH_INTERVAL = 5 * 60 * 1000;
+setInterval(async () => {
+  try {
+    await cache.delPattern('leaderboard:*');
+  } catch {
+    // silently fail
+  }
+}, LEADERBOARD_REFRESH_INTERVAL);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

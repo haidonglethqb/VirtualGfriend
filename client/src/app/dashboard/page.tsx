@@ -69,9 +69,8 @@ interface Memory {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
-  const { character, fetchCharacter, createCharacter, isLoading: characterLoading, needsCreation } = useCharacterStore();
+  const { character, fetchCharacter, isLoading: characterLoading, needsCreation } = useCharacterStore();
   const [greeting, setGreeting] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
   const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([]);
   const [recentMemories, setRecentMemories] = useState<Memory[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
@@ -81,14 +80,18 @@ export default function DashboardPage() {
   });
 
   const fetchDashboardData = useCallback(async () => {
+    // Fetch daily quests
     try {
-      // Fetch daily quests
       const questsResponse = await api.get<DailyQuest[]>('/quests/daily');
       if (questsResponse.success) {
         setDailyQuests(questsResponse.data.slice(0, 3));
       }
+    } catch (error) {
+      console.error('Failed to fetch quests:', error);
+    }
 
-      // Fetch chat history to count today's messages
+    // Fetch chat history to count today's messages
+    try {
       const chatResponse = await api.get<{ messages: Array<{ createdAt: string }> }>('/chat/history?limit=100');
       if (chatResponse.success) {
         const messages = chatResponse.data.messages || [];
@@ -101,25 +104,31 @@ export default function DashboardPage() {
           messagesToday: todayMessages.length,
         }));
       }
+    } catch (error) {
+      console.error('Failed to fetch chat history:', error);
+    }
 
-      // Fetch gift history
-      const giftResponse = await api.get<{ gifts?: unknown[] } | unknown[]>('/shop/history');
+    // Fetch gift history
+    try {
+      const giftResponse = await api.get<{ items: unknown[]; total: number }>('/shop/history');
       if (giftResponse.success) {
-        const data = giftResponse.data as { gifts?: unknown[] } | unknown[];
-        const gifts = Array.isArray(data) ? data : (data.gifts || []);
         setStats((prev) => ({
           ...prev,
-          giftsGiven: gifts.length,
+          giftsGiven: giftResponse.data.total || 0,
         }));
       }
+    } catch (error) {
+      console.error('Failed to fetch gift history:', error);
+    }
 
-      // Fetch recent memories
-      const memoriesResponse = await api.get<{ memories: Memory[] }>('/memories?limit=3');
+    // Fetch recent memories
+    try {
+      const memoriesResponse = await api.get<{ items: Memory[] }>('/memories?limit=3');
       if (memoriesResponse.success) {
-        setRecentMemories(memoriesResponse.data.memories?.slice(0, 3) || []);
+        setRecentMemories(memoriesResponse.data.items?.slice(0, 3) || []);
       }
     } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
+      console.error('Failed to fetch memories:', error);
     }
   }, []);
 
@@ -211,7 +220,7 @@ export default function DashboardPage() {
                 </div>
                 {/* Mood indicator */}
                 <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-[#181114]/60 backdrop-blur-sm text-sm border border-white/10">
-                  {getMoodEmoji(character?.mood || 'NEUTRAL')} {character?.mood?.toLowerCase() || 'happy'}
+                  {getMoodEmoji(character?.mood || 'neutral')} {character?.mood || 'happy'}
                 </div>
               </div>
 

@@ -50,6 +50,11 @@ export default function ProfileSettingsPage() {
       setIsLoading(true);
       const response = await api.patch('/users/profile', formData);
       if (response.success) {
+        // Update auth store to avoid stale state
+        const { setUser, user: currentUser } = useAuthStore.getState();
+        if (currentUser) {
+          setUser({ ...currentUser, username: formData.username, bio: formData.bio });
+        }
         toast({
           title: 'Thành công',
           description: 'Hồ sơ đã được cập nhật',

@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { cache } from '../../lib/redis';
 import { aiService } from './ai.service';
 import { Message } from '@prisma/client';
 
@@ -20,9 +21,8 @@ interface NotificationTemplate {
   templates: string[];
 }
 
-// In-memory cache for last notification time per character
-// In production, this should be stored in Redis or database
-const lastNotificationCache = new Map<string, { time: Date; type: ProactiveNotificationType }>();
+// Redis key helper for notification cooldown
+const notifCacheKey = (characterId: string) => `proactive_notif:${characterId}`;
 
 // Notification templates based on relationship level
 const NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
@@ -160,8 +160,8 @@ export const proactiveNotificationService = {
     const now = new Date();
     const currentHour = now.getHours();
 
-    // Get last notification sent from in-memory cache
-    const lastNotification = lastNotificationCache.get(characterId);
+    // Get last notification sent from Redis cache
+    const lastNotification = await cache.get<{ time: string; type: ProactiveNotificationType }>(notifCacheKey(characterId));
 
     // Calculate time since last chat
     const lastMessage = character.messages[0];
@@ -186,10 +186,10 @@ export const proactiveNotificationService = {
         if (currentHour < start || currentHour > end) return false;
       }
 
-      // Check cooldown using in-memory cache
+      // Check cooldown using Redis cache
       if (lastNotification) {
         const minutesSinceLastNotification = 
-          (Date.now() - lastNotification.time.getTime()) / (1000 * 60);
+          (Date.now() - new Date(lastNotification.time).getTime()) / (1000 * 60);
         if (minutesSinceLastNotification < template.cooldownMinutes) return false;
       }
 
@@ -211,11 +211,11 @@ export const proactiveNotificationService = {
     // Replace placeholders
     const finalMessage = message.replace(/\{name\}/g, character.user.displayName || 'anh');
 
-    // Update in-memory cache
-    lastNotificationCache.set(characterId, {
-      time: new Date(),
+    // Update Redis cache (TTL = max cooldown = 24h)
+    await cache.set(notifCacheKey(characterId), {
+      time: new Date().toISOString(),
       type: selectedTemplate.type,
-    });
+    }, 60 * 60 * 24);
 
     return {
       shouldSend: true,

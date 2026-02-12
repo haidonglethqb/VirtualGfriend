@@ -100,14 +100,30 @@ export const gameEventService = {
       result.questsCompleted.map((completed) => this.autoClaimQuest(userId, completed.questId, _depth))
     );
 
-    // 4. Check for milestones
+    // 4. Increment Redis milestone counters for relevant actions
+    if (action === 'SEND_MESSAGE') {
+      const key = `milestone_msg_count:${userId}`;
+      const current = await cache.get<number>(key);
+      if (current !== null) {
+        await cache.set(key, current + 1, 3600);
+      }
+    }
+    if (action === 'SEND_GIFT') {
+      const key = `milestone_gift_count:${userId}`;
+      const current = await cache.get<number>(key);
+      if (current !== null) {
+        await cache.set(key, current + 1, 3600);
+      }
+    }
+
+    // 5. Check for milestones
     if (characterId) {
       const milestones = await this.checkMilestones(userId, characterId, action, metadata);
       result.milestonesUnlocked = milestones.unlocked;
       result.newMemories = milestones.memories;
     }
 
-    // 5. Update user stats
+    // 6. Update user stats
     await this.updateUserStats(userId, action);
 
     return result;
@@ -366,10 +382,29 @@ export const gameEventService = {
     if (!user) return { unlocked, memories };
 
     // Get user stats in parallel (batch instead of sequential)
-    const [messageCount, giftCount] = await Promise.all([
-      prisma.message.count({ where: { userId, role: 'USER' } }),
-      prisma.giftHistory.count({ where: { userId } }),
+    // Use Redis counters with DB fallback to avoid expensive COUNT(*)
+    const msgCounterKey = `milestone_msg_count:${userId}`;
+    const giftCounterKey = `milestone_gift_count:${userId}`;
+    const [cachedMsgCount, cachedGiftCount] = await Promise.all([
+      cache.get<number>(msgCounterKey),
+      cache.get<number>(giftCounterKey),
     ]);
+    let messageCount: number;
+    let giftCount: number;
+    if (cachedMsgCount !== null && cachedGiftCount !== null) {
+      messageCount = cachedMsgCount;
+      giftCount = cachedGiftCount;
+    } else {
+      // Fallback: full COUNT, then cache for 1 hour
+      [messageCount, giftCount] = await Promise.all([
+        prisma.message.count({ where: { userId, role: 'USER' } }),
+        prisma.giftHistory.count({ where: { userId } }),
+      ]);
+      await Promise.all([
+        cache.set(msgCounterKey, messageCount, 3600),
+        cache.set(giftCounterKey, giftCount, 3600),
+      ]);
+    }
 
     // Check various milestones
     const milestonesToCheck: { type: MilestoneType; condition: boolean; title: string; description: string }[] = [
@@ -387,19 +422,19 @@ export const gameEventService = {
       },
       {
         type: 'AFFECTION_100',
-        condition: character.affection >= 100 && character.affection < 110,
+        condition: character.affection >= 100,
         title: 'Tình cảm nảy nở',
         description: `Mối quan hệ với ${character.name} đang phát triển tốt đẹp.`,
       },
       {
         type: 'AFFECTION_500',
-        condition: character.affection >= 500 && character.affection < 510,
+        condition: character.affection >= 500,
         title: 'Người bạn thân',
         description: `${character.name} giờ đây là người bạn thân thiết của bạn.`,
       },
       {
         type: 'AFFECTION_1000',
-        condition: character.affection >= 1000 && character.affection < 1010,
+        condition: character.affection >= 1000,
         title: 'Tình yêu đích thực',
         description: `Bạn và ${character.name} đã có một tình yêu sâu đậm.`,
       },

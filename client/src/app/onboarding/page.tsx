@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Heart, Sparkles, ArrowRight } from 'lucide-react';
 import { useCharacterStore } from '@/store/character-store';
+import { useToast } from '@/hooks/use-toast';
 
 const OCCUPATIONS = [
     { value: 'student', label: 'Sinh viên', emoji: '📚' },
@@ -28,6 +29,7 @@ const PERSONALITIES = [
 export default function OnboardingPage() {
     const router = useRouter();
     const { createCharacter } = useCharacterStore();
+    const { toast } = useToast();
     const [step, setStep] = useState(1);
     const [isCreating, setIsCreating] = useState(false);
 
@@ -59,6 +61,11 @@ export default function OnboardingPage() {
             router.push('/dashboard');
         } catch (error) {
             console.error('Failed to create character:', error);
+            toast({
+                title: 'Lỗi tạo nhân vật',
+                description: 'Không thể tạo người yêu ảo. Vui lòng thử lại!',
+                variant: 'destructive',
+            });
             setIsCreating(false);
         }
     };

@@ -17,7 +17,7 @@ interface Quest {
   id: string;
   title: string;
   description: string;
-  type: 'DAILY' | 'WEEKLY' | 'ACHIEVEMENT' | 'STORY';
+  type: 'DAILY' | 'WEEKLY' | 'ACHIEVEMENT' | 'STORY' | 'EVENT';
   category: string;
   requirements: {
     count: number;
@@ -143,7 +143,7 @@ export default function QuestsPage() {
   const filteredQuests = quests.filter((q) => {
     if (activeTab === 'daily') return q.type === 'DAILY';
     if (activeTab === 'weekly') return q.type === 'WEEKLY';
-    if (activeTab === 'achievement') return q.type === 'ACHIEVEMENT' || q.type === 'STORY';
+    if (activeTab === 'achievement') return q.type === 'ACHIEVEMENT' || q.type === 'STORY' || q.type === 'EVENT';
     return true;
   });
 

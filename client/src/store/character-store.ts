@@ -126,13 +126,15 @@ export const useCharacterStore = create<CharacterState>((set) => ({
   addExperience: (xp: number) => {
     set((state) => {
       if (!state.character) return state;
-      const xpPerLevel = 100;
       let newXp = state.character.experience + xp;
       let newLevel = state.character.level;
 
-      while (newXp >= xpPerLevel) {
-        newXp -= xpPerLevel;
+      // XP scaling formula matching backend: 100 + (level - 1) * 50
+      let xpNeeded = 100 + (newLevel - 1) * 50;
+      while (newXp >= xpNeeded) {
+        newXp -= xpNeeded;
         newLevel++;
+        xpNeeded = 100 + (newLevel - 1) * 50;
       }
 
       return { character: { ...state.character, experience: newXp, level: newLevel } };

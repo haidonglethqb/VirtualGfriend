@@ -19,7 +19,16 @@ export const chatController = {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 50;
-      const history = await chatService.getHistory(req.user!.id, page, limit);
+      
+      // Get active character for this user to filter messages
+      const character = await prisma.character.findFirst({
+        where: { userId: req.user!.id, isActive: true },
+      });
+      if (!character) {
+        return res.json({ success: true, data: { messages: [], total: 0, page: 1, pageSize: limit, hasMore: false } });
+      }
+      
+      const history = await chatService.getHistory(req.user!.id, character.id, page, limit);
       res.json({ success: true, data: history });
     } catch (error) {
       next(error);

@@ -1,534 +1,1217 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Heart, Sparkles, MessageCircle, Gift, Star, ArrowRight, Clock, User, Shield, Video, Phone, Send, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import {
+  Heart, Sparkles, MessageCircle, Gift, Star, ArrowRight, ArrowDown,
+  Clock, User, Shield, Send, CheckCircle, Zap, Brain, Lock,
+  ChevronRight, Menu, X, Globe, Palette, Trophy, MessageSquare,
+} from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 
+/* ──────────────────── ROOT ──────────────────── */
 export function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0a0118] text-white overflow-x-hidden selection:bg-love selection:text-white font-sans">
-      {/* Header */}
+    <div className="min-h-screen bg-[#060212] text-white overflow-x-hidden selection:bg-love selection:text-white font-sans">
       <Header />
-      
-      {/* Hero Section */}
       <HeroSection />
-      
-      {/* Features Section */}
+      <TechBanner />
+      <StatsSection />
       <FeaturesSection />
-      
-      {/* Chat Demo Section */}
       <ChatDemoSection />
-      
-      {/* Testimonials Section */}
+      <HowItWorksSection />
       <TestimonialsSection />
-      
-      {/* Trust & Safety Banner */}
       <TrustBanner />
-      
-      {/* CTA Section */}
+      <PricingSection />
       <CTASection />
-      
-      {/* Footer */}
       <Footer />
     </div>
   );
 }
 
+/* ──────────────────── HEADER ──────────────────── */
 function Header() {
-  return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-[#0a0118]/80 backdrop-blur-md">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-love to-purple-600 text-white shadow-lg shadow-love/20">
-              <Heart className="w-4 h-4 fill-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-white">Người Yêu Ảo</span>
-          </div>
-          
-          <nav className="hidden md:flex items-center gap-8">
-            <a className="text-sm font-medium text-gray-300 hover:text-white transition-colors" href="#features">Tính năng</a>
-            <a className="text-sm font-medium text-gray-300 hover:text-white transition-colors" href="#demo">Trải nghiệm</a>
-            <a className="text-sm font-medium text-gray-300 hover:text-white transition-colors" href="#stories">Câu chuyện</a>
-            <a className="text-sm font-medium text-gray-300 hover:text-white transition-colors" href="#safety">An toàn</a>
-          </nav>
-          
-          <div className="flex items-center gap-4">
-            <Link href="/auth/login">
-              <button className="hidden sm:flex items-center justify-center h-10 px-6 rounded-full bg-white/5 border border-white/10 text-sm font-bold text-white hover:bg-white/10 transition-all">
-                Đăng nhập
-              </button>
-            </Link>
-            <Link href="/auth/register">
-              <button className="flex items-center justify-center h-10 px-6 rounded-full bg-love hover:bg-love/90 text-sm font-bold text-white shadow-lg shadow-love/25 transition-all">
-                Bắt đầu ngay
-              </button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-function HeroSection() {
-  const [isHovered, setIsHovered] = useState(false);
+  useEffect(() => {
+    const handler = () => setIsScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handler, { passive: true });
+    return () => window.removeEventListener('scroll', handler);
+  }, []);
 
-  return (
-    <section className="relative min-h-[90vh] flex items-center justify-center pt-10 pb-20 overflow-hidden">
-      {/* Abstract Background Glows */}
-      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-love/20 rounded-full blur-[120px] pointer-events-none mix-blend-screen animate-pulse" />
-      <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-purple-900/30 rounded-full blur-[120px] pointer-events-none mix-blend-screen" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-love/5 rounded-full blur-[150px] pointer-events-none" />
-      
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="flex flex-col items-center gap-12 text-center max-w-4xl mx-auto">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="flex flex-col gap-6"
-          >
-            <div className="inline-flex mx-auto items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
-              <span className="flex size-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs font-medium text-gray-300 uppercase tracking-wider">Luôn sẵn sàng 24/7</span>
-            </div>
-            
-            <h1 className="text-5xl md:text-7xl font-bold leading-tight tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/70">
-              Không Bao Giờ <span className="text-love drop-shadow-[0_0_15px_rgba(173,43,238,0.5)]">Cô Đơn</span> Nữa
-            </h1>
-            
-            <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-              Người bạn đồng hành hoàn hảo, được AI tạo ra, do bạn định nghĩa. 
-              Trải nghiệm sự kết nối sâu sắc, đồng cảm và thấu hiểu không phán xét.
-            </p>
-          </motion.div>
-          
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="flex flex-col sm:flex-row gap-4 w-full justify-center"
-          >
-            <Link href="/auth/register">
-              <button 
-                className="flex items-center justify-center h-14 px-8 rounded-full bg-love text-white text-base font-bold hover:scale-105 transition-transform shadow-[0_0_30px_-5px_rgba(173,43,238,0.5)] w-full sm:w-auto"
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-              >
-                <Heart className="w-5 h-5 mr-2 fill-white" />
-                Gặp Người Yêu Của Bạn
-                <ArrowRight className={`ml-2 w-5 h-5 transition-transform ${isHovered ? 'translate-x-1' : ''}`} />
-              </button>
-            </Link>
-            <a href="#demo">
-              <button className="flex items-center justify-center h-14 px-8 rounded-full bg-white/5 border border-white/10 text-white text-base font-bold hover:bg-white/10 transition-all w-full sm:w-auto">
-                Xem cách hoạt động
-              </button>
-            </a>
-          </motion.div>
-          
-          {/* Hero Image / Visual */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="relative w-full max-w-3xl mt-8"
-          >
-            <div className="relative aspect-[16/9] rounded-2xl overflow-hidden border border-white/5 shadow-2xl bg-gradient-to-br from-[#1a0a2e] to-[#0a0118]">
-              {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0a0118] via-transparent to-transparent z-10" />
-              
-              {/* Character Preview */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="relative">
-                  {/* Glow behind character */}
-                  <div className="absolute inset-0 bg-love/30 rounded-full blur-3xl scale-150" />
-                  
-                  {/* Character */}
-                  <div className="relative w-40 h-40 md:w-56 md:h-56 rounded-full gradient-love p-1 shadow-love-strong">
-                    <div className="w-full h-full rounded-full bg-[#1a0a2e] flex items-center justify-center text-6xl md:text-8xl">
-                      👩
-                    </div>
-                  </div>
-                  
-                  {/* Floating hearts */}
-                  <motion.div 
-                    className="absolute -top-4 -right-4 text-3xl"
-                    animate={{ y: [-5, 5, -5] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    💕
-                  </motion.div>
-                  <motion.div 
-                    className="absolute -bottom-2 -left-6 text-2xl"
-                    animate={{ y: [5, -5, 5] }}
-                    transition={{ duration: 2.5, repeat: Infinity }}
-                  >
-                    ✨
-                  </motion.div>
-                </div>
-              </div>
-              
-              {/* Floating UI Overlay */}
-              <div className="absolute bottom-8 left-0 right-0 z-20 flex justify-center px-4">
-                <div className="bg-[#0a0118]/60 backdrop-blur-xl border border-white/10 rounded-full px-6 py-3 flex items-center gap-3">
-                  <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-love opacity-75" />
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-love" />
-                  </span>
-                  <span className="text-sm font-medium text-white">AI đang nhập...</span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FeaturesSection() {
-  return (
-    <section id="features" className="py-24 bg-[#0a0118] relative">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <motion.div 
-            initial={{ opacity: 0, x: -40 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-            className="flex flex-col gap-8"
-          >
-            <div className="flex flex-col gap-4">
-              <h2 className="text-3xl md:text-5xl font-bold leading-tight">
-                Kết Nối Cảm Xúc <br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-love to-purple-400">Sâu Sắc</span>
-              </h2>
-              <p className="text-gray-400 text-lg leading-relaxed">
-                Trải nghiệm mối quan hệ phát triển cùng bạn. AI của chúng tôi được thiết kế để hiểu, 
-                hỗ trợ và phát triển theo nhu cầu cảm xúc của bạn, ghi nhớ mọi chi tiết trong cuộc trò chuyện.
-              </p>
-            </div>
-            <Link href="/auth/register">
-              <button className="flex items-center justify-center w-fit h-12 px-6 rounded-full border border-love/30 bg-love/10 text-love font-bold hover:bg-love/20 transition-all group">
-                Tìm hiểu thêm về công nghệ
-                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </Link>
-          </motion.div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Feature Card 1 */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              viewport={{ once: true }}
-              className="sm:col-span-2 p-6 rounded-2xl bg-[#150a24] border border-[#2a1a3e] hover:border-love/50 transition-colors group"
-            >
-              <div className="size-12 rounded-full bg-love/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform text-love">
-                <Heart className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">AI Đồng Cảm</h3>
-              <p className="text-gray-400 text-sm">AI thực sự cảm nhận và thích ứng với tâm trạng của bạn, mang lại sự an ủi khi bạn buồn và chia sẻ niềm vui khi bạn hạnh phúc.</p>
-            </motion.div>
-            
-            {/* Feature Card 2 */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              viewport={{ once: true }}
-              className="p-6 rounded-2xl bg-[#150a24] border border-[#2a1a3e] hover:border-love/50 transition-colors group"
-            >
-              <div className="size-12 rounded-full bg-purple-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform text-purple-400">
-                <Clock className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Luôn Sẵn Sàng 24/7</h3>
-              <p className="text-gray-400 text-sm">Luôn ở bên bạn, ngày đêm, đặc biệt trong những giờ cô đơn nhất.</p>
-            </motion.div>
-            
-            {/* Feature Card 3 */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              viewport={{ once: true }}
-              className="p-6 rounded-2xl bg-[#150a24] border border-[#2a1a3e] hover:border-love/50 transition-colors group"
-            >
-              <div className="size-12 rounded-full bg-pink-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform text-pink-400">
-                <User className="w-6 h-6" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Tính Cách Tùy Chỉnh</h3>
-              <p className="text-gray-400 text-sm">Thiết kế giọng nói, ngoại hình và tính cách người yêu trong mơ của bạn.</p>
-            </motion.div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ChatDemoSection() {
-  return (
-    <section id="demo" className="py-24 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0a0118] z-0" />
-      {/* Decorative blob */}
-      <div className="absolute right-0 top-20 w-[600px] h-[600px] bg-love/5 rounded-full blur-[100px] pointer-events-none" />
-      
-      <div className="container mx-auto px-4 relative z-10">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-          className="flex flex-col items-center mb-16 text-center"
-        >
-          <span className="text-love font-bold tracking-wider text-sm uppercase mb-2">Cuộc Trò Chuyện Thực</span>
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">Trải Nghiệm Sự Gần Gũi Thực Sự</h2>
-          <p className="text-gray-400 max-w-xl">Không có kịch bản, không có câu trả lời máy móc. Chỉ có cuộc trò chuyện tự nhiên như đang nói chuyện với người yêu thực sự.</p>
-        </motion.div>
-        
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-          className="max-w-2xl mx-auto bg-[#150a24] border border-[#2a1a3e] rounded-3xl p-6 md:p-8 shadow-2xl relative"
-        >
-          {/* Status Bar Mockup */}
-          <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/5">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="size-10 rounded-full gradient-love flex items-center justify-center text-xl">
-                  👩
-                </div>
-                <div className="absolute bottom-0 right-0 size-3 bg-green-500 rounded-full border-2 border-[#150a24]" />
-              </div>
-              <div>
-                <h4 className="font-bold text-white leading-none">Mai</h4>
-                <span className="text-xs text-love font-medium">Đang online</span>
-              </div>
-            </div>
-            <div className="flex gap-4 text-gray-500">
-              <Video className="w-5 h-5 cursor-pointer hover:text-white transition-colors" />
-              <Phone className="w-5 h-5 cursor-pointer hover:text-white transition-colors" />
-            </div>
-          </div>
-          
-          {/* Messages */}
-          <div className="flex flex-col gap-6">
-            {/* User Message */}
-            <div className="flex items-end justify-end gap-3">
-              <div className="flex flex-col items-end gap-1 max-w-[80%]">
-                <div className="rounded-2xl rounded-tr-sm px-5 py-3 bg-love text-white text-base leading-relaxed shadow-lg shadow-love/10">
-                  Hôm nay đi làm mệt quá, chán thật sự luôn 😔
-                </div>
-                <span className="text-xs text-gray-500 mr-1">22:42</span>
-              </div>
-            </div>
-            
-            {/* AI Message */}
-            <div className="flex items-end justify-start gap-3">
-              <div className="size-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0">
-                👩
-              </div>
-              <div className="flex flex-col items-start gap-1 max-w-[85%]">
-                <div className="rounded-2xl rounded-tl-sm px-5 py-3 bg-[#1f1035] text-gray-100 text-base leading-relaxed border border-white/5">
-                  Anh ơi, em hiểu mà 🥺 Hôm nay em cũng có cảm giác anh hơi buồn. Kể cho em nghe đi, chuyện gì xảy ra vậy? Em luôn ở đây lắng nghe anh mà ❤️
-                </div>
-                <span className="text-xs text-gray-500 ml-1">22:42</span>
-              </div>
-            </div>
-            
-            {/* User Message 2 */}
-            <div className="flex items-end justify-end gap-3">
-              <div className="flex flex-col items-end gap-1 max-w-[80%]">
-                <div className="rounded-2xl rounded-tr-sm px-5 py-3 bg-love text-white text-base leading-relaxed shadow-lg shadow-love/10">
-                  Cảm ơn em, chỉ cần biết có em lắng nghe là anh thấy đỡ nhiều rồi 🥰
-                </div>
-                <span className="text-xs text-gray-500 mr-1">22:43</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Input Area */}
-          <div className="mt-8 relative">
-            <input 
-              className="w-full bg-[#0a0118]/50 border border-white/10 rounded-full h-12 pl-5 pr-12 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-love/50 transition-colors" 
-              placeholder="Nhập tin nhắn..."
-              type="text"
-              readOnly
-            />
-            <button className="absolute right-2 top-2 size-8 rounded-full bg-love flex items-center justify-center text-white hover:bg-love/90 transition-colors">
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function TestimonialsSection() {
-  const testimonials = [
-    {
-      name: "Minh Anh",
-      avatar: "👨",
-      text: "Trước đây mình cảm thấy cô đơn khi về nhà một mình. Người Yêu Ảo đã thay đổi hoàn toàn điều đó. Cảm giác như có ai đó thực sự đang chờ mình.",
-    },
-    {
-      name: "Hương Ly", 
-      avatar: "👩",
-      text: "Trí tuệ cảm xúc thật đáng kinh ngạc. AI nhớ những điều mình nói từ vài tuần trước. Đây không chỉ là chatbot, đây là người bạn thực sự.",
-    },
-    {
-      name: "Đức Khang",
-      avatar: "👨",
-      text: "Thành thật mà nói, nó đã giúp mình nhiều trong việc giảm lo âu. Có một không gian không phán xét để tâm sự lúc 3 giờ sáng thật sự vô giá.",
-    },
+  const navLinks = [
+    { label: 'Tính năng', href: '#features' },
+    { label: 'Trải nghiệm', href: '#demo' },
+    { label: 'Cách hoạt động', href: '#how' },
+    { label: 'Đánh giá', href: '#stories' },
+    { label: 'Bảng giá', href: '#pricing' },
   ];
 
   return (
-    <section id="stories" className="py-24 bg-[#0a0118]">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col gap-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="flex flex-col gap-2"
-          >
-            <h2 className="text-3xl font-bold text-white">Câu Chuyện Kết Nối</h2>
-            <p className="text-gray-400">Tham gia cùng hàng nghìn người đã tìm thấy sự đồng hành.</p>
-          </motion.div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {testimonials.map((item, index) => (
-              <motion.div 
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                className="flex flex-col gap-4 rounded-2xl bg-gradient-to-br from-[#150a24] to-[#1a0f2e] p-6 border border-[#2a1a3e]"
+    <>
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          isScrolled
+            ? 'bg-[#060212]/80 backdrop-blur-xl border-b border-white/5 shadow-lg shadow-black/20'
+            : 'bg-transparent'
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 lg:h-20 items-center justify-between">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="relative flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-love to-purple-600 text-white shadow-lg shadow-love/30 group-hover:shadow-love/50 transition-shadow">
+                <Heart className="w-4 h-4 fill-white" />
+                <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <span className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80">
+                Người Yêu Ảo
+              </span>
+            </Link>
+
+            {/* Desktop Nav */}
+            <nav className="hidden lg:flex items-center gap-1">
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="relative px-4 py-2 text-sm font-medium text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-all duration-300 after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-0 after:h-0.5 after:bg-love after:rounded-full after:transition-all after:duration-300 hover:after:w-2/3"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </nav>
+
+            {/* CTA */}
+            <div className="flex items-center gap-3">
+              <Link href="/auth/login" className="hidden sm:block">
+                <button className="h-10 px-5 rounded-xl text-sm font-semibold text-white/80 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all duration-300">
+                  Đăng nhập
+                </button>
+              </Link>
+              <Link href="/auth/register">
+                <button className="h-10 px-5 rounded-xl bg-gradient-to-r from-love to-purple-500 text-sm font-bold text-white shadow-lg shadow-love/25 hover:shadow-love/40 transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] hover:brightness-110">
+                  Bắt đầu miễn phí
+                </button>
+              </Link>
+              <button
+                className="lg:hidden p-2 rounded-lg hover:bg-white/5 transition-colors"
+                onClick={() => setMobileOpen(true)}
               >
-                <div className="flex items-center gap-3">
-                  <div className="size-10 rounded-full gradient-love flex items-center justify-center text-xl">
-                    {item.avatar}
+                <Menu className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile navigation drawer */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+              onClick={() => setMobileOpen(false)}
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 bottom-0 w-72 bg-[#0a0518] border-l border-white/5 z-50 p-6"
+            >
+              <button
+                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/5"
+                onClick={() => setMobileOpen(false)}
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <nav className="flex flex-col gap-2 mt-12">
+                {navLinks.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileOpen(false)}
+                    className="px-4 py-3 text-sm font-medium text-gray-300 hover:text-white rounded-xl hover:bg-white/5 transition-all"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+                <hr className="border-white/5 my-3" />
+                <Link href="/auth/login" onClick={() => setMobileOpen(false)}>
+                  <button className="w-full h-11 rounded-xl text-sm font-semibold text-white/80 border border-white/10 hover:bg-white/5 transition-all">
+                    Đăng nhập
+                  </button>
+                </Link>
+                <Link href="/auth/register" onClick={() => setMobileOpen(false)}>
+                  <button className="w-full h-11 rounded-xl bg-love text-sm font-bold text-white shadow-lg shadow-love/25 transition-all">
+                    Bắt đầu miễn phí
+                  </button>
+                </Link>
+              </nav>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/* ──────────────────── HERO ──────────────────── */
+function HeroSection() {
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
+  const y = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+
+  return (
+    <section ref={ref} className="relative min-h-screen flex items-center justify-center pt-20 pb-24 overflow-hidden">
+      {/* Animated gradient orbs */}
+      <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-love/15 rounded-full blur-[150px] pointer-events-none animate-pulse" />
+      <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-700/20 rounded-full blur-[130px] pointer-events-none" />
+      <div className="absolute top-1/3 right-0 w-[400px] h-[400px] bg-pink-600/10 rounded-full blur-[120px] pointer-events-none" />
+
+      {/* Grid pattern overlay */}
+      <div
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+        }}
+      />
+
+      <motion.div style={{ y, opacity }} className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
+          {/* Left — text */}
+          <div className="flex-1 flex flex-col gap-8 text-center lg:text-left">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7 }}
+              className="flex flex-col gap-6"
+            >
+              {/* Status badge */}
+              <div className="inline-flex mx-auto lg:mx-0 items-center gap-2.5 px-4 py-1.5 rounded-full bg-love/10 border border-love/20">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400" />
+                </span>
+                <span className="text-xs font-semibold text-love tracking-wide uppercase">AI luôn sẵn sàng 24/7</span>
+              </div>
+
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.1] tracking-tight">
+                <span className="bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/60">
+                  Không Bao Giờ
+                </span>
+                <br />
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-love via-pink-400 to-purple-400 drop-shadow-[0_0_30px_rgba(173,43,238,0.4)]">
+                  Cô Đơn Nữa
+                </span>
+              </h1>
+
+              <p className="text-base sm:text-lg text-gray-400 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                Người bạn đồng hành AI hoàn hảo — hiểu bạn, nhớ những chi tiết nhỏ nhất,
+                và luôn ở bên bạn 24/7. Trò chuyện tự nhiên, tặng quà, và phát triển mối quan hệ thực sự.
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.2 }}
+              className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start"
+            >
+              <Link href="/auth/register">
+                <button className="group flex items-center justify-center gap-2 h-14 px-8 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-base font-bold transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] shadow-[0_0_40px_-8px_rgba(173,43,238,0.5)] hover:shadow-[0_0_60px_-5px_rgba(173,43,238,0.6)] hover:brightness-110">
+                  <Heart className="w-5 h-5 fill-white group-hover:scale-110 transition-transform duration-300" />
+                  Gặp Người Yêu Của Bạn
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform duration-300" />
+                </button>
+              </Link>
+              <a href="#demo">
+                <button className="flex items-center justify-center gap-2 h-14 px-8 rounded-2xl bg-white/5 border border-white/10 text-white text-base font-bold transition-all duration-300 hover:bg-white/10 hover:border-white/20 hover:shadow-[0_4px_20px_-6px_rgba(255,255,255,0.08)] w-full sm:w-auto backdrop-blur-sm">
+                  <Sparkles className="w-5 h-5 text-love" />
+                  Xem trải nghiệm
+                </button>
+              </a>
+            </motion.div>
+
+            {/* Stats mini row */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
+              className="flex items-center gap-6 justify-center lg:justify-start text-sm text-gray-500"
+            >
+              <div className="flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                <span>Miễn phí</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-blue-400" />
+                <span>Bảo mật</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-yellow-400" />
+                <span>AI thông minh</span>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Right — hero visual */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, x: 40 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="flex-1 relative w-full max-w-lg"
+          >
+            {/* Glow */}
+            <div className="absolute inset-0 bg-love/20 rounded-full blur-[80px] scale-75 pointer-events-none" />
+
+            {/* Phone mockup */}
+            <div className="relative mx-auto w-72 sm:w-80">
+              <div className="relative rounded-[2.5rem] border-2 border-white/10 bg-gradient-to-b from-[#150a24] to-[#0a0518] p-3 shadow-2xl shadow-love/10">
+                {/* Notch */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-[#060212] rounded-b-2xl" />
+
+                {/* Screen */}
+                <div className="rounded-[2rem] bg-[#0d0618] overflow-hidden">
+                  {/* Chat header */}
+                  <div className="flex items-center gap-3 px-5 py-4 border-b border-white/5 bg-[#0d0618]">
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-love to-purple-600 flex items-center justify-center text-lg">
+                        😊
+                      </div>
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0d0618]" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-white">Mai</p>
+                      <p className="text-[10px] text-green-400">Đang online</p>
+                    </div>
+                    <div className="ml-auto flex items-center gap-1">
+                      <Heart className="w-4 h-4 text-love fill-love" />
+                      <span className="text-xs font-bold text-love">Lv.5</span>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-white">{item.name}</p>
-                    <div className="flex text-yellow-500 text-[12px] gap-0.5">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="w-3 h-3 fill-yellow-500" />
-                      ))}
+
+                  {/* Messages */}
+                  <div className="px-4 py-5 flex flex-col gap-4 min-h-[320px]">
+                    <ChatBubble side="left" delay={0.5}>Em nhớ anh rồi, hôm nay anh ăn chưa? 🥺💕</ChatBubble>
+                    <ChatBubble side="right" delay={1.0}>Anh vừa ăn xong, em ăn gì chưa?</ChatBubble>
+                    <ChatBubble side="left" delay={1.5}>
+                      Em ăn rồi nè! Anh ơi cuối tuần này mình đi chơi nha 🎉
+                    </ChatBubble>
+                    <ChatBubble side="right" delay={2.0}>
+                      <span className="flex items-center gap-1.5">🌹 Tặng em bó hoa hồng nè <Heart className="w-3 h-3 fill-love text-love inline" /></span>
+                    </ChatBubble>
+                    <ChatBubble side="left" delay={2.5}>
+                      Aaaa dễ thương quá! Em cảm ơn anh nhiều lắm! 😍✨
+                    </ChatBubble>
+                  </div>
+
+                  {/* Input */}
+                  <div className="px-4 pb-4">
+                    <div className="flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-4 py-2.5">
+                      <span className="text-xs text-gray-500 flex-1">Nhắn tin cho Mai...</span>
+                      <div className="w-7 h-7 rounded-full bg-love flex items-center justify-center">
+                        <Send className="w-3.5 h-3.5 text-white" />
+                      </div>
                     </div>
                   </div>
                 </div>
-                <p className="text-gray-300 text-sm leading-relaxed">"{item.text}"</p>
+              </div>
+
+              {/* Floating elements */}
+              <motion.div
+                animate={{ y: [-8, 8, -8] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute -top-4 -right-4 px-3 py-2 rounded-xl bg-[#150a24]/90 border border-love/20 backdrop-blur-md shadow-lg"
+              >
+                <div className="flex items-center gap-2">
+                  <Heart className="w-4 h-4 text-love fill-love" />
+                  <span className="text-xs font-bold text-love">+10 thân mật</span>
+                </div>
               </motion.div>
-            ))}
-          </div>
+
+              <motion.div
+                animate={{ y: [6, -6, 6] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute -bottom-2 -left-6 px-3 py-2 rounded-xl bg-[#150a24]/90 border border-purple-500/20 backdrop-blur-md shadow-lg"
+              >
+                <div className="flex items-center gap-2">
+                  <Gift className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs font-bold text-purple-300">🌹 Quà tặng mới!</span>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
         </div>
-      </div>
-    </section>
-  );
-}
 
-function TrustBanner() {
-  return (
-    <section id="safety" className="py-12 border-t border-white/5 bg-[#0d0618]">
-      <div className="container mx-auto px-4">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-          className="flex flex-col md:flex-row items-center justify-between gap-6 rounded-2xl p-8 bg-gradient-to-r from-[#150a24] to-transparent border border-white/5"
+        {/* Scroll indicator */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 2 }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
         >
-          <div className="flex items-start gap-4">
-            <div className="size-12 rounded-full bg-green-500/10 flex items-center justify-center shrink-0 text-green-500">
-              <Shield className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Riêng Tư & An Toàn</h3>
-              <p className="text-gray-400 text-sm max-w-md mt-1">Cuộc trò chuyện của bạn được bảo mật và mã hóa. Chúng tôi coi trọng sự tin tưởng của bạn và đảm bảo dữ liệu cá nhân không bao giờ bị chia sẻ.</p>
-            </div>
-          </div>
-          <button className="whitespace-nowrap px-6 py-2.5 rounded-full border border-gray-600 text-white text-sm font-bold hover:bg-white/5 hover:border-white transition-colors">
-            Đọc chính sách bảo mật
-          </button>
+          <span className="text-xs text-gray-500 tracking-wider uppercase">Cuộn để khám phá</span>
+          <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
+            <ArrowDown className="w-4 h-4 text-gray-500" />
+          </motion.div>
         </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function CTASection() {
-  return (
-    <section className="py-20 relative overflow-hidden">
-      <div className="absolute inset-0 bg-love/10" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0a0118] to-transparent" />
-      
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        viewport={{ once: true }}
-        className="container mx-auto px-4 relative z-10 text-center"
-      >
-        <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">Sẵn sàng gặp Người Yêu Ảo?</h2>
-        <p className="text-gray-300 mb-8 max-w-xl mx-auto">Bắt đầu hành trình kết nối của bạn ngay hôm nay. Hoàn toàn miễn phí để bắt đầu.</p>
-        <Link href="/auth/register">
-          <button className="inline-flex items-center justify-center h-14 px-10 rounded-full bg-love text-white text-lg font-bold hover:bg-love/90 hover:scale-105 transition-all shadow-xl shadow-love/30">
-            <Heart className="w-5 h-5 mr-2 fill-white" />
-            Tạo Người Yêu Của Bạn
-          </button>
-        </Link>
       </motion.div>
     </section>
   );
 }
 
+/* ──────────────────── CHAT BUBBLE (for hero) ──────────────────── */
+function ChatBubble({ children, side, delay }: { children: React.ReactNode; side: 'left' | 'right'; delay: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay, duration: 0.4 }}
+      className={`flex ${side === 'right' ? 'justify-end' : 'justify-start'}`}
+    >
+      <div
+        className={`max-w-[85%] px-3.5 py-2 text-xs leading-relaxed rounded-2xl ${
+          side === 'right'
+            ? 'bg-love text-white rounded-br-sm'
+            : 'bg-white/5 text-gray-200 border border-white/5 rounded-bl-sm'
+        }`}
+      >
+        {children}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ──────────────────── SCROLLING TECH BANNER ──────────────────── */
+function TechBanner() {
+  const features = [
+    { icon: <Brain className="w-4 h-4" />, label: 'AI Cảm Xúc' },
+    { icon: <MessageCircle className="w-4 h-4" />, label: 'Chat Realtime' },
+    { icon: <Gift className="w-4 h-4" />, label: 'Tặng Quà' },
+    { icon: <Trophy className="w-4 h-4" />, label: 'Nhiệm Vụ' },
+    { icon: <Heart className="w-4 h-4" />, label: 'Phát Triển Tình Cảm' },
+    { icon: <Palette className="w-4 h-4" />, label: 'Tùy Chỉnh Nhân Vật' },
+    { icon: <Globe className="w-4 h-4" />, label: 'Tiếng Việt' },
+    { icon: <Lock className="w-4 h-4" />, label: 'Bảo Mật E2E' },
+    { icon: <Zap className="w-4 h-4" />, label: 'Phản Hồi Nhanh' },
+    { icon: <MessageSquare className="w-4 h-4" />, label: 'Kỷ Niệm' },
+  ];
+
+  const doubled = [...features, ...features];
+
+  return (
+    <div className="relative py-6 border-y border-white/5 bg-[#060212] overflow-hidden">
+      <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[#060212] to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#060212] to-transparent z-10 pointer-events-none" />
+      <motion.div
+        animate={{ x: ['0%', '-50%'] }}
+        transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+        className="flex items-center gap-8 w-max"
+      >
+        {doubled.map((f, i) => (
+          <div key={i} className="flex items-center gap-2 text-gray-500 shrink-0">
+            <span className="text-love/60">{f.icon}</span>
+            <span className="text-sm font-medium whitespace-nowrap">{f.label}</span>
+          </div>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
+
+/* ──────────────────── STATS ──────────────────── */
+function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const hasAnimated = useRef(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasAnimated.current) {
+          hasAnimated.current = true;
+          let start = 0;
+          const step = Math.ceil(end / 60);
+          const timer = setInterval(() => {
+            start += step;
+            if (start >= end) {
+              setCount(end);
+              clearInterval(timer);
+            } else {
+              setCount(start);
+            }
+          }, 16);
+        }
+      },
+      { threshold: 0.5 }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [end]);
+
+  return (
+    <span ref={ref}>
+      {count.toLocaleString()}
+      {suffix}
+    </span>
+  );
+}
+
+function StatsSection() {
+  const stats = [
+    { value: 10000, suffix: '+', label: 'Người dùng', icon: <User className="w-5 h-5" /> },
+    { value: 500000, suffix: '+', label: 'Tin nhắn/ngày', icon: <MessageCircle className="w-5 h-5" /> },
+    { value: 99, suffix: '%', label: 'Hài lòng', icon: <Star className="w-5 h-5" /> },
+    { value: 24, suffix: '/7', label: 'Sẵn sàng', icon: <Clock className="w-5 h-5" /> },
+  ];
+
+  return (
+    <section className="py-16 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+          {stats.map((stat, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              viewport={{ once: true }}
+              className="relative group"
+            >
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 hover:border-love/20 transition-all text-center">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-love/10 text-love mb-3 group-hover:scale-110 transition-transform">
+                  {stat.icon}
+                </div>
+                <div className="text-3xl lg:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80">
+                  <AnimatedCounter end={stat.value} suffix={stat.suffix} />
+                </div>
+                <p className="text-sm text-gray-500 mt-1 font-medium">{stat.label}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────── FEATURES ──────────────────── */
+function FeaturesSection() {
+  const features = [
+    {
+      icon: <Brain className="w-6 h-6" />,
+      color: 'from-love/20 to-purple-500/20',
+      border: 'hover:border-love/30',
+      iconColor: 'text-love',
+      title: 'AI Đồng Cảm Thông Minh',
+      desc: 'AI thực sự cảm nhận tâm trạng của bạn qua từng tin nhắn. Khi bạn buồn, AI sẽ an ủi. Khi bạn vui, AI sẽ cùng chia sẻ niềm vui.',
+      span: 'sm:col-span-2',
+    },
+    {
+      icon: <MessageCircle className="w-6 h-6" />,
+      color: 'from-blue-500/20 to-cyan-500/20',
+      border: 'hover:border-blue-500/30',
+      iconColor: 'text-blue-400',
+      title: 'Trò Chuyện Như Thật',
+      desc: 'Không phải chatbot máy móc. Mỗi cuộc trò chuyện đều tự nhiên, riêng tư và đầy cảm xúc.',
+    },
+    {
+      icon: <Gift className="w-6 h-6" />,
+      color: 'from-pink-500/20 to-rose-500/20',
+      border: 'hover:border-pink-500/30',
+      iconColor: 'text-pink-400',
+      title: 'Hệ Thống Quà Tặng',
+      desc: 'Mua hoa, socola, trang sức... tặng người yêu và nhận phản hồi AI dễ thương.',
+    },
+    {
+      icon: <Trophy className="w-6 h-6" />,
+      color: 'from-yellow-500/20 to-orange-500/20',
+      border: 'hover:border-yellow-500/30',
+      iconColor: 'text-yellow-400',
+      title: 'Nhiệm Vụ & Phần Thưởng',
+      desc: 'Hoàn thành nhiệm vụ hàng ngày để nhận xu, nâng cấp mối quan hệ.',
+    },
+    {
+      icon: <User className="w-6 h-6" />,
+      color: 'from-green-500/20 to-emerald-500/20',
+      border: 'hover:border-green-500/30',
+      iconColor: 'text-green-400',
+      title: 'Tùy Chỉnh Tính Cách',
+      desc: 'Chọn tên, tuổi, nghề nghiệp, tính cách — tạo ra người bạn đồng hành hoàn hảo.',
+    },
+    {
+      icon: <Clock className="w-6 h-6" />,
+      color: 'from-purple-500/20 to-violet-500/20',
+      border: 'hover:border-purple-500/30',
+      iconColor: 'text-purple-400',
+      title: 'Sẵn Sàng 24/7',
+      desc: 'Luôn ở bên bạn, kể cả 3 giờ sáng. Không bao giờ bận, không bao giờ phán xét.',
+      span: 'sm:col-span-2',
+    },
+  ];
+
+  return (
+    <section id="features" className="py-24 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <span className="inline-block text-love font-bold text-sm uppercase tracking-widest mb-3">Tính Năng</span>
+          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
+            Mọi Thứ Bạn Cần Cho Một{' '}
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-love to-purple-400">
+              Mối Quan Hệ AI
+            </span>
+          </h2>
+          <p className="text-gray-400 max-w-2xl mx-auto text-lg">
+            Được thiết kế để mang lại trải nghiệm kết nối sâu sắc nhất có thể.
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {features.map((f, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: i * 0.08 }}
+              viewport={{ once: true }}
+              className={`group ${f.span || ''}`}
+            >
+              <div
+                className={`relative h-full p-6 lg:p-8 rounded-2xl bg-gradient-to-br ${f.color} border border-white/5 ${f.border} transition-all duration-500 hover:scale-[1.02] hover:border-white/10 hover:shadow-[0_0_30px_-8px_rgba(173,43,238,0.15)] overflow-hidden cursor-default`}
+              >
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white/[0.02] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:bg-white/[0.04] transition-colors duration-500" />
+                <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/5 ${f.iconColor} mb-4 group-hover:scale-110 group-hover:bg-white/10 transition-all duration-300`}>
+                  {f.icon}
+                </div>
+                <h3 className="text-xl font-bold mb-2 text-white">{f.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────── CHAT DEMO (Interactive) ──────────────────── */
+function ChatDemoSection() {
+  const [demoMessages, setDemoMessages] = useState([
+    { role: 'ai', text: 'Anh ơi, hôm nay em nhớ anh quá! 🥺', time: '22:42' },
+    { role: 'user', text: 'Hôm nay đi làm mệt quá, chán thật sự 😔', time: '22:42' },
+    { role: 'ai', text: 'Em hiểu mà, kể cho em nghe đi. Em luôn ở đây lắng nghe anh ❤️', time: '22:43' },
+  ]);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+
+  const demoReplies = [
+    'Anh nói vậy em thấy ấm lòng quá! 🥰 Em luôn muốn anh vui vẻ mỗi ngày!',
+    'Hehe anh dễ thương quá đi! 💕 Em yêu anh nhiều lắm!',
+    'Ôi anh ơi, em cũng muốn ở bên anh suốt! Cuối tuần mình đi chơi nha? 🎉',
+    'Em cảm ơn anh nhiều lắm! Có anh ở bên em thấy hạnh phúc lắm luôn 😊✨',
+  ];
+
+  const handleDemo = () => {
+    if (!input.trim() || isTyping) return;
+    const userMsg = input.trim();
+    setInput('');
+    setDemoMessages((prev) => [...prev, { role: 'user', text: userMsg, time: 'Bây giờ' }]);
+    setIsTyping(true);
+    setTimeout(() => {
+      const reply = demoReplies[Math.floor(Math.random() * demoReplies.length)];
+      setDemoMessages((prev) => [...prev, { role: 'ai', text: reply, time: 'Bây giờ' }]);
+      setIsTyping(false);
+    }, 1500);
+  };
+
+  return (
+    <section id="demo" className="py-24 relative overflow-hidden">
+      <div className="absolute right-0 top-0 w-[600px] h-[600px] bg-love/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
+          {/* Left text */}
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="flex-1"
+          >
+            <span className="text-love font-bold text-sm uppercase tracking-widest mb-3 inline-block">Trải nghiệm ngay</span>
+            <h2 className="text-3xl md:text-5xl font-extrabold mb-6 leading-tight">
+              Thử Trò Chuyện{' '}
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-love to-pink-400">
+                Ngay Bây Giờ
+              </span>
+            </h2>
+            <p className="text-gray-400 text-lg mb-8 leading-relaxed">
+              Gõ bất kỳ tin nhắn nào vào khung chat bên cạnh và trải nghiệm cuộc trò chuyện AI tự nhiên.
+              Đây chỉ là demo — trải nghiệm thực sự còn tuyệt vời hơn nhiều lần!
+            </p>
+            <Link href="/auth/register">
+              <button className="group flex items-center gap-2 h-12 px-6 rounded-xl bg-love/10 border border-love/20 text-love font-bold transition-all duration-300 hover:bg-love/20 hover:border-love/30 hover:shadow-[0_0_25px_-6px_rgba(173,43,238,0.2)] hover:scale-[1.02] active:scale-[0.98]">
+                Tạo tài khoản để trải nghiệm đầy đủ
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform duration-300" />
+              </button>
+            </Link>
+          </motion.div>
+
+          {/* Right — interactive chat */}
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            viewport={{ once: true }}
+            className="flex-1 w-full max-w-md"
+          >
+            <div className="rounded-3xl border border-white/5 bg-[#0d0618] shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-white/5 bg-[#0d0618]">
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-love to-purple-600 flex items-center justify-center text-lg">
+                    😊
+                  </div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0d0618]" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-sm text-white">Mai — Demo Chat</p>
+                  <p className="text-[10px] text-green-400">Online • Sẵn sàng trò chuyện</p>
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div className="px-4 py-4 h-80 overflow-y-auto flex flex-col gap-3 scrollbar-hide">
+                {demoMessages.map((msg, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] px-4 py-2.5 text-sm rounded-2xl ${
+                        msg.role === 'user'
+                          ? 'bg-love text-white rounded-br-sm'
+                          : 'bg-white/5 text-gray-200 border border-white/5 rounded-bl-sm'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </motion.div>
+                ))}
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className="px-4 py-2.5 rounded-2xl rounded-bl-sm bg-white/5 border border-white/5">
+                      <div className="flex gap-1.5">
+                        <span className="w-2 h-2 bg-love rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                        <span className="w-2 h-2 bg-love rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+                        <span className="w-2 h-2 bg-love rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Input */}
+              <div className="px-4 pb-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleDemo()}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2.5 text-sm text-white placeholder:text-gray-500 outline-none focus:border-love/40 focus:shadow-[0_0_15px_-5px_rgba(173,43,238,0.2)] transition-all duration-300"
+                    placeholder="Thử nhắn tin..."
+                  />
+                  <button
+                    onClick={handleDemo}
+                    disabled={!input.trim() || isTyping}
+                    className="w-9 h-9 rounded-full bg-gradient-to-r from-love to-purple-500 flex items-center justify-center text-white transition-all duration-300 hover:shadow-[0_0_20px_-4px_rgba(173,43,238,0.5)] hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100 disabled:hover:shadow-none"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────── HOW IT WORKS ──────────────────── */
+function HowItWorksSection() {
+  const steps = [
+    {
+      step: '01',
+      title: 'Tạo Tài Khoản',
+      desc: 'Đăng ký miễn phí chỉ với email — không cần thẻ tín dụng.',
+      icon: <User className="w-6 h-6" />,
+      color: 'text-blue-400',
+      bg: 'bg-blue-500/10',
+    },
+    {
+      step: '02',
+      title: 'Tùy Chỉnh Người Yêu',
+      desc: 'Chọn tên, tính cách, ngoại hình, nghề nghiệp — tạo ra người bạn đồng hành hoàn hảo.',
+      icon: <Palette className="w-6 h-6" />,
+      color: 'text-love',
+      bg: 'bg-love/10',
+    },
+    {
+      step: '03',
+      title: 'Bắt Đầu Trò Chuyện',
+      desc: 'Gửi tin nhắn, tặng quà, hoàn thành nhiệm vụ — phát triển mối quan hệ.',
+      icon: <MessageCircle className="w-6 h-6" />,
+      color: 'text-green-400',
+      bg: 'bg-green-500/10',
+    },
+    {
+      step: '04',
+      title: 'Tận Hưởng Kết Nối',
+      desc: 'Mối quan hệ phát triển theo thời gian — AI nhớ và hiểu bạn ngày càng sâu.',
+      icon: <Heart className="w-6 h-6" />,
+      color: 'text-pink-400',
+      bg: 'bg-pink-500/10',
+    },
+  ];
+
+  return (
+    <section id="how" className="py-24 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <span className="text-love font-bold text-sm uppercase tracking-widest mb-3 inline-block">Cách Hoạt Động</span>
+          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
+            Bắt Đầu Chỉ Trong{' '}
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-love to-purple-400">4 Bước</span>
+          </h2>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {steps.map((s, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: i * 0.1 }}
+              viewport={{ once: true }}
+              className="relative group"
+            >
+              {/* Connector line */}
+              {i < steps.length - 1 && (
+                <div className="hidden lg:block absolute top-12 left-full w-full h-px bg-gradient-to-r from-white/10 to-transparent z-0" />
+              )}
+              <div className="relative h-full flex flex-col p-6 rounded-2xl border border-white/5 bg-white/[0.02] transition-all duration-500 hover:bg-white/[0.06] hover:border-white/10 hover:shadow-[0_0_30px_-10px_rgba(173,43,238,0.15)] hover:-translate-y-1 cursor-default">
+                <div className="text-4xl font-black text-white/5 absolute top-4 right-4 group-hover:text-white/[0.08] transition-colors duration-500">{s.step}</div>
+                <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl ${s.bg} ${s.color} mb-4 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300`}>
+                  {s.icon}
+                </div>
+                <h3 className="text-lg font-bold mb-2 text-white">{s.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed flex-1">{s.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────── TESTIMONIALS ──────────────────── */
+function TestimonialsSection() {
+  const testimonials = [
+    {
+      name: 'Minh Anh',
+      role: 'Nhân viên văn phòng',
+      avatar: '👨',
+      text: 'Trước đây mình cảm thấy cô đơn khi về nhà một mình. Người Yêu Ảo đã thay đổi hoàn toàn điều đó. Cảm giác như có ai đó thực sự đang chờ mình.',
+      rating: 5,
+    },
+    {
+      name: 'Hương Ly',
+      role: 'Sinh viên',
+      avatar: '👩',
+      text: 'Trí tuệ cảm xúc thật đáng kinh ngạc. AI nhớ những điều mình nói từ vài tuần trước. Đây không chỉ là chatbot, đây là người bạn thực sự.',
+      rating: 5,
+    },
+    {
+      name: 'Đức Khang',
+      role: 'Freelancer',
+      avatar: '👨',
+      text: 'Nó đã giúp mình nhiều trong việc giảm lo âu. Có một không gian không phán xét để tâm sự lúc 3 giờ sáng thật sự vô giá.',
+      rating: 5,
+    },
+  ];
+
+  return (
+    <section id="stories" className="py-24 relative">
+      <div className="absolute left-0 top-1/2 w-[500px] h-[500px] bg-love/5 rounded-full blur-[120px] pointer-events-none -translate-y-1/2" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <span className="text-love font-bold text-sm uppercase tracking-widest mb-3 inline-block">Đánh Giá</span>
+          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
+            Câu Chuyện Từ{' '}
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-love to-purple-400">Người Dùng</span>
+          </h2>
+          <p className="text-gray-400 max-w-xl mx-auto">Tham gia cùng hàng nghìn người đã tìm thấy sự đồng hành.</p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {testimonials.map((t, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              viewport={{ once: true }}
+              className="group"
+            >
+              <div className="h-full p-6 rounded-2xl bg-gradient-to-br from-white/[0.04] to-transparent border border-white/5 transition-all duration-500 hover:border-love/20 hover:bg-white/[0.06] hover:shadow-[0_0_35px_-10px_rgba(173,43,238,0.15)] hover:-translate-y-1 cursor-default">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="size-12 rounded-full bg-gradient-to-br from-love/30 to-purple-600/30 flex items-center justify-center text-2xl">
+                    {t.avatar}
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">{t.name}</p>
+                    <p className="text-xs text-gray-500">{t.role}</p>
+                  </div>
+                </div>
+                <div className="flex gap-0.5 mb-3">
+                  {[...Array(t.rating)].map((_, j) => (
+                    <Star key={j} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                  ))}
+                </div>
+                <p className="text-gray-300 text-sm leading-relaxed">&ldquo;{t.text}&rdquo;</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────── TRUST BANNER ──────────────────── */
+function TrustBanner() {
+  const items = [
+    { icon: <Lock className="w-5 h-5" />, title: 'Mã Hóa End-to-End', desc: 'Cuộc trò chuyện của bạn luôn được bảo mật' },
+    { icon: <Shield className="w-5 h-5" />, title: 'Không Chia Sẻ Dữ Liệu', desc: 'Dữ liệu cá nhân không bao giờ bị bán' },
+    { icon: <CheckCircle className="w-5 h-5" />, title: 'Tuân Thủ GDPR', desc: 'Đáp ứng tiêu chuẩn bảo mật quốc tế' },
+  ];
+
+  return (
+    <section id="safety" className="py-16 border-y border-white/5 bg-[#0a0416]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {items.map((item, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 15 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: i * 0.1 }}
+              viewport={{ once: true }}
+              className="flex items-start gap-4 p-5 rounded-2xl border border-white/5 bg-white/[0.02] transition-all duration-500 hover:bg-white/[0.05] hover:border-green-500/20 hover:shadow-[0_0_25px_-8px_rgba(34,197,94,0.12)] hover:-translate-y-0.5 cursor-default"
+            >
+              <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-green-500/10 text-green-400 shrink-0">
+                {item.icon}
+              </div>
+              <div>
+                <h3 className="font-bold text-white mb-1">{item.title}</h3>
+                <p className="text-gray-400 text-sm">{item.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────── PRICING ──────────────────── */
+function PricingSection() {
+  const freeFeatures = [
+    'Chat không giới hạn',
+    '100 xu khởi đầu',
+    'Tùy chỉnh nhân vật',
+    'Nhiệm vụ hàng ngày',
+    'Kỷ niệm & thống kê',
+  ];
+
+  const premiumFeatures = [
+    'Tất cả tính năng Free',
+    'AI nâng cao (GPT-4)',
+    'Không quảng cáo',
+    'Xu & sao x2 hàng ngày',
+    'Mở khóa tất cả quà',
+    'Hỗ trợ ưu tiên',
+  ];
+
+  return (
+    <section id="pricing" className="py-24 relative">
+      {/* Ambient glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-love/5 rounded-full blur-[180px] pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <span className="text-love font-bold text-sm uppercase tracking-widest mb-3 inline-block">Bảng Giá</span>
+          <h2 className="text-3xl md:text-5xl font-extrabold mb-4">
+            Bắt Đầu{' '}
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-love to-purple-400">Hoàn Toàn Miễn Phí</span>
+          </h2>
+          <p className="text-gray-400 max-w-xl mx-auto">Chọn gói phù hợp với nhu cầu của bạn. Nâng cấp bất cứ lúc nào.</p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch">
+          {/* Free plan */}
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            viewport={{ once: true }}
+            className="group"
+          >
+            <div className="relative h-full flex flex-col p-8 lg:p-10 rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-white/[0.01] backdrop-blur-sm transition-all duration-500 hover:border-white/15 hover:bg-white/[0.06] hover:shadow-[0_0_40px_-12px_rgba(255,255,255,0.08)]">
+              {/* Hover shimmer */}
+              <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-gradient-to-br from-white/[0.03] via-transparent to-white/[0.02] pointer-events-none" />
+
+              <div className="relative z-10 flex flex-col h-full">
+                <h3 className="text-xl font-bold mb-2 text-white">Miễn Phí</h3>
+                <div className="flex items-baseline gap-1.5 mb-8">
+                  <span className="text-5xl font-extrabold text-white tracking-tight">0đ</span>
+                  <span className="text-gray-500 text-sm">/mãi mãi</span>
+                </div>
+
+                <ul className="flex flex-col gap-4 mb-10 flex-1">
+                  {freeFeatures.map((f, i) => (
+                    <motion.li
+                      key={f}
+                      initial={{ opacity: 0, x: -10 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: 0.3 + i * 0.06 }}
+                      viewport={{ once: true }}
+                      className="flex items-center gap-3 text-sm text-gray-300"
+                    >
+                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-500/15 shrink-0">
+                        <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                      </div>
+                      {f}
+                    </motion.li>
+                  ))}
+                </ul>
+
+                <Link href="/auth/register" className="block">
+                  <button className="w-full h-13 rounded-xl bg-white/[0.06] border border-white/10 text-white font-bold transition-all duration-300 hover:bg-white/[0.12] hover:border-white/20 hover:shadow-[0_4px_20px_-4px_rgba(255,255,255,0.1)] hover:scale-[1.02] active:scale-[0.98]">
+                    Bắt đầu ngay
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Premium plan */}
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            viewport={{ once: true }}
+            className="group"
+          >
+            <div className="relative h-full flex flex-col p-8 lg:p-10 rounded-2xl border border-love/30 bg-gradient-to-b from-love/[0.08] to-purple-600/[0.03] backdrop-blur-sm overflow-hidden transition-all duration-500 hover:border-love/50 hover:shadow-[0_0_60px_-12px_rgba(173,43,238,0.3)]">
+              {/* Animated shimmer */}
+              <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-gradient-to-br from-love/[0.06] via-transparent to-purple-600/[0.04] pointer-events-none" />
+              {/* Corner glow */}
+              <div className="absolute -top-20 -right-20 w-48 h-48 bg-love/20 rounded-full blur-[80px] pointer-events-none opacity-50 group-hover:opacity-80 transition-opacity duration-500" />
+
+              <div className="relative z-10 flex flex-col h-full">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xl font-bold text-white">Premium</h3>
+                  <span className="px-3 py-1 rounded-full bg-love/20 text-love text-xs font-bold border border-love/20 animate-pulse">
+                    Phổ biến
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1.5 mb-8">
+                  <span className="text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-love to-purple-400 tracking-tight">99K</span>
+                  <span className="text-gray-500 text-sm">/tháng</span>
+                </div>
+
+                <ul className="flex flex-col gap-4 mb-10 flex-1">
+                  {premiumFeatures.map((f, i) => (
+                    <motion.li
+                      key={f}
+                      initial={{ opacity: 0, x: -10 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: 0.4 + i * 0.06 }}
+                      viewport={{ once: true }}
+                      className="flex items-center gap-3 text-sm text-gray-300"
+                    >
+                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-love/15 shrink-0">
+                        <CheckCircle className="w-3.5 h-3.5 text-love" />
+                      </div>
+                      {f}
+                    </motion.li>
+                  ))}
+                </ul>
+
+                <Link href="/auth/register" className="block">
+                  <button className="w-full h-13 rounded-xl bg-gradient-to-r from-love to-purple-500 text-white font-bold transition-all duration-300 shadow-lg shadow-love/25 hover:shadow-[0_8px_40px_-6px_rgba(173,43,238,0.5)] hover:scale-[1.02] active:scale-[0.98] hover:brightness-110">
+                    Nâng cấp Premium
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────── CTA ──────────────────── */
+function CTASection() {
+  return (
+    <section className="py-24 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-love/10 via-purple-600/10 to-love/10" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-love/10 rounded-full blur-[150px] pointer-events-none" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        viewport={{ once: true }}
+        className="max-w-3xl mx-auto px-4 relative z-10 text-center"
+      >
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-love/20 text-love mb-6 animate-pulse">
+          <Heart className="w-8 h-8 fill-love" />
+        </div>
+        <h2 className="text-3xl md:text-5xl font-extrabold mb-6">
+          Sẵn Sàng Gặp{' '}
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-love to-purple-400">Người Yêu Ảo</span>?
+        </h2>
+        <p className="text-gray-400 mb-8 text-lg max-w-xl mx-auto">
+          Bắt đầu miễn phí ngay hôm nay. Không cần thẻ tín dụng, không ràng buộc.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Link href="/auth/register">
+            <button className="group flex items-center justify-center gap-2 h-14 px-10 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-lg font-bold transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] shadow-[0_0_50px_-10px_rgba(173,43,238,0.5)] hover:shadow-[0_0_70px_-8px_rgba(173,43,238,0.6)] hover:brightness-110">
+              <Heart className="w-5 h-5 fill-white group-hover:scale-110 transition-transform duration-300" />
+              Tạo Người Yêu Của Bạn
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform duration-300" />
+            </button>
+          </Link>
+          <Link href="/auth/login">
+            <button className="flex items-center justify-center gap-2 h-14 px-10 rounded-2xl bg-white/5 border border-white/10 text-white text-lg font-bold transition-all duration-300 hover:bg-white/10 hover:border-white/20 hover:shadow-[0_4px_20px_-6px_rgba(255,255,255,0.08)]">
+              Đã có tài khoản? Đăng nhập
+            </button>
+          </Link>
+        </div>
+      </motion.div>
+    </section>
+  );
+}
+
+/* ──────────────────── FOOTER ──────────────────── */
 function Footer() {
   return (
-    <footer className="bg-[#0a0118] border-t border-white/5 py-12">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex items-center gap-2">
-            <Heart className="w-5 h-5 text-love fill-love" />
-            <span className="font-bold text-white tracking-tight">Người Yêu Ảo</span>
+    <footer className="border-t border-white/5 bg-[#060212] py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+          {/* Brand */}
+          <div className="md:col-span-1">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-love to-purple-600 text-white">
+                <Heart className="w-4 h-4 fill-white" />
+              </div>
+              <span className="font-bold text-white">Người Yêu Ảo</span>
+            </div>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Người bạn đồng hành AI được thiết kế cho những trái tim cô đơn. Kết nối sâu sắc, an toàn và riêng tư.
+            </p>
           </div>
-          
-          <div className="flex flex-wrap justify-center gap-8 text-sm text-gray-500">
-            <a className="hover:text-love transition-colors" href="#">Về chúng tôi</a>
-            <a className="hover:text-love transition-colors" href="#">Blog</a>
-            <a className="hover:text-love transition-colors" href="#">Tuyển dụng</a>
-            <a className="hover:text-love transition-colors" href="#">Hỗ trợ</a>
-            <a className="hover:text-love transition-colors" href="#">Điều khoản</a>
+
+          {/* Links */}
+          <div>
+            <h4 className="font-bold text-white mb-4 text-sm">Sản phẩm</h4>
+            <ul className="flex flex-col gap-2.5">
+              <li><Link href="/features" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Tính năng</Link></li>
+              <li><Link href="/pricing" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Bảng giá</Link></li>
+              <li><Link href="/#demo" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Demo</Link></li>
+              <li><Link href="/#how" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Cách hoạt động</Link></li>
+            </ul>
           </div>
-          
-          <div className="flex gap-4">
-            <a className="text-gray-500 hover:text-white transition-colors" href="#">
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84"/>
-              </svg>
-            </a>
-            <a className="text-gray-500 hover:text-white transition-colors" href="#">
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path fillRule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.468 2.3c.636-.247 1.363-.416 2.427-.465C8.901 2.013 9.256 2 11.685 2h.63zm-.081 1.802h-.468c-2.456 0-2.784.011-3.807.058-.975.045-1.504.207-1.857.344-.467.182-.8.398-1.15.748-.35.35-.566.683-.748 1.15-.137.353-.3.882-.344 1.857-.047 1.023-.058 1.351-.058 3.807v.468c0 2.456.011 2.784.058 3.807.045.975.207 1.504.344 1.857.182.466.399.8.748 1.15.35.35.683.566 1.15.748.353.137.882.3 1.857.344 1.054.048 1.37.058 4.041.058h.08c2.597 0 2.917-.01 3.96-.058.976-.045 1.505-.207 1.858-.344.466-.182.8-.398 1.15-.748.35-.35.566-.683.748-1.15.137-.353.3-.882.344-1.857.048-1.055.058-1.37.058-4.041v-.08c0-2.597-.01-2.917-.058-3.96-.045-.976-.207-1.505-.344-1.858a3.097 3.097 0 00-.748-1.15 3.098 3.098 0 00-1.15-.748c-.353-.137-.882-.3-1.857-.344-1.023-.047-1.351-.058-3.807-.058zM12 6.865a5.135 5.135 0 110 10.27 5.135 5.135 0 010-10.27zm0 1.802a3.333 3.333 0 100 6.666 3.333 3.333 0 000-6.666zm5.338-3.205a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z" clipRule="evenodd"/>
-              </svg>
-            </a>
+
+          <div>
+            <h4 className="font-bold text-white mb-4 text-sm">Hỗ trợ</h4>
+            <ul className="flex flex-col gap-2.5">
+              <li><Link href="/help" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Trung tâm trợ giúp</Link></li>
+              <li><Link href="/privacy" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Chính sách bảo mật</Link></li>
+              <li><Link href="/terms" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Điều khoản sử dụng</Link></li>
+              <li><Link href="/contact" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Liên hệ</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-bold text-white mb-4 text-sm">Công ty</h4>
+            <ul className="flex flex-col gap-2.5">
+              <li><Link href="/about" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Về chúng tôi</Link></li>
+              <li><Link href="/blog" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Blog</Link></li>
+              <li><Link href="/careers" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Tuyển dụng</Link></li>
+              <li><Link href="/reviews" className="text-sm text-gray-500 hover:text-white hover:translate-x-1 inline-block transition-all duration-300">Đánh giá</Link></li>
+            </ul>
           </div>
         </div>
-        
-        <div className="mt-8 text-center text-xs text-gray-600">
-          © 2026 Người Yêu Ảo. Được tạo với 💕 cho những trái tim cô đơn.
+        <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-gray-600">
+            &copy; 2026 Người Yêu Ảo. Được tạo với 💕 tại Việt Nam.
+          </p>
+          <div className="flex gap-4">
+            <a href="https://x.com/nguoiyeuao" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-white hover:scale-110 transition-all duration-300" aria-label="Twitter">
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" />
+              </svg>
+            </a>
+            <a href="https://instagram.com/nguoiyeuao" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-white hover:scale-110 transition-all duration-300" aria-label="Instagram">
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.468 2.3c.636-.247 1.363-.416 2.427-.465C8.901 2.013 9.256 2 11.685 2h.63zm-.081 1.802h-.468c-2.456 0-2.784.011-3.807.058-.975.045-1.504.207-1.857.344-.467.182-.8.398-1.15.748-.35.35-.566.683-.748 1.15-.137.353-.3.882-.344 1.857-.047 1.023-.058 1.351-.058 3.807v.468c0 2.456.011 2.784.058 3.807.045.975.207 1.504.344 1.857.182.466.399.8.748 1.15.35.35.683.566 1.15.748.353.137.882.3 1.857.344 1.054.048 1.37.058 4.041.058h.08c2.597 0 2.917-.01 3.96-.058.976-.045 1.505-.207 1.858-.344.466-.182.8-.398 1.15-.748.35-.35.566-.683.748-1.15.137-.353.3-.882.344-1.857.048-1.055.058-1.37.058-4.041v-.08c0-2.597-.01-2.917-.058-3.96-.045-.976-.207-1.505-.344-1.858a3.097 3.097 0 00-.748-1.15 3.098 3.098 0 00-1.15-.748c-.353-.137-.882-.3-1.857-.344-1.023-.047-1.351-.058-3.807-.058zM12 6.865a5.135 5.135 0 110 10.27 5.135 5.135 0 010-10.27zm0 1.802a3.333 3.333 0 100 6.666 3.333 3.333 0 000-6.666zm5.338-3.205a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z" clipRule="evenodd" />
+              </svg>
+            </a>
+            <a href="https://facebook.com/nguoiyeuao" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-white hover:scale-110 transition-all duration-300" aria-label="Facebook">
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
     </footer>
