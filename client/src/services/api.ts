@@ -62,7 +62,24 @@ class ApiClient {
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, config);
 
-    const data: ApiResponse<T> = await response.json();
+    // Handle 401 — try refreshing the token once
+    if (response.status === 401 && token && !options.headers?.['X-Retry']) {
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        return this.request<T>(endpoint, {
+          ...options,
+          headers: { ...headers, 'X-Retry': '1' },
+        });
+      }
+    }
+
+    // Safely parse JSON (server might return HTML on 502/503)
+    let data: ApiResponse<T>;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(`Server error (${response.status})`);
+    }
 
     // Check if response is not ok, throw with backend message
     if (!response.ok) {
@@ -75,6 +92,32 @@ class ApiClient {
     }
 
     return data;
+  }
+
+  private async tryRefreshToken(): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data.success && data.data?.tokens?.accessToken) {
+        // Update Zustand persisted store in localStorage
+        const stored = localStorage.getItem('vgfriend-auth');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          parsed.state.accessToken = data.data.tokens.accessToken;
+          if (data.data.user) parsed.state.user = data.data.user;
+          localStorage.setItem('vgfriend-auth', JSON.stringify(parsed));
+        }
+        return true;
+      }
+    } catch {
+      // Refresh failed
+    }
+    return false;
   }
 
   get<T = unknown>(endpoint: string) {

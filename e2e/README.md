@@ -2,7 +2,7 @@
 
 Framework kiểm thử End-to-End cho VGfriend sử dụng **Playwright** với pattern **Page Object Model (POM)**.
 
-## 📁 Cấu trúc thư mục
+## Cau truc thu muc
 
 ```
 e2e/
@@ -52,7 +52,7 @@ e2e/
 └── README.md              # This file
 ```
 
-## 🚀 Cài đặt
+## Cai dat
 
 ```bash
 cd e2e
@@ -67,7 +67,7 @@ npx playwright install
 cp .env.example .env
 ```
 
-## ⚙️ Cấu hình
+## Cau hinh
 
 Tạo file `.env` trong thư mục `e2e`:
 
@@ -85,7 +85,7 @@ HEADLESS=true
 CI=false
 ```
 
-## 🧪 Chạy Tests
+## Chay Tests
 
 ### UI Tests
 
@@ -151,7 +151,7 @@ npx playwright test --debug
 npx playwright show-report
 ```
 
-## 📝 Viết Test mới
+## Viet Test moi
 
 ### 1. Tạo Page Object (nếu cần)
 
@@ -206,14 +206,14 @@ test.describe('New Feature @smoke', () => {
 });
 ```
 
-## 🏷️ Tags
+## Tags
 
 - `@smoke` - Quick sanity tests, chạy trước mỗi deploy
 - `@regression` - Full regression suite
 - `@api` - API tests only
 - `@mobile` - Mobile-specific tests
 
-## 📊 Reports
+## Reports
 
 Sau khi chạy tests, reports sẽ được tạo trong:
 
@@ -225,7 +225,7 @@ Xem report:
 npx playwright show-report
 ```
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Lỗi timeout
 - Tăng timeout trong `playwright.config.ts`
@@ -239,7 +239,7 @@ npx playwright show-report
 - Kiểm tra `TEST_USER_EMAIL` và `TEST_USER_PASSWORD` trong `.env`
 - Đảm bảo user tồn tại trong database
 
-## 🤝 Best Practices
+## Best Practices
 
 1. **Luôn dùng Page Objects** - Không hardcode selectors trong tests
 2. **Independent tests** - Mỗi test có thể chạy độc lập
@@ -248,7 +248,7 @@ npx playwright show-report
 5. **Tags** - Sử dụng tags để phân loại tests
 6. **Parallel safe** - Tests phải chạy được parallel
 
-## 📚 Tài liệu tham khảo
+## Tai lieu tham khao
 
 - [Playwright Documentation](https://playwright.dev/docs/intro)
 - [Page Object Model](https://playwright.dev/docs/pom)

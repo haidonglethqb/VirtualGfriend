@@ -136,7 +136,7 @@ export const giftService = {
       const aiResponse = await aiService.generateResponse({
         characterId: data.characterId,
         personality: character.personality as any,
-        mood: (character.mood as string) || 'happy',
+        mood: (character.mood || 'happy') as any,
         relationshipStage: character.relationshipStage,
         affection: character.affection,
         level: character.level,

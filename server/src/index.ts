@@ -18,6 +18,15 @@ import { createModuleLogger } from './lib/logger';
 
 const log = createModuleLogger('Server');
 
+// Validate critical env vars at startup
+const requiredEnvVars = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'DATABASE_URL'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    log.error(`FATAL: ${envVar} environment variable is not set`);
+    process.exit(1);
+  }
+}
+
 const app = express();
 const httpServer = createServer(app);
 

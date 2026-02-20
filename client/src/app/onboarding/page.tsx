@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Heart, Sparkles, ArrowRight } from 'lucide-react';
 import { useCharacterStore } from '@/store/character-store';
+import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
 
 const OCCUPATIONS = [
@@ -29,9 +30,17 @@ const PERSONALITIES = [
 export default function OnboardingPage() {
     const router = useRouter();
     const { createCharacter } = useCharacterStore();
+    const { isAuthenticated } = useAuthStore();
     const { toast } = useToast();
     const [step, setStep] = useState(1);
     const [isCreating, setIsCreating] = useState(false);
+
+    // Auth guard
+    useEffect(() => {
+        if (!isAuthenticated) {
+            router.push('/auth/login');
+        }
+    }, [isAuthenticated, router]);
 
     const [formData, setFormData] = useState({
         name: '',

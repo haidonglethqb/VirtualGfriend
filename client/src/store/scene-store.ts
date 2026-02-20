@@ -64,8 +64,7 @@ export const useSceneStore = create<SceneState>()(
           await api.post(`/scenes/set-active/${sceneId}`);
           set({ activeSceneId: sceneId });
         } catch (error) {
-          // If API fails, still set locally
-          set({ activeSceneId: sceneId });
+          set({ error: error instanceof Error ? error.message : 'Failed to set active scene' });
         }
       },
 

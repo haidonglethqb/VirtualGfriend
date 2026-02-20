@@ -68,6 +68,8 @@ class SocketService {
 
     this.socket.on('character:typing', (data: { characterId: string; sourceSocketId?: string }) => {
       useChatStore.getState().setTyping(true)
+      // Safety timeout: auto-clear typing if AI response never arrives
+      setTimeout(() => useChatStore.getState().setTyping(false), 30000)
       // NO BroadcastChannel here - socket room already syncs all tabs
     })
 
