@@ -8,6 +8,7 @@ import {
   Calendar, Sparkles, ImageIcon
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import AppLayout from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
@@ -190,10 +191,20 @@ export default function DashboardPage() {
               {/* Character Header with gradient */}
               <div className="relative h-48 bg-gradient-to-br from-love/80 via-love/60 to-purple-600/60">
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-28 h-28 rounded-full bg-[#181114] p-1 shadow-xl border-4 border-[#271b21]">
-                    <div className="w-full h-full rounded-full bg-[#271b21] flex items-center justify-center text-5xl">
-                      {character?.gender === 'FEMALE' ? '😊' : '😎'}
-                    </div>
+                  <div className="w-28 h-28 rounded-full bg-[#181114] p-1 shadow-xl border-4 border-[#271b21] overflow-hidden">
+                    {character?.avatarUrl ? (
+                      <Image
+                        src={character.avatarUrl}
+                        alt={character.name || 'Avatar'}
+                        width={112}
+                        height={112}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-[#271b21] flex items-center justify-center text-5xl">
+                        {character?.name?.[0]?.toUpperCase() || '💕'}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* Mood indicator */}

@@ -15,6 +15,7 @@ async function main() {
   await prisma.$transaction([
     prisma.characterScene.deleteMany({}),
     prisma.scene.deleteMany({}),
+    prisma.characterTemplate.deleteMany({}),
     prisma.userQuest.deleteMany({}),
     prisma.quest.deleteMany({}),
     prisma.userGift.deleteMany({}),
@@ -81,6 +82,62 @@ async function main() {
     skipDuplicates: true,
   });
   console.log(`[Seed] Created ${scenes.count} scenes`);
+
+  // ============================================
+  // CHARACTER TEMPLATES
+  // ============================================
+  const templates = await prisma.characterTemplate.createMany({
+    data: [
+      {
+        name: 'Mai',
+        description: 'Co gai diu dang, luon quan tam va cham soc ban',
+        avatarUrl: '/characters/template1.png',
+        gender: 'FEMALE',
+        personality: 'caring',
+        style: 'anime',
+        isDefault: true,
+        sortOrder: 1,
+      },
+      {
+        name: 'Linh',
+        description: 'Co nang nang dong, vui ve va hay dua',
+        avatarUrl: '/characters/template2.png',
+        gender: 'FEMALE',
+        personality: 'playful',
+        style: 'anime',
+        sortOrder: 2,
+      },
+      {
+        name: 'Huong',
+        description: 'Co gai nhut nhat, de thuong va de xau ho',
+        avatarUrl: '/characters/template3.png',
+        gender: 'FEMALE',
+        personality: 'shy',
+        style: 'anime',
+        sortOrder: 3,
+      },
+      {
+        name: 'Trang',
+        description: 'Co nang manh me, quyet doan va day dam me',
+        avatarUrl: '/characters/template4.png',
+        gender: 'FEMALE',
+        personality: 'passionate',
+        style: 'anime',
+        sortOrder: 4,
+      },
+      {
+        name: 'An',
+        description: 'Co gai thong minh, sau sac va triet ly',
+        avatarUrl: '/characters/template5.png',
+        gender: 'FEMALE',
+        personality: 'intellectual',
+        style: 'anime',
+        sortOrder: 5,
+      },
+    ],
+    skipDuplicates: true,
+  });
+  console.log(`[Seed] Created ${templates.count} character templates`);
 
   // ============================================
   // ENHANCED QUEST SYSTEM
@@ -617,7 +674,7 @@ async function main() {
   console.log(`[Seed] Created ${gifts.count} gifts`);
 
   // Create AI prompt templates
-  const templates = await prisma.aIPromptTemplate.createMany({
+  const aiTemplates = await prisma.aIPromptTemplate.createMany({
     data: [
       {
         name: 'caring_default',
@@ -652,7 +709,7 @@ async function main() {
     ],
     skipDuplicates: true,
   });
-  console.log(`[Seed] Created ${templates.count} AI templates`);
+  console.log(`[Seed] Created ${aiTemplates.count} AI templates`);
 
   // Create achievements
   const achievements = await prisma.achievement.createMany({

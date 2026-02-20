@@ -102,6 +102,26 @@ model UserSettings {
 // CHARACTER SYSTEM
 // ============================================
 
+model CharacterTemplate {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  description   String
+  avatarUrl     String   // Image URL for display
+  gender        Gender   @default(FEMALE)
+  personality   String   @default("caring")
+  style         String   @default("anime") // anime, realistic, chibi
+  isDefault     Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  characters    Character[]
+
+  @@index([isActive, sortOrder])
+  @@map("character_templates")
+}
+
 model Character {
   id                String          @id @default(uuid())
   userId            String
@@ -120,7 +140,9 @@ model Character {
   occupation        String          @default("student") // student, office_worker, teacher, nurse, artist, developer, sales, freelancer
   voiceType         String          @default("soft")
   
-  // Avatar customization
+  // Avatar & template
+  avatarUrl         String?         // Character avatar image URL
+  templateId        String?         // Reference to chosen template
   avatarStyle       String          @default("anime")
   hairStyle         String          @default("long")
   hairColor         String          @default("#3b1f0a")
@@ -139,6 +161,7 @@ model Character {
   updatedAt         DateTime        @updatedAt
 
   user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template          CharacterTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   messages          Message[]
   characterFacts    CharacterFact[]
   scenes            CharacterScene[]

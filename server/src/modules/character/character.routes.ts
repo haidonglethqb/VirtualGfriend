@@ -1,9 +1,13 @@
 import { Router } from 'express';
 import { characterController } from './character.controller';
+import { templateController } from './template.controller';
 import { factsController } from './facts.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
 
 export const characterRouter = Router();
+
+// Templates (public - no auth needed for browsing)
+characterRouter.get('/templates', templateController.getTemplates);
 
 characterRouter.use(authenticate);
 

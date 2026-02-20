@@ -16,6 +16,7 @@ import { socketService } from '@/services/socket'
 import { crossTabSync } from '@/services/cross-tab-sync'
 import { getMoodEmoji } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import Image from 'next/image'
 import api from '@/services/api'
 import { AffectionPopup, LevelUpModal, RelationshipUpgradeModal, ProactiveNotification } from '@/components/ui/notifications'
 import { SceneSelector } from '@/components/ui/scene-selector'
@@ -249,8 +250,18 @@ export default function ChatPage() {
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6 flex flex-col items-center">
             {/* Avatar */}
             <div className="relative mb-4">
-              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-6xl border-4 border-love/30 shadow-[0_0_40px_rgba(244,37,140,0.3)]">
-                {character?.gender === 'FEMALE' ? '😊' : '😎'}
+              <div className="w-32 h-32 rounded-full border-4 border-love/30 shadow-[0_0_40px_rgba(244,37,140,0.3)] overflow-hidden bg-gradient-to-br from-love to-pink-600 flex items-center justify-center">
+                {character?.avatarUrl ? (
+                  <Image
+                    src={character.avatarUrl}
+                    alt={character.name || 'Avatar'}
+                    width={128}
+                    height={128}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-6xl">{character?.name?.[0]?.toUpperCase() || '💕'}</span>
+                )}
               </div>
               <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 border-3 border-[#271b21] rounded-full" />
             </div>
@@ -307,8 +318,18 @@ export default function ChatPage() {
           <div className="lg:hidden flex items-center justify-between p-3 border-b border-[#392830] bg-gradient-to-r from-[#271b21] to-[#2d1f26]">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(244,37,140,0.3)]">
-                  {character?.gender === 'FEMALE' ? '😊' : '😎'}
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(244,37,140,0.3)] overflow-hidden">
+                  {character?.avatarUrl ? (
+                    <Image
+                      src={character.avatarUrl}
+                      alt={character.name || 'Avatar'}
+                      width={44}
+                      height={44}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>{character?.name?.[0]?.toUpperCase() || '💕'}</span>
+                  )}
                 </div>
                 <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#271b21] rounded-full animate-pulse" />
               </div>
@@ -409,8 +430,18 @@ export default function ChatPage() {
                     className={`relative z-10 flex ${isUser ? 'flex-col items-end self-end' : 'gap-4 items-end'}`}
                   >
                     {!isUser && (
-                      <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1 shadow-lg">
-                        {character?.gender === 'FEMALE' ? '👩' : '👨'}
+                      <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1 shadow-lg overflow-hidden">
+                        {character?.avatarUrl ? (
+                          <Image
+                            src={character.avatarUrl}
+                            alt={character.name || 'Avatar'}
+                            width={32}
+                            height={32}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span>{character?.name?.[0]?.toUpperCase() || '💕'}</span>
+                        )}
                       </div>
                     )}
                     <div className={`flex flex-col gap-1 max-w-[85%] ${isUser ? 'items-end' : ''}`}>
@@ -443,8 +474,18 @@ export default function ChatPage() {
               animate={{ opacity: 1, y: 0 }}
               className="relative z-10 flex gap-4 items-end"
             >
-              <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1 shadow-lg">
-                {character?.gender === 'FEMALE' ? '👩' : '👨'}
+              <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1 shadow-lg overflow-hidden">
+                {character?.avatarUrl ? (
+                  <Image
+                    src={character.avatarUrl}
+                    alt={character?.name || 'Avatar'}
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span>{character?.name?.[0]?.toUpperCase() || '💕'}</span>
+                )}
               </div>
               <div className="bg-[#271b21]/90 backdrop-blur-md px-4 py-3 rounded-2xl rounded-bl-sm border border-white/10 shadow-lg">
                 <div className="flex gap-1.5 items-center h-4">

@@ -1,12 +1,27 @@
 import { create } from 'zustand';
 import { api } from '@/services/api';
 
+export interface CharacterTemplate {
+  id: string;
+  name: string;
+  description: string;
+  avatarUrl: string;
+  gender: 'MALE' | 'FEMALE' | 'OTHER';
+  personality: string;
+  style: string;
+  isDefault: boolean;
+  sortOrder: number;
+}
+
 interface Character {
   id: string;
   name: string;
   nickname?: string;
   gender: 'MALE' | 'FEMALE';
   avatar?: string;
+  avatarUrl?: string;
+  templateId?: string;
+  template?: CharacterTemplate;
   bio?: string;
   personality: string;
   mood: string;
@@ -47,6 +62,8 @@ interface CharacterState {
     personality?: string;
     age?: number;
     occupation?: string;
+    templateId?: string;
+    avatarUrl?: string;
   }) => Promise<void>;
   updateMood: (mood: string) => void;
   updateAffection: (change: number) => void;

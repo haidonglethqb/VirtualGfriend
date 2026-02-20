@@ -99,21 +99,11 @@ export const useChatStore = create<ChatState>()(
         try {
           const response = await api.get<MessagesData>('/chat/history')
           if (response.success && response.data) {
-            const currentMessages = get().messages
             const fetchedMessages = response.data.messages || []
             
-            // Merge fetched messages with existing (for offline support)
-            const messageMap = new Map<string, Message>()
-            
-            // Add current messages
-            currentMessages.forEach(msg => messageMap.set(msg.id, msg))
-            
-            // Add/update from server (server is authoritative)
-            fetchedMessages.forEach(msg => messageMap.set(msg.id, msg))
-            
-            // Sort by createdAt and trim
-            const merged = Array.from(messageMap.values())
-              .sort((a, b) => {
+            // Server is authoritative - replace local messages entirely
+            const sorted = fetchedMessages
+              .sort((a: Message, b: Message) => {
                 const dateA = new Date(a.createdAt).getTime()
                 const dateB = new Date(b.createdAt).getTime()
                 return dateA - dateB
@@ -121,7 +111,7 @@ export const useChatStore = create<ChatState>()(
               .slice(-MAX_PERSISTED_MESSAGES)
             
             set({ 
-              messages: merged, 
+              messages: sorted, 
               isLoading: false,
               lastSyncTimestamp: Date.now(),
             })
