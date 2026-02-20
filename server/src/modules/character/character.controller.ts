@@ -15,6 +15,8 @@ const createCharacterSchema = z.object({
   bio: z.string().max(500).optional(),
   age: z.number().min(18).max(30).optional(),
   occupation: z.enum(['student', 'office_worker', 'teacher', 'nurse', 'artist', 'developer', 'sales', 'freelancer']).optional(),
+  templateId: z.string().uuid().optional(),
+  avatarUrl: z.string().max(500).optional(),
 });
 
 const updateCharacterSchema = z.object({
@@ -24,6 +26,8 @@ const updateCharacterSchema = z.object({
   bio: z.string().max(500).optional(),
   responseStyle: z.string().optional(),
   creativityLevel: z.number().min(0).max(1).optional(),
+  avatarUrl: z.string().max(500).optional(),
+  templateId: z.string().uuid().optional(),
 });
 
 const customizeCharacterSchema = z.object({

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '@/services/api';
+import { useChatStore } from './chat-store';
+import { useCharacterStore } from './character-store';
 
 interface User {
   id: string;
@@ -77,6 +79,10 @@ export const useAuthStore = create<AuthState>()(
         } catch {
           // Ignore errors
         }
+        
+        // Clear all user-scoped stores
+        useChatStore.getState().clearMessages();
+        useCharacterStore.getState().clear();
         
         set({
           user: null,

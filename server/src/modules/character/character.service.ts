@@ -15,6 +15,8 @@ interface CreateCharacterData {
   bio?: string;
   age?: number;
   occupation?: string;
+  templateId?: string;
+  avatarUrl?: string;
 }
 
 interface UpdateCharacterData {
@@ -24,6 +26,8 @@ interface UpdateCharacterData {
   bio?: string;
   responseStyle?: string;
   creativityLevel?: number;
+  avatarUrl?: string;
+  templateId?: string;
 }
 
 interface CustomizeCharacterData {
@@ -122,6 +126,7 @@ export const characterService = {
     const character = await prisma.character.findFirst({
       where: { userId, isActive: true },
       include: {
+        template: true,
         characterFacts: {
           orderBy: { importance: 'desc' },
           take: 20,
@@ -177,10 +182,15 @@ export const characterService = {
         gender: data.gender || 'FEMALE',
         personality: data.personality || 'caring',
         birthday: data.birthday ? new Date(data.birthday) : undefined,
-        bio: data.bio || `Xin chào! Tôi là ${data.name} 💕`,
+        bio: data.bio || `Xin chao! Toi la ${data.name}`,
         age: data.age || 22,
         occupation: data.occupation || 'student',
+        templateId: data.templateId || undefined,
+        avatarUrl: data.avatarUrl || undefined,
         isActive: true,
+      },
+      include: {
+        template: true,
       },
     });
 
