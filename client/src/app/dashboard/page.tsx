@@ -80,55 +80,33 @@ export default function DashboardPage() {
   });
 
   const fetchDashboardData = useCallback(async () => {
-    // Fetch daily quests
-    try {
-      const questsResponse = await api.get<DailyQuest[]>('/quests/daily');
-      if (questsResponse.success) {
-        setDailyQuests(questsResponse.data.slice(0, 3));
-      }
-    } catch (error) {
-      console.error('Failed to fetch quests:', error);
+    // Fetch all dashboard data in parallel for faster load
+    const [questsResult, chatResult, giftResult, memoriesResult] = await Promise.allSettled([
+      api.get<DailyQuest[]>('/quests/daily'),
+      api.get<{ messages: Array<{ createdAt: string }> }>('/chat/history?limit=100'),
+      api.get<{ items: unknown[]; total: number }>('/shop/history'),
+      api.get<{ items: Memory[] }>('/memories?limit=3'),
+    ]);
+
+    if (questsResult.status === 'fulfilled' && questsResult.value.success) {
+      setDailyQuests(questsResult.value.data.slice(0, 3));
     }
 
-    // Fetch chat history to count today's messages
-    try {
-      const chatResponse = await api.get<{ messages: Array<{ createdAt: string }> }>('/chat/history?limit=100');
-      if (chatResponse.success) {
-        const messages = chatResponse.data.messages || [];
-        const today = new Date().toDateString();
-        const todayMessages = messages.filter(
-          (m) => new Date(m.createdAt).toDateString() === today
-        );
-        setStats((prev) => ({
-          ...prev,
-          messagesToday: todayMessages.length,
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to fetch chat history:', error);
+    if (chatResult.status === 'fulfilled' && chatResult.value.success) {
+      const messages = chatResult.value.data.messages || [];
+      const today = new Date().toDateString();
+      const todayMessages = messages.filter(
+        (m) => new Date(m.createdAt).toDateString() === today
+      );
+      setStats((prev) => ({ ...prev, messagesToday: todayMessages.length }));
     }
 
-    // Fetch gift history
-    try {
-      const giftResponse = await api.get<{ items: unknown[]; total: number }>('/shop/history');
-      if (giftResponse.success) {
-        setStats((prev) => ({
-          ...prev,
-          giftsGiven: giftResponse.data.total || 0,
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to fetch gift history:', error);
+    if (giftResult.status === 'fulfilled' && giftResult.value.success) {
+      setStats((prev) => ({ ...prev, giftsGiven: giftResult.value.data.total || 0 }));
     }
 
-    // Fetch recent memories
-    try {
-      const memoriesResponse = await api.get<{ items: Memory[] }>('/memories?limit=3');
-      if (memoriesResponse.success) {
-        setRecentMemories(memoriesResponse.data.items?.slice(0, 3) || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch memories:', error);
+    if (memoriesResult.status === 'fulfilled' && memoriesResult.value.success) {
+      setRecentMemories(memoriesResult.value.data.items?.slice(0, 3) || []);
     }
   }, []);
 

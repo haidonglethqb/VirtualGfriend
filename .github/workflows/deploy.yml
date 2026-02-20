@@ -95,12 +95,15 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
+          port: ${{ secrets.VPS_PORT }}
           script: |
             cd ${{ secrets.VPS_DEPLOY_PATH }}
             
+            # Ensure required directories exist
+            mkdir -p nginx/ssl nginx/logs
+            
             # Create .env file with secrets
-            cat > .env << EOF
+            cat > .env << 'ENVEOF'
             POSTGRES_USER=vgfriend
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
             POSTGRES_DB=vgfriend
@@ -111,16 +114,18 @@ jobs:
             NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_WS_URL=${{ secrets.NEXT_PUBLIC_WS_URL }}
             GITHUB_REPOSITORY=${{ github.repository }}
-            EOF
+            ENVEOF
+            # Remove leading whitespace from .env (caused by YAML indentation)
+            sed -i 's/^[[:space:]]*//' .env
             
             # Login to GitHub Container Registry
-            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             
             # Pull latest images
             docker compose pull
             
-            # Recreate containers with new images
-            docker compose up -d --force-recreate
+            # Recreate containers with new images (include nginx via production profile)
+            docker compose --profile production up -d --force-recreate
             
             # Cleanup old images
             docker image prune -af

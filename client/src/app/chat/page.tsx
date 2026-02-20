@@ -270,7 +270,7 @@ export default function ChatPage() {
               <div className="h-2 bg-[#392830] rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-love to-pink-500 rounded-full transition-all"
-                  style={{ width: `${(character?.affection || 0) % 100}%` }}
+                  style={{ width: `${(character?.affection || 0) % 100 || (character?.affection ? 100 : 0)}%` }}
                 />
               </div>
             </div>

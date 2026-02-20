@@ -256,10 +256,14 @@ export const dmService = {
       data: { lastReadAt: new Date() },
     })
 
+    // messages are ordered desc: [newest, ..., oldest]
+    // nextCursor should be the oldest message's createdAt for "load older" pagination
+    const nextCursor = hasMore ? messages[messages.length - 1]?.createdAt?.toISOString() : undefined
+
     return {
       messages: messages.reverse(),
       hasMore,
-      nextCursor: hasMore ? messages[0]?.createdAt?.toISOString() : undefined,
+      nextCursor,
     }
   },
 

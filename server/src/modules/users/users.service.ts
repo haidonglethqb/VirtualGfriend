@@ -18,7 +18,6 @@ interface UpdateSettingsData {
   autoPlayVoice?: boolean;
   chatBubbleStyle?: string;
   fontSize?: 'small' | 'medium' | 'large';
-  notifications?: boolean;
 }
 
 interface UpdatePrivacyData {

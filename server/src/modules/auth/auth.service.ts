@@ -164,10 +164,22 @@ export const authService = {
       }),
     ]);
 
-    // Return user data without password (select specific fields)
-    const { password: _, ...userWithoutPassword } = user;
+    // Return user data with consistent shape (same fields as register)
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      displayName: user.displayName,
+      avatar: user.avatar,
+      isPremium: user.isPremium,
+      coins: user.coins,
+      gems: user.gems,
+      streak: user.streak,
+      bio: user.bio,
+      createdAt: user.createdAt,
+    };
 
-    return { user: userWithoutPassword, tokens };
+    return { user: userResponse, tokens };
   },
 
   async refreshToken(token: string) {

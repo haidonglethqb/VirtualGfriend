@@ -19,7 +19,6 @@ const updateSettingsSchema = z.object({
   autoPlayVoice: z.boolean().optional(),
   chatBubbleStyle: z.string().optional(),
   fontSize: z.enum(['small', 'medium', 'large']).optional(),
-  notifications: z.boolean().optional(),
 });
 
 const updatePrivacySchema = z.object({

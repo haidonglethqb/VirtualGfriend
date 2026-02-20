@@ -98,10 +98,18 @@ export const sceneService = {
         throw new AppError('Not enough gems', 400, 'INSUFFICIENT_GEMS');
       }
 
-      await prisma.user.update({
-        where: { id: userId },
-        data: { gems: { decrement: scene.priceGems } },
-      });
+      // Use transaction to ensure atomicity: deduct gems + create unlock together
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: userId },
+          data: { gems: { decrement: scene.priceGems } },
+        }),
+        prisma.characterScene.create({
+          data: { characterId: character.id, sceneId },
+        }),
+      ]);
+
+      return { scene, unlocked: true };
     }
 
     await prisma.characterScene.create({

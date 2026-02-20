@@ -369,7 +369,7 @@ export const gameEventService = {
 
     const character = await prisma.character.findUnique({
       where: { id: characterId },
-      select: { id: true, name: true, affection: true, level: true, userId: true },
+      select: { id: true, name: true, affection: true, level: true, userId: true, relationshipStage: true },
     });
 
     if (!character) return { unlocked, memories };
@@ -467,6 +467,30 @@ export const gameEventService = {
         condition: user.streak === 30,
         title: 'Một tháng yêu thương',
         description: `30 ngày bên nhau - tình cảm thật sự!`,
+      },
+      {
+        type: 'GIFTS_50',
+        condition: giftCount === 50,
+        title: 'Người phóng khoáng',
+        description: `Bạn đã tặng ${character.name} 50 món quà!`,
+      },
+      {
+        type: 'RELATIONSHIP_FRIEND',
+        condition: character.relationshipStage === 'FRIEND',
+        title: 'Trở thành bạn bè',
+        description: `Bạn và ${character.name} đã trở thành bạn bè thân!`,
+      },
+      {
+        type: 'RELATIONSHIP_LOVER',
+        condition: character.relationshipStage === 'LOVER',
+        title: 'Người yêu',
+        description: `Bạn và ${character.name} chính thức trở thành người yêu!`,
+      },
+      {
+        type: 'LEVEL_UP',
+        condition: action === 'REACH_AFFECTION_LEVEL',
+        title: `Lên cấp ${character.level}`,
+        description: `${character.name} đã đạt cấp độ ${character.level}!`,
       },
     ];
 
