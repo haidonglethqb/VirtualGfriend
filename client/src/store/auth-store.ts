@@ -37,6 +37,7 @@ interface AuthState {
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   setUser: (user: User) => void;
+  setAccessToken: (token: string) => void;
   checkAuth: () => Promise<void>;
   updateBalance: (coins?: number, gems?: number) => void;
 }
@@ -115,6 +116,10 @@ export const useAuthStore = create<AuthState>()(
         set({ user });
       },
 
+      setAccessToken: (token: string) => {
+        set({ accessToken: token, isAuthenticated: true });
+      },
+
       checkAuth: async () => {
         const token = get().accessToken;
         
@@ -169,3 +174,35 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+// Cross-tab sync: Listen for storage changes from other tabs
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'vgfriend-auth' && event.newValue) {
+      try {
+        const parsed = JSON.parse(event.newValue);
+        const newToken = parsed.state?.accessToken;
+        const currentToken = useAuthStore.getState().accessToken;
+        
+        // If token changed, update the store
+        if (newToken && newToken !== currentToken) {
+          useAuthStore.setState({ 
+            accessToken: newToken, 
+            isAuthenticated: true 
+          });
+        } else if (!newToken && currentToken) {
+          // Token was cleared (logout from another tab)
+          useAuthStore.setState({
+            accessToken: null,
+            user: null,
+            isAuthenticated: false,
+          });
+          useChatStore.getState().clearMessages();
+          useCharacterStore.getState().clear();
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  });
+}

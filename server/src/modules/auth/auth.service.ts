@@ -194,62 +194,71 @@ export const authService = {
       throw new AppError('Invalid refresh token', 401, 'INVALID_REFRESH_TOKEN');
     }
 
-    // Check if token exists and not revoked
-    const storedToken = await prisma.refreshToken.findUnique({
-      where: { token },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            username: true,
-            displayName: true,
-            avatar: true,
-            bio: true,
-            isEmailVerified: true,
-            isPremium: true,
-            premiumExpiresAt: true,
-            coins: true,
-            gems: true,
-            streak: true,
-            lastActiveAt: true,
-            lastLoginAt: true,
-            createdAt: true,
-            updatedAt: true,
-          },
+    // Use a transaction to ensure atomicity and prevent race conditions
+    // This prevents multiple simultaneous refresh requests from succeeding
+    const result = await prisma.$transaction(async (tx) => {
+      // Atomically find and revoke the token in one operation
+      // This uses an atomic update with a conditional where clause
+      const revokedTokens = await tx.refreshToken.updateMany({
+        where: {
+          token,
+          isRevoked: false, // Only update if not already revoked
+          expiresAt: { gt: new Date() }, // And not expired
         },
-      },
+        data: { isRevoked: true },
+      });
+
+      // If no token was revoked, it means:
+      // 1. Token doesn't exist, OR
+      // 2. Token was already revoked (race condition - another request won), OR
+      // 3. Token is expired
+      if (revokedTokens.count === 0) {
+        throw new AppError('Invalid or already used refresh token', 401, 'INVALID_REFRESH_TOKEN');
+      }
+
+      // Get user data for response
+      const user = await tx.user.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          displayName: true,
+          avatar: true,
+          bio: true,
+          isEmailVerified: true,
+          isPremium: true,
+          premiumExpiresAt: true,
+          coins: true,
+          gems: true,
+          streak: true,
+          lastActiveAt: true,
+          lastLoginAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!user) {
+        throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+      }
+
+      // Generate new tokens
+      const tokens = generateTokens(decoded.userId, decoded.email);
+
+      // Store new refresh token
+      await tx.refreshToken.create({
+        data: {
+          token: tokens.refreshToken,
+          userId: decoded.userId,
+          expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRES * 1000),
+        },
+      });
+
+      return { user, tokens };
     });
 
-    if (!storedToken || storedToken.isRevoked) {
-      throw new AppError('Invalid refresh token', 401, 'INVALID_REFRESH_TOKEN');
-    }
-
-    if (storedToken.expiresAt < new Date()) {
-      throw new AppError('Refresh token expired', 401, 'REFRESH_TOKEN_EXPIRED');
-    }
-
-    // Revoke old token
-    await prisma.refreshToken.update({
-      where: { id: storedToken.id },
-      data: { isRevoked: true },
-    });
-
-    // Generate new tokens
-    const tokens = generateTokens(decoded.userId, decoded.email);
-
-    // Store new refresh token
-    await prisma.refreshToken.create({
-      data: {
-        token: tokens.refreshToken,
-        userId: decoded.userId,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRES * 1000),
-      },
-    });
-
-    const { password: _, ...userWithoutPassword } = storedToken.user as any;
-
-    return { user: userWithoutPassword, tokens };
+    return result;
   },
 
   async logout(token: string) {

@@ -21,9 +21,46 @@ interface ApiResponse<T = unknown> {
 
 class ApiClient {
   private baseUrl: string;
+  private refreshPromise: Promise<boolean> | null = null;
+  private tokenSyncChannel: BroadcastChannel | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+    this.initTokenSync();
+  }
+
+  // Listen for token updates from other tabs
+  private initTokenSync() {
+    if (typeof window === 'undefined') return;
+    try {
+      this.tokenSyncChannel = new BroadcastChannel('vgfriend-token-sync');
+      this.tokenSyncChannel.onmessage = (event) => {
+        if (event.data?.type === 'token-updated' && event.data?.accessToken) {
+          // Update localStorage with new token from another tab
+          const stored = localStorage.getItem('vgfriend-auth');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            parsed.state.accessToken = event.data.accessToken;
+            if (event.data.user) parsed.state.user = event.data.user;
+            localStorage.setItem('vgfriend-auth', JSON.stringify(parsed));
+          }
+        }
+      };
+    } catch {
+      // BroadcastChannel not supported
+    }
+  }
+
+  private broadcastTokenUpdate(accessToken: string, user?: unknown) {
+    try {
+      this.tokenSyncChannel?.postMessage({
+        type: 'token-updated',
+        accessToken,
+        user,
+      });
+    } catch {
+      // Ignore broadcast errors
+    }
   }
 
   private getAccessToken(): string | null {
@@ -95,6 +132,23 @@ class ApiClient {
   }
 
   private async tryRefreshToken(): Promise<boolean> {
+    // If a refresh is already in progress, wait for it
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    // Start the refresh and save the promise
+    this.refreshPromise = this.doRefreshToken();
+    
+    try {
+      return await this.refreshPromise;
+    } finally {
+      // Clear the promise after completion (allow future refreshes)
+      this.refreshPromise = null;
+    }
+  }
+
+  private async doRefreshToken(): Promise<boolean> {
     try {
       const res = await fetch(`${this.baseUrl}/auth/refresh`, {
         method: 'POST',
@@ -104,14 +158,21 @@ class ApiClient {
       if (!res.ok) return false;
       const data = await res.json();
       if (data.success && data.data?.tokens?.accessToken) {
+        const newToken = data.data.tokens.accessToken;
+        const newUser = data.data.user;
+        
         // Update Zustand persisted store in localStorage
         const stored = localStorage.getItem('vgfriend-auth');
         if (stored) {
           const parsed = JSON.parse(stored);
-          parsed.state.accessToken = data.data.tokens.accessToken;
-          if (data.data.user) parsed.state.user = data.data.user;
+          parsed.state.accessToken = newToken;
+          if (newUser) parsed.state.user = newUser;
           localStorage.setItem('vgfriend-auth', JSON.stringify(parsed));
         }
+        
+        // Broadcast to other tabs so they get the new token immediately
+        this.broadcastTokenUpdate(newToken, newUser);
+        
         return true;
       }
     } catch {
