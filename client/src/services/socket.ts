@@ -11,17 +11,49 @@ class SocketService {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private socketId: string | null = null
+  private currentToken: string | null = null
 
   connect(token: string) {
-    if (this.socket?.connected) {
+    // If already connected with the same token, do nothing
+    if (this.socket?.connected && this.currentToken === token) {
       return
     }
+
+    // If connected with a different token, disconnect first
+    if (this.socket && this.currentToken !== token) {
+      this.socket.disconnect()
+      this.socket = null
+    }
+
+    this.currentToken = token
 
     // Initialize cross-tab sync
     crossTabSync.initialize()
 
     this.socket = io(WS_URL, {
       auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: 1000,
+    })
+
+    this.setupEventHandlers()
+  }
+
+  // Reconnect with a new token (used after token refresh)
+  reconnectWithNewToken(newToken: string) {
+    if (this.currentToken === newToken) return
+    
+    this.currentToken = newToken
+    
+    if (this.socket) {
+      this.socket.disconnect()
+      this.socket = null
+    }
+
+    this.socket = io(WS_URL, {
+      auth: { token: newToken },
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
