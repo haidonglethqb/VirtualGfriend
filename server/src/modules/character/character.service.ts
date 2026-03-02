@@ -222,8 +222,9 @@ export const characterService = {
       data,
     });
 
-    // Invalidate cache
+    // Invalidate caches
     await cache.del(CacheKeys.character(userId));
+    await cache.del(CacheKeys.characterWithFacts(character.id));
 
     return updated;
   },
@@ -242,8 +243,9 @@ export const characterService = {
       data,
     });
 
-    // Invalidate cache
+    // Invalidate caches
     await cache.del(CacheKeys.character(userId));
+    await cache.del(CacheKeys.characterWithFacts(character.id));
 
     return updated;
   },
