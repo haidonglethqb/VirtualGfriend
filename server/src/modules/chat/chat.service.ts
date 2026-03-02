@@ -236,6 +236,9 @@ export const chatService = {
       }
     }
 
+    // Invalidate character cache after affection/XP updates
+    await cache.del(CacheKeys.characterWithFacts(character.id));
+
     // Process game event for quest progress and milestones
     const gameResult = await gameEventService.processAction({
       userId,

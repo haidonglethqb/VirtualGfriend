@@ -280,7 +280,7 @@ export const characterService = {
       throw new AppError('No active character found', 404, 'NO_CHARACTER');
     }
 
-    return prisma.characterFact.upsert({
+    const fact = await prisma.characterFact.upsert({
       where: {
         characterId_key: {
           characterId: character.id,
@@ -300,6 +300,11 @@ export const characterService = {
         importance: data.importance || 5,
       },
     });
+
+    // Invalidate character cache after adding/updating fact
+    await cache.del(CacheKeys.characterWithFacts(character.id));
+
+    return fact;
   },
 
   async getRelationshipStatus(userId: string) {
