@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import rateLimit from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
 
 import { router } from './routes';
 import { errorHandler } from './middlewares/error.middleware';
@@ -65,18 +66,53 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Rate limiting (skip for Playwright tests only in non-production)
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute
-  max: parseInt(process.env.RATE_LIMIT_MAX || '1000'), // 1000 requests per minute in dev
+// Rate limiting — per-user for authenticated routes, per-IP for public routes
+// This ensures logged-in users get their own generous limit while
+// unauthenticated endpoints (login, register, etc.) are still protected by IP.
+const isPlaywrightTest = (req: Request) => {
+  if (process.env.NODE_ENV === 'production') return false;
+  return req.headers['x-playwright-test'] === 'true';
+};
+
+// Public routes limiter (IP-based) — for /api/auth/* etc.
+const publicLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,                 // 100 requests per 15 min per IP
   message: { error: 'Too many requests, please try again later.' },
-  skip: (req: Request) => {
-    // Skip rate limiting for Playwright E2E tests — only in non-production
-    if (process.env.NODE_ENV === 'production') return false;
-    return req.headers['x-playwright-test'] === 'true';
-  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: isPlaywrightTest,
 });
-app.use('/api/', limiter);
+
+// Authenticated routes limiter (per-user via JWT) — generous for normal usage
+// Falls back to IP if no user is found (shouldn't happen for authed routes)
+const authenticatedLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,  // 1 minute window
+  max: 200,                  // 200 requests per minute per user — enough for tab navigation
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => {
+    // Use userId from JWT if available, otherwise fall back to IP
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+        return `user:${decoded.userId}`;
+      } catch {
+        // Token invalid/expired — fall back to IP
+      }
+    }
+    return req.ip || req.socket.remoteAddress || 'unknown';
+  },
+  skip: isPlaywrightTest,
+});
+
+// Apply public limiter to auth routes (unauthenticated)
+app.use('/api/auth', publicLimiter);
+// Apply per-user limiter to all other API routes
+app.use('/api/', authenticatedLimiter);
 
 // Health check (with DB connectivity) — cached for 5 seconds
 let healthCache: { data: Record<string, unknown>; expiry: number } | null = null;
