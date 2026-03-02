@@ -152,6 +152,23 @@ export const cache = {
   },
 
   /**
+   * Atomic SET if Not eXists with TTL
+   * Returns true if the key was set, false if it already existed
+   * Used for distributed locking and deduplication
+   */
+  async setNX(key: string, value: unknown, ttlSeconds: number = 60): Promise<boolean> {
+    try {
+      const client = await getClient();
+      if (!client) return false;
+
+      const result = await client.set(key, JSON.stringify(value), 'EX', ttlSeconds, 'NX');
+      return result === 'OK';
+    } catch {
+      return false;
+    }
+  },
+
+  /**
    * Check if Redis is available
    */
   async isAvailable(): Promise<boolean> {
