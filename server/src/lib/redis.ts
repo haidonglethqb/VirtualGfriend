@@ -200,6 +200,7 @@ export const CacheKeys = {
   userAuth: (userId: string) => `user:auth:${userId}`,
   character: (userId: string) => `character:active:${userId}`,
   characterById: (characterId: string) => `character:${characterId}`,
+  characterWithFacts: (characterId: string) => `character:${characterId}:facts`,
   quests: () => 'quests:all',
   gifts: (category?: string) => category ? `gifts:${category}` : 'gifts:all',
   giftInventory: (userId: string) => `gifts:inventory:${userId}`,
