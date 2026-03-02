@@ -64,11 +64,11 @@ export function setupSocketHandlers(io: Server) {
 
       // Use cache-aside pattern (same as auth middleware) instead of raw DB query
       const cacheKey = CacheKeys.userAuth(decoded.userId)
-      let user = await cache.get<{ id: string; isActive?: boolean }>(cacheKey)
+      let user = await cache.get<{ id: string; email: string }>(cacheKey)
       if (!user) {
         const dbUser = await prisma.user.findUnique({
           where: { id: decoded.userId },
-          select: { id: true, email: true, isActive: true },
+          select: { id: true, email: true },
         })
         if (dbUser) {
           await cache.set(cacheKey, dbUser, CACHE_TTL.SOCKET_AUTH)
@@ -76,8 +76,8 @@ export function setupSocketHandlers(io: Server) {
         }
       }
 
-      if (!user || user.isActive === false) {
-        return next(new Error('User not found or inactive'))
+      if (!user) {
+        return next(new Error('User not found'))
       }
 
       socket.userId = user.id
