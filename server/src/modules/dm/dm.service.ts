@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma'
 import { cache, CacheKeys, CacheTTL } from '../../lib/redis'
 import { AppError } from '../../middlewares/error.middleware'
 import { createModuleLogger } from '../../lib/logger'
+import { MESSAGE_LIMITS } from '../../lib/constants'
 
 const log = createModuleLogger('DM')
 
@@ -181,8 +182,8 @@ export const dmService = {
     }
 
     const trimmed = content.trim()
-    if (!trimmed || trimmed.length > 2000) {
-      throw new AppError('Invalid message content', 400, 'INVALID_CONTENT')
+    if (!trimmed || trimmed.length > MESSAGE_LIMITS.MAX_DM_MESSAGE_LENGTH) {
+      throw new AppError(`Invalid message content (max ${MESSAGE_LIMITS.MAX_DM_MESSAGE_LENGTH} characters)`, 400, 'INVALID_CONTENT')
     }
 
     const message = await prisma.directMessage.create({

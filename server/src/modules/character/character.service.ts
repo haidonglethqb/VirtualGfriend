@@ -3,6 +3,7 @@ import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { RelationshipStage, Gender } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
+import { VALIDATION } from '../../lib/constants';
 
 const log = createModuleLogger('Character');
 
@@ -336,16 +337,25 @@ export const characterService = {
     };
   },
 
-  async updateAffection(characterId: string, amount: number) {
+  async updateAffection(characterId: string, amount: number, userId?: string) {
     const character = await prisma.character.findUnique({
       where: { id: characterId },
+      select: { id: true, userId: true, affection: true, relationshipStage: true },
     });
 
     if (!character) {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
-    const newAffection = Math.max(0, Math.min(1000, character.affection + amount));
+    // Authorization check: if userId is provided, verify ownership
+    if (userId && character.userId !== userId) {
+      throw new AppError('Not authorized to update this character', 403, 'FORBIDDEN');
+    }
+
+    const newAffection = Math.max(
+      VALIDATION.AFFECTION_MIN,
+      Math.min(VALIDATION.AFFECTION_MAX, character.affection + amount)
+    );
     const newStage = calculateRelationshipStage(newAffection);
     const stageChanged = newStage !== character.relationshipStage;
 
