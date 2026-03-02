@@ -101,10 +101,17 @@ export function setupSocketHandlers(io: Server) {
         const recentlyChecked = await cache.get<boolean>(notifDebounceKey)
         if (recentlyChecked) return
 
-        const characters = await prisma.character.findMany({
-          where: { userId },
-          select: { id: true, name: true },
-        })
+        // Cache character list for 5 minutes to avoid repeated DB queries
+        const charCacheKey = `user:${userId}:characters:list`
+        let characters = await cache.get<Array<{ id: string; name: string }>>(charCacheKey)
+
+        if (!characters) {
+          characters = await prisma.character.findMany({
+            where: { userId },
+            select: { id: true, name: true },
+          })
+          await cache.set(charCacheKey, characters, 300) // 5 minutes
+        }
 
         for (const character of characters) {
           const result = await proactiveNotificationService.checkAndSendNotification(character.id)
@@ -338,11 +345,17 @@ export function setupSocketHandlers(io: Server) {
 
         const message = await dmService.sendMessage(userId, data.conversationId, data.content)
 
-        // Get conversation members to broadcast
-        const members = await prisma.conversationMember.findMany({
-          where: { conversationId: data.conversationId, isActive: true },
-          select: { userId: true },
-        })
+        // Get conversation members to broadcast (cached for 5 minutes)
+        const membersCacheKey = `conversation:${data.conversationId}:members`
+        let members = await cache.get<Array<{ userId: string }>>(membersCacheKey)
+
+        if (!members) {
+          members = await prisma.conversationMember.findMany({
+            where: { conversationId: data.conversationId, isActive: true },
+            select: { userId: true },
+          })
+          await cache.set(membersCacheKey, members, 300) // 5 minutes
+        }
 
         // Broadcast to all members' rooms
         members.forEach(member => {
@@ -369,13 +382,20 @@ export function setupSocketHandlers(io: Server) {
           return
         }
 
-        // Broadcast typing to other members (with await)
-        const members = await prisma.conversationMember.findMany({
-          where: { conversationId: data.conversationId, isActive: true, userId: { not: userId } },
-          select: { userId: true },
-        })
+        // Broadcast typing to other members (cached to avoid DB query on every keystroke)
+        const membersCacheKey = `conversation:${data.conversationId}:members`
+        let members = await cache.get<Array<{ userId: string }>>(membersCacheKey)
 
-        members.forEach(member => {
+        if (!members) {
+          members = await prisma.conversationMember.findMany({
+            where: { conversationId: data.conversationId, isActive: true },
+            select: { userId: true },
+          })
+          await cache.set(membersCacheKey, members, 300) // 5 minutes
+        }
+
+        // Filter out current user and broadcast to others
+        members.filter(m => m.userId !== userId).forEach(member => {
           io.to(`user:${member.userId}`).emit('dm:typing', {
             conversationId: data.conversationId,
             userId,
