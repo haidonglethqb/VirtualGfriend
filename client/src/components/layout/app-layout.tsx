@@ -225,8 +225,8 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
         </main>
       </div>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#181114]/95 backdrop-blur-sm border-t border-[#392830] z-20">
+      {/* Mobile Bottom Nav — only on mobile (below md), header nav covers md-lg, sidebar covers lg+ */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#181114]/95 backdrop-blur-sm border-t border-[#392830] z-20">
         <div className="flex items-center justify-around py-3">
           {navItems.map((item) => {
             const isActive = pathname === item.href;

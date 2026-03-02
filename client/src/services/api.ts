@@ -99,6 +99,17 @@ class ApiClient {
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, config);
 
+    // Handle 429 — rate limited, wait and retry once
+    if (response.status === 429 && !options.headers?.['X-Rate-Retry']) {
+      const retryAfter = response.headers.get('Retry-After');
+      const waitMs = retryAfter ? parseInt(retryAfter) * 1000 : 2000;
+      await new Promise(resolve => setTimeout(resolve, Math.min(waitMs, 5000)));
+      return this.request<T>(endpoint, {
+        ...options,
+        headers: { ...headers, 'X-Rate-Retry': '1' },
+      });
+    }
+
     // Handle 401 — try refreshing the token once
     if (response.status === 401 && token && !options.headers?.['X-Retry']) {
       const refreshed = await this.tryRefreshToken();
