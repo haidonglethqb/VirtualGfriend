@@ -200,6 +200,7 @@ export const CacheKeys = {
   userAuth: (userId: string) => `user:auth:${userId}`,
   character: (userId: string) => `character:active:${userId}`,
   characterById: (characterId: string) => `character:${characterId}`,
+  characterWithFacts: (characterId: string) => `character:${characterId}:facts`,
   quests: () => 'quests:all',
   gifts: (category?: string) => category ? `gifts:${category}` : 'gifts:all',
   giftInventory: (userId: string) => `gifts:inventory:${userId}`,
@@ -219,4 +220,5 @@ export const CacheTTL = {
   SETTINGS: 30 * 60,         // 30 minutes
   CONVERSATIONS: 60,         // 1 minute (DM list, changes often)
   LEADERBOARD: 5 * 60,       // 5 minutes
+  SOCKET_AUTH: 10 * 60,      // 10 minutes (socket authentication)
 };
