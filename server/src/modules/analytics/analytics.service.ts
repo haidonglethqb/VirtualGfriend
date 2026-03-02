@@ -42,12 +42,21 @@ export const analyticsService = {
       throw new Error('Character not found');
     }
 
-    // Get messages for analysis
-    const messages = await prisma.message.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    });
+    // Build activity heatmap using aggregation instead of loading 500 messages
+    const activityData = await prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+      SELECT
+        DATE("createdAt") as date,
+        COUNT(*)::bigint as count
+      FROM "messages"
+      WHERE "userId" = ${userId}
+      GROUP BY DATE("createdAt")
+      ORDER BY date DESC
+    `;
+
+    const activityHeatmap: ActivityHeatmapData[] = activityData.map(item => ({
+      date: item.date,
+      count: Number(item.count),
+    }));
 
     // Build affection history from character's current state (simplified)
     const affectionHistory: AffectionHistoryPoint[] = [];
@@ -67,18 +76,6 @@ export const analyticsService = {
         level: Math.floor(progress * character.level) || 1,
       });
     }
-
-    // Build activity heatmap from messages
-    const activityMap = new Map<string, number>();
-    messages.forEach(msg => {
-      const dateKey = msg.createdAt.toISOString().split('T')[0];
-      activityMap.set(dateKey, (activityMap.get(dateKey) || 0) + 1);
-    });
-
-    const activityHeatmap: ActivityHeatmapData[] = Array.from(activityMap.entries()).map(([date, count]) => ({
-      date,
-      count,
-    }));
 
     // Total counts
     const totalMessages = await prisma.message.count({
@@ -150,30 +147,42 @@ export const analyticsService = {
       },
     });
 
-    // Calculate streak from message history
-    let streak = 0;
-    let currentDate = new Date();
-    for (let i = 0; i < 30; i++) {
-      const dayStart = new Date(currentDate);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayEnd.getDate() + 1);
+    // Calculate streak from message history - Optimized with a single query
+    // Get message counts grouped by day for the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-      const messagesOnDay = await prisma.message.count({
-        where: {
-          userId,
-          createdAt: {
-            gte: dayStart,
-            lt: dayEnd,
-          },
-        },
-      });
+    const messageCounts = await prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+      SELECT
+        DATE("createdAt") as date,
+        COUNT(*)::bigint as count
+      FROM "messages"
+      WHERE "userId" = ${userId}
+        AND "createdAt" >= ${thirtyDaysAgo}
+      GROUP BY DATE("createdAt")
+      ORDER BY date DESC
+    `;
+
+    // Calculate streak from the message counts
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const messageMap = new Map(
+      messageCounts.map(mc => [new Date(mc.date).toISOString().split('T')[0], Number(mc.count)])
+    );
+
+    let currentDate = new Date(today);
+    for (let i = 0; i < 30; i++) {
+      const dateKey = currentDate.toISOString().split('T')[0];
+      const messagesOnDay = messageMap.get(dateKey) || 0;
 
       if (messagesOnDay > 0) {
         streak++;
         currentDate.setDate(currentDate.getDate() - 1);
       } else if (i > 0) {
-        // If not today and no messages, break
+        // If not today and no messages, break the streak
         break;
       } else {
         // Today has no messages, check yesterday

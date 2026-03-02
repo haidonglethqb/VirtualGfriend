@@ -147,24 +147,37 @@ export const dmService = {
       },
     })
 
-    // Add unread counts
-    const withUnread = await Promise.all(
-      conversations.map(async (conv) => {
-        const member = conv.members.find(m => m.userId === userId)
-        const unreadCount = member
-          ? await prisma.directMessage.count({
-              where: {
-                conversationId: conv.id,
-                senderId: { not: userId },
-                isDeleted: false,
-                createdAt: { gt: member.lastReadAt },
-              },
-            })
-          : 0
+    // Add unread counts efficiently
+    // If no conversations, return early
+    if (conversations.length === 0) {
+      return { conversations: [], total, page, limit: safeLimit }
+    }
 
-        return { ...conv, unreadCount }
-      })
+    // Get unread counts for all conversations in a single query
+    const unreadCounts = await prisma.$queryRaw<Array<{ conversationId: string; unreadCount: bigint }>>`
+      SELECT
+        cm."conversationId",
+        COUNT(dm.id)::bigint as "unreadCount"
+      FROM "conversation_members" cm
+      LEFT JOIN "direct_messages" dm ON dm."conversationId" = cm."conversationId"
+        AND dm."senderId" != ${userId}
+        AND dm."isDeleted" = false
+        AND dm."createdAt" > cm."lastReadAt"
+      WHERE cm."userId" = ${userId}
+        AND cm."isActive" = true
+        AND cm."conversationId" = ANY(${conversations.map(c => c.id)})
+      GROUP BY cm."conversationId"
+    `
+
+    // Map unread counts
+    const unreadMap = new Map(
+      unreadCounts.map((uc) => [uc.conversationId, Number(uc.unreadCount)])
     )
+
+    const withUnread = conversations.map((conv) => ({
+      ...conv,
+      unreadCount: unreadMap.get(conv.id) || 0
+    }))
 
     return { conversations: withUnread, total, page, limit: safeLimit }
   },
@@ -286,29 +299,22 @@ export const dmService = {
   },
 
   /**
-   * Get total unread message count across all conversations
+   * Get total unread message count across all conversations - Optimized to avoid N+1
    */
   async getTotalUnreadCount(userId: string) {
-    const memberships = await prisma.conversationMember.findMany({
-      where: { userId, isActive: true },
-      select: { conversationId: true, lastReadAt: true },
-    })
+    // Use a single aggregated query instead of looping through memberships
+    const result = await prisma.$queryRaw<Array<{ total: bigint }>>`
+      SELECT COUNT(dm.id)::bigint as total
+      FROM "conversation_members" cm
+      INNER JOIN "direct_messages" dm ON dm."conversationId" = cm."conversationId"
+        AND dm."senderId" != ${userId}
+        AND dm."isDeleted" = false
+        AND dm."createdAt" > cm."lastReadAt"
+      WHERE cm."userId" = ${userId}
+        AND cm."isActive" = true
+    `
 
-    if (memberships.length === 0) return 0
-
-    let totalUnread = 0
-    for (const m of memberships) {
-      totalUnread += await prisma.directMessage.count({
-        where: {
-          conversationId: m.conversationId,
-          senderId: { not: userId },
-          isDeleted: false,
-          createdAt: { gt: m.lastReadAt },
-        },
-      })
-    }
-
-    return totalUnread
+    return result.length > 0 ? Number(result[0].total) : 0
   },
 
   /**

@@ -55,15 +55,33 @@ export default function OnboardingPage() {
                 const response = await api.get<CharacterTemplate[]>('/character/templates');
                 if (response.success && response.data) {
                     setTemplates(response.data);
+                    if (response.data.length === 0) {
+                        toast({
+                            title: 'Cảnh báo',
+                            description: 'Không tìm thấy mẫu nhân vật. Vui lòng liên hệ hỗ trợ.',
+                            variant: 'destructive',
+                        });
+                    }
+                } else {
+                    toast({
+                        title: 'Lỗi tải dữ liệu',
+                        description: 'Không thể tải danh sách mẫu nhân vật.',
+                        variant: 'destructive',
+                    });
                 }
             } catch (error) {
                 console.error('Failed to fetch templates:', error);
+                toast({
+                    title: 'Lỗi kết nối',
+                    description: 'Không thể kết nối đến server. Vui lòng thử lại.',
+                    variant: 'destructive',
+                });
             } finally {
                 setIsLoadingTemplates(false);
             }
         };
         fetchTemplates();
-    }, []);
+    }, [toast]);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -93,6 +111,16 @@ export default function OnboardingPage() {
     };
 
     const handleCreate = async () => {
+        // Validate template selection
+        if (!formData.templateId) {
+            toast({
+                title: 'Thiếu thông tin',
+                description: 'Vui lòng chọn mẫu nhân vật trước khi tiếp tục.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
         setIsCreating(true);
         try {
             await createCharacter({
@@ -104,12 +132,33 @@ export default function OnboardingPage() {
                 templateId: formData.templateId || undefined,
                 avatarUrl: formData.avatarUrl || undefined,
             });
+
+            toast({
+                title: 'Thành công!',
+                description: 'Đã tạo nhân vật thành công.',
+            });
+
             router.push('/dashboard');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to create character:', error);
+
+            // Better error messages based on error type
+            let errorMessage = 'Không thể tạo người yêu ảo. Vui lòng thử lại!';
+
+            if (error?.response?.status === 400) {
+                errorMessage = 'Thông tin nhân vật không hợp lệ. Vui lòng kiểm tra lại.';
+            } else if (error?.response?.status === 401) {
+                errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+                setTimeout(() => router.push('/auth/login'), 2000);
+            } else if (error?.response?.status === 500) {
+                errorMessage = 'Lỗi server. Vui lòng thử lại sau ít phút.';
+            } else if (error?.message) {
+                errorMessage = error.message;
+            }
+
             toast({
                 title: 'Lỗi tạo nhân vật',
-                description: 'Không thể tạo người yêu ảo. Vui lòng thử lại!',
+                description: errorMessage,
                 variant: 'destructive',
             });
             setIsCreating(false);

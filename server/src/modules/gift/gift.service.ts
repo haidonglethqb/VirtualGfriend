@@ -201,8 +201,9 @@ export const giftService = {
     // Update affection (outside transaction as it has its own logic)
     const updatedCharacter = await characterService.updateAffection(data.characterId, gift.affectionBonus);
 
-    // Invalidate inventory cache
+    // Invalidate caches
     await cache.del(CacheKeys.giftInventory(userId));
+    await cache.del(CacheKeys.characterWithFacts(data.characterId));
 
     // Process game event for quest progress and milestones
     const gameResult = await gameEventService.processAction({
