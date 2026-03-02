@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma';
-import { cache } from '../../lib/redis';
+import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { aiService } from '../ai/ai.service';
 import { factsLearningService } from '../ai/facts-learning.service';
@@ -104,9 +104,13 @@ export const chatService = {
   },
 
   async sendMessage(userId: string, data: SendMessageData) {
-    // Parallel: verify character + get user info at the same time
-    const [character, user] = await Promise.all([
-      prisma.character.findFirst({
+    // Try to get character from cache first
+    const cacheKey = CacheKeys.characterWithFacts(data.characterId);
+    let character = await cache.get<any>(cacheKey);
+
+    if (!character) {
+      // Cache miss - fetch from database
+      character = await prisma.character.findFirst({
         where: { id: data.characterId, userId },
         include: {
           characterFacts: {
@@ -114,12 +118,19 @@ export const chatService = {
             take: 10,
           },
         },
-      }),
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: { displayName: true, username: true },
-      }),
-    ]);
+      });
+
+      if (character) {
+        // Cache for 5 minutes
+        await cache.set(cacheKey, character, CacheTTL.INVENTORY);
+      }
+    }
+
+    // Get user info (this is lightweight, no need to cache)
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true, username: true },
+    });
 
     if (!character) {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
@@ -224,6 +235,9 @@ export const chatService = {
         };
       }
     }
+
+    // Invalidate character cache after affection/XP updates
+    await cache.del(CacheKeys.characterWithFacts(character.id));
 
     // Process game event for quest progress and milestones
     const gameResult = await gameEventService.processAction({

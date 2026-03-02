@@ -93,9 +93,13 @@ export const authService = {
         characters: {
           create: {
             name: 'Mai',
+            gender: 'FEMALE',
             personality: 'caring',
             mood: 'happy',
+            age: 22,
+            occupation: 'student',
             bio: 'Xin chào! Tôi là Mai, người bạn đồng hành của bạn 💕',
+            isActive: true,
           },
         },
       },
