@@ -42,12 +42,21 @@ export const analyticsService = {
       throw new Error('Character not found');
     }
 
-    // Get messages for analysis
-    const messages = await prisma.message.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    });
+    // Build activity heatmap using aggregation instead of loading 500 messages
+    const activityData = await prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+      SELECT
+        DATE("createdAt") as date,
+        COUNT(*)::bigint as count
+      FROM "messages"
+      WHERE "userId" = ${userId}
+      GROUP BY DATE("createdAt")
+      ORDER BY date DESC
+    `;
+
+    const activityHeatmap: ActivityHeatmapData[] = activityData.map(item => ({
+      date: item.date,
+      count: Number(item.count),
+    }));
 
     // Build affection history from character's current state (simplified)
     const affectionHistory: AffectionHistoryPoint[] = [];
@@ -67,18 +76,6 @@ export const analyticsService = {
         level: Math.floor(progress * character.level) || 1,
       });
     }
-
-    // Build activity heatmap from messages
-    const activityMap = new Map<string, number>();
-    messages.forEach(msg => {
-      const dateKey = msg.createdAt.toISOString().split('T')[0];
-      activityMap.set(dateKey, (activityMap.get(dateKey) || 0) + 1);
-    });
-
-    const activityHeatmap: ActivityHeatmapData[] = Array.from(activityMap.entries()).map(([date, count]) => ({
-      date,
-      count,
-    }));
 
     // Total counts
     const totalMessages = await prisma.message.count({
