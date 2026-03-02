@@ -127,11 +127,22 @@ export const passwordResetService = {
     const resetToken = crypto.randomBytes(32).toString('hex');
     const tokenExpiry = new Date(Date.now() + 5 * 60 * 1000);
 
-    // Store reset token temporarily (you could use Redis here for better performance)
-    await prisma.passwordResetOTP.create({
+    // Invalidate old tokens for this email
+    await prisma.passwordResetToken.updateMany({
+      where: {
+        email: email.toLowerCase(),
+        used: false,
+      },
+      data: {
+        used: true,
+      },
+    });
+
+    // Store reset token in dedicated table
+    await prisma.passwordResetToken.create({
       data: {
         email: email.toLowerCase(),
-        otp: resetToken, // Reuse OTP field for reset token
+        token: resetToken,
         expiresAt: tokenExpiry,
         used: false,
       },
@@ -148,11 +159,11 @@ export const passwordResetService = {
    * Reset password with token
    */
   async resetPassword(email: string, token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
-    // Verify reset token
-    const tokenRecord = await prisma.passwordResetOTP.findFirst({
+    // Verify reset token from dedicated table
+    const tokenRecord = await prisma.passwordResetToken.findFirst({
       where: {
         email: email.toLowerCase(),
-        otp: token,
+        token,
         used: false,
       },
       orderBy: {
@@ -184,7 +195,7 @@ export const passwordResetService = {
     });
 
     // Mark token as used
-    await prisma.passwordResetOTP.update({
+    await prisma.passwordResetToken.update({
       where: { id: tokenRecord.id },
       data: { used: true },
     });
@@ -199,15 +210,26 @@ export const passwordResetService = {
   },
 
   /**
-   * Cleanup expired OTPs (run periodically)
+   * Cleanup expired OTPs and tokens (run periodically)
    */
   async cleanupExpiredOTPs(): Promise<void> {
-    await prisma.passwordResetOTP.deleteMany({
-      where: {
-        expiresAt: {
-          lt: new Date(),
+    const now = new Date();
+
+    await Promise.all([
+      prisma.passwordResetOTP.deleteMany({
+        where: {
+          expiresAt: {
+            lt: now,
+          },
         },
-      },
-    });
+      }),
+      prisma.passwordResetToken.deleteMany({
+        where: {
+          expiresAt: {
+            lt: now,
+          },
+        },
+      }),
+    ]);
   },
 };
