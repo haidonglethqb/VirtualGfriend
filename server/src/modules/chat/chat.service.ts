@@ -7,6 +7,7 @@ import { characterService } from '../character/character.service';
 import { gameEventService } from '../game/game-event.service';
 import { MessageType } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
+import { MESSAGE_LIMITS } from '../../lib/constants';
 
 const log = createModuleLogger('Chat');
 

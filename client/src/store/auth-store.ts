@@ -175,6 +175,15 @@ export const useAuthStore = create<AuthState>()(
   )
 );
 
+// Helper function to validate JWT token structure
+function isValidJWTStructure(token: string): boolean {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  // Basic check: each part should be base64-like
+  return parts.every(part => /^[A-Za-z0-9_-]+$/.test(part));
+}
+
 // Cross-tab sync: Listen for storage changes from other tabs
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
@@ -183,12 +192,18 @@ if (typeof window !== 'undefined') {
         const parsed = JSON.parse(event.newValue);
         const newToken = parsed.state?.accessToken;
         const currentToken = useAuthStore.getState().accessToken;
-        
-        // If token changed, update the store
+
+        // If token changed, validate and update the store
         if (newToken && newToken !== currentToken) {
-          useAuthStore.setState({ 
-            accessToken: newToken, 
-            isAuthenticated: true 
+          // Validate JWT structure before applying
+          if (!isValidJWTStructure(newToken)) {
+            console.warn('Invalid token structure detected in cross-tab sync');
+            return;
+          }
+
+          useAuthStore.setState({
+            accessToken: newToken,
+            isAuthenticated: true
           });
         } else if (!newToken && currentToken) {
           // Token was cleared (logout from another tab)

@@ -7,8 +7,36 @@ import { dmService } from '../modules/dm/dm.service'
 import { proactiveNotificationService } from '../modules/ai/proactive-notification.service'
 import { moodService } from '../modules/character/mood.service'
 import { createModuleLogger } from '../lib/logger'
+import { MESSAGE_LIMITS, CACHE_TTL, RATE_LIMITS, TIMINGS } from '../lib/constants'
 
 const log = createModuleLogger('Socket')
+
+// Rate limiting state (per user per event type)
+const rateLimiters = new Map<string, { count: number; resetAt: number }>()
+
+function checkRateLimit(userId: string, eventType: 'message' | 'dm' | 'typing'): boolean {
+  const key = `${userId}:${eventType}`
+  const now = Date.now()
+  const config = eventType === 'message'
+    ? RATE_LIMITS.SOCKET_MESSAGE_SEND
+    : eventType === 'dm'
+    ? RATE_LIMITS.SOCKET_DM_SEND
+    : RATE_LIMITS.SOCKET_TYPING
+
+  const limiter = rateLimiters.get(key)
+
+  if (!limiter || now > limiter.resetAt) {
+    rateLimiters.set(key, { count: 1, resetAt: now + config.WINDOW_MS })
+    return true
+  }
+
+  if (limiter.count >= config.MAX_REQUESTS) {
+    return false
+  }
+
+  limiter.count++
+  return true
+}
 
 interface AuthenticatedSocket extends Socket {
   userId?: string
@@ -36,20 +64,20 @@ export function setupSocketHandlers(io: Server) {
 
       // Use cache-aside pattern (same as auth middleware) instead of raw DB query
       const cacheKey = CacheKeys.userAuth(decoded.userId)
-      let user = await cache.get<{ id: string }>(cacheKey)
+      let user = await cache.get<{ id: string; isActive?: boolean }>(cacheKey)
       if (!user) {
         const dbUser = await prisma.user.findUnique({
           where: { id: decoded.userId },
-          select: { id: true, email: true },
+          select: { id: true, email: true, isActive: true },
         })
         if (dbUser) {
-          await cache.set(cacheKey, dbUser, CacheTTL.USER_AUTH)
+          await cache.set(cacheKey, dbUser, CACHE_TTL.SOCKET_AUTH)
           user = dbUser
         }
       }
 
-      if (!user) {
-        return next(new Error('User not found'))
+      if (!user || user.isActive === false) {
+        return next(new Error('User not found or inactive'))
       }
 
       socket.userId = user.id
@@ -122,32 +150,37 @@ export function setupSocketHandlers(io: Server) {
       clientId?: string
     }) => {
       try {
+        // Rate limiting
+        if (!checkRateLimit(userId, 'message')) {
+          socket.emit('error', { message: 'Too many messages. Please slow down.' })
+          return
+        }
+
         // Input validation
         if (!data.content || typeof data.content !== 'string') {
           socket.emit('error', { message: 'Message content is required' })
           return
         }
-        
+
         // Sanitize and validate content length
         const content = data.content.trim()
         if (content.length === 0) {
           socket.emit('error', { message: 'Message cannot be empty' })
           return
         }
-        if (content.length > 2000) {
-          socket.emit('error', { message: 'Message too long (max 2000 characters)' })
+        if (content.length > MESSAGE_LIMITS.MAX_CHAT_MESSAGE_LENGTH) {
+          socket.emit('error', { message: `Message too long (max ${MESSAGE_LIMITS.MAX_CHAT_MESSAGE_LENGTH} characters)` })
           return
         }
 
-        // Idempotency check — prevent duplicate processing
+        // Atomic idempotency check — prevent duplicate processing
         if (data.clientId) {
           const dedupKey = `dedup:${userId}:${data.clientId}`
-          const alreadyProcessed = await cache.get<boolean>(dedupKey)
-          if (alreadyProcessed) {
+          const isNew = await cache.setNX(dedupKey, true, CACHE_TTL.DEDUPLICATION)
+          if (!isNew) {
             log.debug('Duplicate message blocked:', data.clientId)
             return
           }
-          await cache.set(dedupKey, true, 60) // 60s TTL
         }
 
         // Broadcast typing indicator to ALL user's tabs
@@ -276,17 +309,31 @@ export function setupSocketHandlers(io: Server) {
       clientId?: string
     }) => {
       try {
+        // Rate limiting
+        if (!checkRateLimit(userId, 'dm')) {
+          socket.emit('error', { message: 'Too many messages. Please slow down.' })
+          return
+        }
+
         if (!data.content?.trim() || !data.conversationId) {
           socket.emit('error', { message: 'conversationId and content required' })
           return
         }
 
-        // Idempotency
+        // Validate content length
+        if (data.content.trim().length > MESSAGE_LIMITS.MAX_DM_MESSAGE_LENGTH) {
+          socket.emit('error', { message: `Message too long (max ${MESSAGE_LIMITS.MAX_DM_MESSAGE_LENGTH} characters)` })
+          return
+        }
+
+        // Atomic idempotency
         if (data.clientId) {
           const dedupKey = `dedup_dm:${userId}:${data.clientId}`
-          const dup = await cache.get<boolean>(dedupKey)
-          if (dup) return
-          await cache.set(dedupKey, true, 60)
+          const isNew = await cache.setNX(dedupKey, true, CACHE_TTL.DEDUPLICATION)
+          if (!isNew) {
+            log.debug('Duplicate DM blocked:', data.clientId)
+            return
+          }
         }
 
         const message = await dmService.sendMessage(userId, data.conversationId, data.content)
@@ -310,19 +357,33 @@ export function setupSocketHandlers(io: Server) {
       }
     })
 
-    socket.on('dm:typing', (data: { conversationId: string }) => {
-      // Broadcast typing to other members
-      prisma.conversationMember.findMany({
-        where: { conversationId: data.conversationId, isActive: true, userId: { not: userId } },
-        select: { userId: true },
-      }).then(members => {
+    socket.on('dm:typing', async (data: { conversationId: string }) => {
+      try {
+        // Rate limiting
+        if (!checkRateLimit(userId, 'typing')) {
+          return
+        }
+
+        // Input validation
+        if (!data.conversationId) {
+          return
+        }
+
+        // Broadcast typing to other members (with await)
+        const members = await prisma.conversationMember.findMany({
+          where: { conversationId: data.conversationId, isActive: true, userId: { not: userId } },
+          select: { userId: true },
+        })
+
         members.forEach(member => {
           io.to(`user:${member.userId}`).emit('dm:typing', {
             conversationId: data.conversationId,
             userId,
           })
         })
-      }).catch(() => {})
+      } catch (error) {
+        log.error('DM typing error:', error)
+      }
     })
 
     socket.on('dm:read', async (data: { conversationId: string }) => {
