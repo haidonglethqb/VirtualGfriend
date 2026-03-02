@@ -161,12 +161,6 @@ export const characterService = {
   },
 
   async createCharacter(userId: string, data: CreateCharacterData) {
-    // Deactivate other characters
-    await prisma.character.updateMany({
-      where: { userId },
-      data: { isActive: false },
-    });
-
     log.debug('Creating character with data:', {
       userId,
       name: data.name,
@@ -175,24 +169,34 @@ export const characterService = {
       personality: data.personality,
     });
 
-    const character = await prisma.character.create({
-      data: {
-        userId,
-        name: data.name,
-        nickname: data.nickname,
-        gender: data.gender || 'FEMALE',
-        personality: data.personality || 'caring',
-        birthday: data.birthday ? new Date(data.birthday) : undefined,
-        bio: data.bio || `Xin chao! Toi la ${data.name}`,
-        age: data.age || 22,
-        occupation: data.occupation || 'student',
-        templateId: data.templateId || undefined,
-        avatarUrl: data.avatarUrl || undefined,
-        isActive: true,
-      },
-      include: {
-        template: true,
-      },
+    // Use transaction to ensure atomicity: deactivate old characters and create new one
+    const character = await prisma.$transaction(async (tx) => {
+      // Deactivate other characters
+      await tx.character.updateMany({
+        where: { userId },
+        data: { isActive: false },
+      });
+
+      // Create new character
+      return tx.character.create({
+        data: {
+          userId,
+          name: data.name,
+          nickname: data.nickname,
+          gender: data.gender || 'FEMALE',
+          personality: data.personality || 'caring',
+          birthday: data.birthday ? new Date(data.birthday) : undefined,
+          bio: data.bio || `Xin chao! Toi la ${data.name}`,
+          age: data.age || 22,
+          occupation: data.occupation || 'student',
+          templateId: data.templateId || undefined,
+          avatarUrl: data.avatarUrl || undefined,
+          isActive: true,
+        },
+        include: {
+          template: true,
+        },
+      });
     });
 
     log.debug('Character created:', {
@@ -202,8 +206,10 @@ export const characterService = {
       occupation: character.occupation,
     });
 
-    // Invalidate cache for this user's active character
+    // Invalidate caches for this user
     await cache.del(CacheKeys.character(userId));
+    await cache.del(CacheKeys.characterWithFacts(character.id));
+    await cache.del(`user:${userId}:characters:list`);
 
     return character;
   },
