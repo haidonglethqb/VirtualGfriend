@@ -71,7 +71,7 @@ export function setupSocketHandlers(io: Server) {
           select: { id: true, email: true },
         })
         if (dbUser) {
-          await cache.set(cacheKey, dbUser, CACHE_TTL.SOCKET_AUTH)
+          await cache.set(cacheKey, dbUser, CacheTTL.SOCKET_AUTH)
           user = dbUser
         }
       }

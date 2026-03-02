@@ -220,4 +220,5 @@ export const CacheTTL = {
   SETTINGS: 30 * 60,         // 30 minutes
   CONVERSATIONS: 60,         // 1 minute (DM list, changes often)
   LEADERBOARD: 5 * 60,       // 5 minutes
+  SOCKET_AUTH: 10 * 60,      // 10 minutes (socket authentication)
 };
