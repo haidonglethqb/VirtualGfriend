@@ -119,6 +119,7 @@ model CharacterTemplate {
   characters    Character[]
 
   @@index([isActive, sortOrder])
+  @@index([isActive])           // Optimize queries that filter by isActive only
   @@map("character_templates")
 }
 
@@ -171,6 +172,7 @@ model Character {
   @@index([userId, isActive])
   @@index([isActive, level, experience])  // Leaderboard: top by level
   @@index([isActive, affection])          // Leaderboard: top by affection
+  @@index([templateId])                   // Optimize reverse lookups from template to characters
   @@map("characters")
 }
 
@@ -240,6 +242,8 @@ model Message {
   character   Character   @relation(fields: [characterId], references: [id], onDelete: Cascade)
 
   @@index([userId, characterId, createdAt])
+  @@index([characterId, createdAt])       // Optimize queries by character for recent messages
+  @@index([userId, createdAt])             // Optimize user message history
   @@map("messages")
 }
 
@@ -285,6 +289,8 @@ model Quest {
   userQuests      UserQuest[]
 
   @@unique([title, type]) // Prevent duplicate quests
+  @@index([type, isActive])               // Optimize DAILY quest queries
+  @@index([isActive])                     // Optimize active quest filtering
   @@map("quests")
 }
 
@@ -351,6 +357,8 @@ model Gift {
   giftHistory     GiftHistory[]
 
   @@unique([name, rarity])
+  @@index([isActive, category])           // Optimize shop queries by category
+  @@index([isActive])                     // Optimize active gift filtering
   @@map("gifts")
 }
 
@@ -419,6 +427,7 @@ model Scene {
   characterScenes CharacterScene[]
 
   @@unique([name])
+  @@index([isActive])                     // Optimize active scene queries
   @@map("scenes")
 }
 
@@ -497,6 +506,8 @@ model UserAchievement {
   achievement Achievement @relation(fields: [achievementId], references: [id])
 
   @@unique([userId, achievementId])
+  @@index([userId, unlockedAt])           // Optimize leaderboard by achievements
+  @@index([userId])                        // Optimize user achievement queries
   @@map("user_achievements")
 }
 
@@ -545,6 +556,7 @@ model DailyReward {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, claimedAt])
+  @@index([userId, day])                  // Optimize day-specific reward queries
   @@map("daily_rewards")
 }
 
