@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '../../lib/prisma';
+import { cache, CacheKeys } from '../../lib/redis';
 import { aiService } from '../ai/ai.service';
 import { Message } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
@@ -105,6 +106,12 @@ export const factsLearningService = {
       }
 
       log.info('Saved ' + savedFacts.length + ' facts');
+
+      // Invalidate character cache after extracting and saving facts
+      if (savedFacts.length > 0) {
+        await cache.del(CacheKeys.characterWithFacts(characterId));
+      }
+
       return savedFacts;
     } catch (error) {
       log.error('Error extracting facts:', error);
