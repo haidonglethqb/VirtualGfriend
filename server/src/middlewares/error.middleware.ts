@@ -20,11 +20,23 @@ export class AppError extends Error {
 
 export const errorHandler = (
   err: Error | AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) => {
-  log.error(err.message || String(err));
+  // Enhanced error logging with request context
+  const requestContext = {
+    requestId: req.requestId,
+    userId: (req as any).user?.id,
+    method: req.method,
+    path: req.path,
+    ip: req.ip,
+  };
+
+  log.error(`[${requestContext.requestId}] Error: ${err.message || String(err)}`, {
+    ...requestContext,
+    stack: err.stack,
+  });
 
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
