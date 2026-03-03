@@ -103,7 +103,7 @@ interface Pagination {
 }
 
 export default function AdminPage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = checking
   const [token, setToken] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -138,12 +138,14 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const apiCall = useCallback(async (endpoint: string, options: RequestInit = {}) => {
+  const apiCall = useCallback(async (endpoint: string, options: RequestInit = {}, authToken?: string) => {
+    const tokenToUse = authToken || token || localStorage.getItem('adminToken') || '';
+    
     const res = await fetch(`${API_URL}/api/admin${endpoint}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${tokenToUse}`,
         ...options.headers,
       },
     });
@@ -156,16 +158,35 @@ export default function AdminPage() {
     return res;
   }, [token]);
 
+  // Check for saved token on mount
   useEffect(() => {
     const savedToken = localStorage.getItem('adminToken');
     if (savedToken) {
-      setToken(savedToken);
-      setIsLoggedIn(true);
+      // Verify token is still valid
+      fetch(`${API_URL}/api/admin/stats`, {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      })
+        .then((res) => {
+          if (res.ok) {
+            setToken(savedToken);
+            setIsLoggedIn(true);
+          } else {
+            localStorage.removeItem('adminToken');
+            setIsLoggedIn(false);
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem('adminToken');
+          setIsLoggedIn(false);
+        });
+    } else {
+      setIsLoggedIn(false);
     }
   }, []);
 
+  // Fetch data when tab changes
   useEffect(() => {
-    if (!isLoggedIn || !token) return;
+    if (isLoggedIn !== true || !token) return;
 
     const fetchData = async () => {
       try {
@@ -483,6 +504,20 @@ export default function AdminPage() {
       setActionLoading(false);
     }
   };
+
+  // Loading state - checking token
+  if (isLoggedIn === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-gray-400">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Login Screen
   if (!isLoggedIn) {
