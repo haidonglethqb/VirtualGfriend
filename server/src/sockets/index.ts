@@ -210,7 +210,9 @@ export function setupSocketHandlers(io: Server) {
           sourceSocketId: socket.id,
         })
 
-        // Small delay to simulate typing
+        // Typing delay proportional to response length (min 1.5s, max 4s)
+        const responseLength = result.aiMessage.content?.length || 50;
+        const typingDelay = Math.min(4000, Math.max(1500, responseLength * 25));
         setTimeout(() => {
           // Broadcast AI response to ALL user's tabs
           io.to(userRoom).emit('message:receive', {
