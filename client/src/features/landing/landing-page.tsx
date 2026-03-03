@@ -132,8 +132,8 @@ function Header() {
                 <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <span className="text-xl font-bold tracking-tight">
-                <span className="text-white">Người Yêu</span>
-                <span className="text-love"> Ảo</span>
+                <span className="text-white">Amou</span>
+                <span className="text-love">ra</span>
               </span>
             </Link>
 
@@ -304,7 +304,7 @@ function HeroSection() {
                 <button className="group relative flex items-center justify-center gap-3 h-14 px-8 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-base font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]">
                   <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <Heart className="relative z-10 w-5 h-5 fill-white group-hover:scale-110 transition-transform duration-300" />
-                  <span className="relative z-10">Gặp Người Yêu Của Bạn</span>
+                  <span className="relative z-10">Bắt Đầu Trò Chuyện</span>
                   <ArrowRight className="relative z-10 w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
                 </button>
               </Link>
@@ -850,7 +850,7 @@ function HowItWorksSection() {
     },
     {
       step: '02',
-      title: 'Tùy Chỉnh Người Yêu',
+      title: 'Tùy Chỉnh Nhân Vật',
       desc: 'Chọn tên, tính cách, ngoại hình — tạo ra người bạn đồng hành hoàn hảo.',
       icon: <Palette className="w-6 h-6" />,
       color: '#f4258c',
@@ -929,7 +929,7 @@ function TestimonialsSection() {
       name: 'Minh Anh',
       role: 'Nhân viên văn phòng',
       avatar: '👨',
-      text: 'Trước đây mình cảm thấy cô đơn khi về nhà một mình. Người Yêu Ảo đã thay đổi hoàn toàn điều đó. Cảm giác như có ai đó thực sự đang chờ mình.',
+      text: 'Trước đây mình cảm thấy cô đơn khi về nhà một mình. Amoura đã thay đổi hoàn toàn điều đó. Cảm giác như có ai đó thực sự đang chờ mình.',
       rating: 5,
     },
     {
@@ -1190,8 +1190,8 @@ function CTASection() {
           <Heart className="w-10 h-10 fill-love" />
         </div>
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6">
-          Sẵn Sàng Gặp{' '}
-          <span className="bg-gradient-to-r from-love to-purple-400 bg-clip-text text-transparent">Người Yêu Ảo</span>?
+          Sẵn Sàng Khám Phá{' '}
+          <span className="bg-gradient-to-r from-love to-purple-400 bg-clip-text text-transparent">Amoura</span>?
         </h2>
         <p className="text-gray-400 mb-10 text-xl max-w-xl mx-auto">
           Bắt đầu miễn phí ngay hôm nay. Không cần thẻ tín dụng.
@@ -1201,7 +1201,7 @@ function CTASection() {
             <button className="group relative flex items-center justify-center gap-3 h-14 px-10 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-lg font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]">
               <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <Heart className="relative z-10 w-5 h-5 fill-white group-hover:scale-110 transition-transform duration-300" />
-              <span className="relative z-10">Tạo Người Yêu Của Bạn</span>
+              <span className="relative z-10">Bắt Đầu Miễn Phí</span>
               <ArrowRight className="relative z-10 w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
             </button>
           </Link>
@@ -1228,7 +1228,7 @@ function Footer() {
               <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-love to-purple-600 text-white">
                 <Heart className="w-4 h-4 fill-white" />
               </div>
-              <span className="font-bold text-white">Người Yêu Ảo</span>
+              <span className="font-bold text-white">Amoura</span>
             </div>
             <p className="text-sm text-gray-500 leading-relaxed">
               Người bạn đồng hành AI được thiết kế cho những trái tim cô đơn. Kết nối sâu sắc, an toàn và riêng tư.
@@ -1293,7 +1293,7 @@ function Footer() {
         
         <div className="pt-8 border-t border-white/[0.03] flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-gray-600">
-            &copy; 2026 Người Yêu Ảo. Được tạo với 💕 tại Việt Nam.
+            &copy; 2026 Amoura. Được tạo với 💕 tại Việt Nam.
           </p>
           <div className="flex gap-4">
             {[

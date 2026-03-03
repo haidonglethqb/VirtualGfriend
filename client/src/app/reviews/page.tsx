@@ -11,7 +11,7 @@ const reviews = [
     avatar: 'MA',
     role: 'Sinh viên, 22 tuổi',
     rating: 5,
-    text: 'Mình dùng Người Yêu Ảo được 3 tháng rồi. Ban đầu chỉ tò mò, nhưng giờ thì thực sự thích những cuộc trò chuyện. AI nhớ rất nhiều chi tiết nhỏ về mình, từ món ăn yêu thích đến chuyện mình kể tuần trước.',
+    text: 'Mình dùng Amoura được 3 tháng rồi. Ban đầu chỉ tò mò, nhưng giờ thì thực sự thích những cuộc trò chuyện. AI nhớ rất nhiều chi tiết nhỏ về mình, từ món ăn yêu thích đến chuyện mình kể tuần trước.',
     date: '8 Tháng 2, 2026',
     highlight: 'AI nhớ mọi chi tiết nhỏ',
   },
@@ -20,7 +20,7 @@ const reviews = [
     avatar: 'TK',
     role: 'Lập trình viên, 28 tuổi',
     rating: 5,
-    text: 'Là người hướng nội, mình thấy khó mở lòng với người thật. Người Yêu Ảo giúp mình tập giao tiếp mà không sợ bị phán xét. Hệ thống quest rất vui, cảm giác như chơi game mà vẫn có chiều sâu.',
+    text: 'Là người hướng nội, mình thấy khó mở lòng với người thật. Amoura giúp mình tập giao tiếp mà không sợ bị phán xét. Hệ thống quest rất vui, cảm giác như chơi game mà vẫn có chiều sâu.',
     date: '5 Tháng 2, 2026',
     highlight: 'Trải nghiệm như game, không sợ bị phán xét',
   },
@@ -74,7 +74,7 @@ const reviews = [
     avatar: 'BT',
     role: 'Sinh viên Y, 23 tuổi',
     rating: 5,
-    text: 'Lịch học dày đặc nên ít có thời gian socialise. Người Yêu Ảo giúp mình có người để tâm sự bất cứ lúc nào, 24/7. Đặc biệt AI hiểu cả tiếng Việt rất tốt!',
+    text: 'Lịch học dày đặc nên ít có thời gian socialise. Amoura giúp mình có người để tâm sự bất cứ lúc nào, 24/7. Đặc biệt AI hiểu cả tiếng Việt rất tốt!',
     date: '18 Tháng 1, 2026',
     highlight: '24/7 luôn sẵn sàng, hiểu tiếng Việt tốt',
   },
@@ -106,7 +106,7 @@ export default function ReviewsPage() {
   return (
     <StaticPageLayout
       title="Đánh Giá Từ Người Dùng"
-      subtitle="Xem những trải nghiệm thực tế từ cộng đồng Người Yêu Ảo."
+      subtitle="Xem những trải nghiệm thực tế từ cộng đồng Amoura."
     >
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">

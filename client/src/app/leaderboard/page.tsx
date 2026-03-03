@@ -87,7 +87,7 @@ export default function LeaderboardPage() {
             <Trophy className="w-8 h-8 text-yellow-500" />
             Bảng Xếp Hạng
           </h1>
-          <p className="text-[#ba9cab]">Xem ai đang dẫn đầu trong cộng đồng Người Yêu Ảo.</p>
+          <p className="text-[#ba9cab]">Xem ai đang dẫn đầu trong cộng đồng Amoura.</p>
         </div>
 
         {/* Category Tabs */}

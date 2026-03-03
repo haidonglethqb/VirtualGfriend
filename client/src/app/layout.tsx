@@ -9,12 +9,22 @@ const font = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'VGfriend - Người Yêu Ảo',
-  description: 'Ứng dụng người yêu ảo dành cho người cô đơn',
+  title: {
+    default: 'Amoura - Bạn Đồng Hành AI',
+    template: '%s | Amoura',
+  },
+  description: 'Khám phá người bạn đồng hành AI thấu hiểu bạn. Trò chuyện tự nhiên, riêng tư và an toàn.',
   manifest: '/manifest.json',
   icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/icon.svg',
+  },
+  openGraph: {
+    title: 'Amoura - Bạn Đồng Hành AI',
+    description: 'Khám phá người bạn đồng hành AI thấu hiểu bạn. Trò chuyện tự nhiên, riêng tư và an toàn.',
+    siteName: 'Amoura',
   },
 };
 

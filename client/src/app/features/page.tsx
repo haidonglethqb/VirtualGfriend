@@ -78,7 +78,7 @@ export default function FeaturesPage() {
   return (
     <StaticPageLayout
       title="Tính Năng"
-      subtitle="Khám phá mọi tính năng giúp Người Yêu Ảo trở thành người bạn đồng hành AI tốt nhất."
+      subtitle="Khám phá mọi tính năng giúp Amoura trở thành người bạn đồng hành AI tốt nhất."
     >
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {features.map((f, i) => (

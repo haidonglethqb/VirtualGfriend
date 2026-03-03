@@ -1,0 +1,20 @@
+{
+  "name": "Amoura - Bạn Đồng Hành AI",
+  "short_name": "Amoura",
+  "description": "Khám phá người bạn đồng hành AI thấu hiểu bạn. Trò chuyện tự nhiên, riêng tư và an toàn.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030014",
+  "theme_color": "#ad2bee",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["social", "lifestyle", "entertainment"],
+  "lang": "vi"
+}
