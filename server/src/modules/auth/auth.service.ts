@@ -4,12 +4,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../../lib/prisma';
 import { cache, CacheKeys } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
+import { validatePassword } from '../../lib/constants';
 
 interface RegisterData {
   email: string;
   password: string;
   username?: string;
   displayName?: string;
+  userGender?: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER' | 'NOT_SPECIFIED';
+  datingPreference?: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'ALL';
 }
 
 interface LoginData {
@@ -52,6 +55,16 @@ function generateTokens(userId: string, email: string): AuthTokens {
 
 export const authService = {
   async register(data: RegisterData) {
+    // Validate password
+    const passwordValidation = validatePassword(data.password);
+    if (!passwordValidation.valid) {
+      throw new AppError(
+        passwordValidation.errors.join('. '),
+        400,
+        'INVALID_PASSWORD'
+      );
+    }
+
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
@@ -82,6 +95,8 @@ export const authService = {
         password: hashedPassword,
         username: data.username,
         displayName: data.displayName || data.username,
+        userGender: data.userGender || 'NOT_SPECIFIED',
+        datingPreference: data.datingPreference || 'ALL',
         coins: 100, // Starting bonus
         gems: 10,
         settings: {
@@ -90,18 +105,7 @@ export const authService = {
             theme: 'dark',
           },
         },
-        characters: {
-          create: {
-            name: 'Mai',
-            gender: 'FEMALE',
-            personality: 'caring',
-            mood: 'happy',
-            age: 22,
-            occupation: 'student',
-            bio: 'Xin chào! Tôi là Mai, người bạn đồng hành của bạn 💕',
-            isActive: true,
-          },
-        },
+        // Don't create default character - let onboarding handle it
       },
       select: {
         id: true,
@@ -110,6 +114,9 @@ export const authService = {
         displayName: true,
         avatar: true,
         isPremium: true,
+        premiumTier: true,
+        userGender: true,
+        datingPreference: true,
         coins: true,
         gems: true,
         streak: true,
@@ -301,6 +308,16 @@ export const authService = {
   },
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    // Validate new password
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      throw new AppError(
+        passwordValidation.errors.join('. '),
+        400,
+        'INVALID_PASSWORD'
+      );
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });

@@ -11,6 +11,130 @@ export const MESSAGE_LIMITS = {
   MAX_CHARACTER_NAME_LENGTH: 50,
 } as const;
 
+// Password Validation
+export const PASSWORD_REQUIREMENTS = {
+  MIN_LENGTH: 8,
+  MAX_LENGTH: 128,
+  REQUIRE_UPPERCASE: true,
+  REQUIRE_LOWERCASE: true,
+  REQUIRE_NUMBER: true,
+  REQUIRE_SPECIAL: false, // Optional: special characters
+} as const;
+
+// Password validation regex patterns
+export const PASSWORD_PATTERNS = {
+  HAS_UPPERCASE: /[A-Z]/,
+  HAS_LOWERCASE: /[a-z]/,
+  HAS_NUMBER: /[0-9]/,
+  HAS_SPECIAL: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/,
+} as const;
+
+// Validate password and return errors
+export function validatePassword(password: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (password.length < PASSWORD_REQUIREMENTS.MIN_LENGTH) {
+    errors.push(`Mật khẩu phải có ít nhất ${PASSWORD_REQUIREMENTS.MIN_LENGTH} ký tự`);
+  }
+  if (password.length > PASSWORD_REQUIREMENTS.MAX_LENGTH) {
+    errors.push(`Mật khẩu không được quá ${PASSWORD_REQUIREMENTS.MAX_LENGTH} ký tự`);
+  }
+  if (PASSWORD_REQUIREMENTS.REQUIRE_UPPERCASE && !PASSWORD_PATTERNS.HAS_UPPERCASE.test(password)) {
+    errors.push('Mật khẩu phải có ít nhất 1 chữ hoa');
+  }
+  if (PASSWORD_REQUIREMENTS.REQUIRE_LOWERCASE && !PASSWORD_PATTERNS.HAS_LOWERCASE.test(password)) {
+    errors.push('Mật khẩu phải có ít nhất 1 chữ thường');
+  }
+  if (PASSWORD_REQUIREMENTS.REQUIRE_NUMBER && !PASSWORD_PATTERNS.HAS_NUMBER.test(password)) {
+    errors.push('Mật khẩu phải có ít nhất 1 số');
+  }
+  if (PASSWORD_REQUIREMENTS.REQUIRE_SPECIAL && !PASSWORD_PATTERNS.HAS_SPECIAL.test(password)) {
+    errors.push('Mật khẩu phải có ít nhất 1 ký tự đặc biệt');
+  }
+  
+  return { valid: errors.length === 0, errors };
+}
+
+// Premium Tier Features
+export const PREMIUM_FEATURES = {
+  FREE: {
+    maxCharacters: 1,
+    maxMessagesPerDay: 50,
+    maxScenes: 3,
+    canAccessPremiumScenes: false,
+    canAccessPremiumGifts: false,
+    canAccessPremiumQuests: false,
+    aiResponseQuality: 'standard',
+    adFree: false,
+    prioritySupport: false,
+    earlyAccess: false,
+    exclusiveContent: false,
+  },
+  BASIC: {
+    maxCharacters: 2,
+    maxMessagesPerDay: 200,
+    maxScenes: 10,
+    canAccessPremiumScenes: false,
+    canAccessPremiumGifts: true,
+    canAccessPremiumQuests: true,
+    aiResponseQuality: 'enhanced',
+    adFree: true,
+    prioritySupport: false,
+    earlyAccess: false,
+    exclusiveContent: false,
+  },
+  PRO: {
+    maxCharacters: 5,
+    maxMessagesPerDay: -1, // Unlimited
+    maxScenes: -1, // Unlimited
+    canAccessPremiumScenes: true,
+    canAccessPremiumGifts: true,
+    canAccessPremiumQuests: true,
+    aiResponseQuality: 'premium',
+    adFree: true,
+    prioritySupport: true,
+    earlyAccess: true,
+    exclusiveContent: true,
+  },
+  ULTIMATE: {
+    maxCharacters: -1, // Unlimited
+    maxMessagesPerDay: -1,
+    maxScenes: -1,
+    canAccessPremiumScenes: true,
+    canAccessPremiumGifts: true,
+    canAccessPremiumQuests: true,
+    aiResponseQuality: 'premium',
+    adFree: true,
+    prioritySupport: true,
+    earlyAccess: true,
+    exclusiveContent: true,
+  },
+} as const;
+
+// Relationship Stage Thresholds
+export const RELATIONSHIP_THRESHOLDS = {
+  STRANGER: 0,
+  ACQUAINTANCE: 100,
+  FRIEND: 250,
+  CLOSE_FRIEND: 450,
+  CRUSH: 600,
+  DATING: 750,
+  IN_LOVE: 850,
+  LOVER: 900,
+} as const;
+
+// Scene categories tied to relationship stages
+export const SCENE_PROGRESSION = {
+  STRANGER: ['school_classroom', 'public_street', 'bus_stop'],
+  ACQUAINTANCE: ['cafe', 'library', 'park_day'],
+  FRIEND: ['home_living_room', 'restaurant', 'movie_theater'],
+  CLOSE_FRIEND: ['beach_day', 'amusement_park', 'shopping_mall'],
+  CRUSH: ['park_sunset', 'rooftop_view', 'garden'],
+  DATING: ['fancy_restaurant', 'beach_night', 'festival'],
+  IN_LOVE: ['romantic_getaway', 'couple_spa', 'sunset_cruise'],
+  LOVER: ['bedroom', 'vacation_resort', 'stargazing', 'proposal_spot'],
+} as const;
+
 // Cache TTLs (in seconds)
 export const CACHE_TTL = {
   DEDUPLICATION: 60,        // Message deduplication window

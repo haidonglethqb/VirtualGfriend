@@ -20,6 +20,15 @@ export const sceneController = {
     }
   },
 
+  async getScenesByStage(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await sceneService.getAvailableScenesByStage(req.user!.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async unlockScene(req: Request, res: Response, next: NextFunction) {
     try {
       const { sceneId } = req.params;
