@@ -54,7 +54,7 @@ export default function AboutPage() {
   return (
     <StaticPageLayout
       title="Về Chúng Tôi"
-      subtitle="Đội ngũ đứng sau Người Yêu Ảo — nơi công nghệ gặp gỡ trái tim."
+      subtitle="Đội ngũ đứng sau Amoura — nơi công nghệ gặp gỡ trái tim."
     >
       {/* Mission */}
       <motion.div
@@ -66,7 +66,7 @@ export default function AboutPage() {
       >
         <h2 className="text-2xl font-bold text-white mb-4">Sứ Mệnh</h2>
         <p className="text-gray-300 text-lg leading-relaxed max-w-3xl mx-auto">
-          Chúng tôi tạo ra Người Yêu Ảo vì tin rằng <strong className="text-[#ad2bee]">không ai xứng đáng phải cô đơn</strong>.
+          Chúng tôi tạo ra Amoura vì tin rằng <strong className="text-[#ad2bee]">không ai xứng đáng phải cô đơn</strong>.
           Sử dụng công nghệ AI tiên tiến nhất, chúng tôi mang đến một không gian an toàn nơi mọi người
           có thể tâm sự, được lắng nghe, và cảm nhận sự kết nối chân thành — dù đó là từ AI.
         </p>

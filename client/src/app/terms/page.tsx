@@ -12,7 +12,7 @@ export default function TermsPage() {
         <section className="p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
           <h2 className="text-xl font-bold text-white mb-4">1. Chấp Nhận Điều Khoản</h2>
           <p className="text-gray-400 leading-relaxed">
-            Bằng việc truy cập và sử dụng dịch vụ Người Yêu Ảo, bạn đồng ý với các điều khoản sử dụng này.
+            Bằng việc truy cập và sử dụng dịch vụ Amoura, bạn đồng ý với các điều khoản sử dụng này.
             Nếu không đồng ý với bất kỳ điều khoản nào, vui lòng không sử dụng dịch vụ.
           </p>
         </section>
@@ -20,7 +20,7 @@ export default function TermsPage() {
         <section className="p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
           <h2 className="text-xl font-bold text-white mb-4">2. Mô Tả Dịch Vụ</h2>
           <p className="text-gray-400 leading-relaxed">
-            Người Yêu Ảo là ứng dụng bạn đồng hành AI sử dụng trí tuệ nhân tạo để tạo trải nghiệm trò chuyện
+            Amoura là ứng dụng bạn đồng hành AI sử dụng trí tuệ nhân tạo để tạo trải nghiệm trò chuyện
             và kết nối. Dịch vụ bao gồm:
           </p>
           <ul className="list-disc list-inside text-gray-400 mt-3 space-y-2">
@@ -66,7 +66,7 @@ export default function TermsPage() {
         <section className="p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
           <h2 className="text-xl font-bold text-white mb-4">6. Giới Hạn Trách Nhiệm</h2>
           <p className="text-gray-400 leading-relaxed">
-            Người Yêu Ảo là sản phẩm giải trí dựa trên AI. Chúng tôi không chịu trách nhiệm cho
+            Amoura là sản phẩm giải trí dựa trên AI. Chúng tôi không chịu trách nhiệm cho
             các quyết định cá nhân dựa trên cuộc trò chuyện AI. AI không thay thế cho tư vấn chuyên gia
             về tâm lý, y tế hoặc pháp lý.
           </p>

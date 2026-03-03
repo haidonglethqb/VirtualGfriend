@@ -143,15 +143,19 @@ export const authService = {
   async login(data: LoginData) {
     // Find user - need password for verification
     const user = await prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email: data.email.toLowerCase().trim() },
     });
 
+    console.log('[Auth] Login attempt:', { email: data.email, userFound: !!user });
+
     if (!user) {
+      console.log('[Auth] User not found for email:', data.email);
       throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
     }
 
     // Check password
     const isValidPassword = await bcrypt.compare(data.password, user.password);
+    console.log('[Auth] Password check:', { isValid: isValidPassword });
 
     if (!isValidPassword) {
       throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');

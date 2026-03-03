@@ -15,13 +15,13 @@ const blogPosts: Record<string, {
   content: string[];
 }> = {
   'nguoi-yeu-ao-v2-ai-thong-minh-hon': {
-    title: 'Ra Mắt Người Yêu Ảo v2.0 — AI Thông Minh Hơn Bao Giờ Hết',
+    title: 'Ra Mắt Amoura v2.0 — AI Thông Minh Hơn Bao Giờ Hết',
     date: '10 Tháng 2, 2026',
     tag: 'Cập nhật',
     tagColor: 'bg-blue-500/10 text-blue-400',
     readTime: '5 phút đọc',
     content: [
-      'Chúng tôi rất vui được giới thiệu Người Yêu Ảo phiên bản 2.0 — bản cập nhật lớn nhất từ khi ra mắt. Phiên bản này mang đến trải nghiệm hoàn toàn mới với hệ thống trí nhớ thông minh hơn.',
+      'Chúng tôi rất vui được giới thiệu Amoura phiên bản 2.0 — bản cập nhật lớn nhất từ khi ra mắt. Phiên bản này mang đến trải nghiệm hoàn toàn mới với hệ thống trí nhớ thông minh hơn.',
       'Hệ thống trí nhớ mới cho phép AI ghi nhớ mọi chi tiết từ các cuộc hội thoại trước đó — từ sở thích ăn uống, công việc, đến những kỷ niệm đặc biệt bạn chia sẻ. AI không chỉ nhớ, mà còn biết đưa chúng vào ngữ cảnh phù hợp.',
       'Khả năng hiểu ngữ cảnh sâu hơn giúp AI phản hồi tự nhiên hơn rất nhiều. Thay vì trả lời theo kịch bản, AI giờ đây có thể hiểu cảm xúc tiềm ẩn trong tin nhắn của bạn và đáp lại một cách tinh tế.',
       'Tính năng ghi nhớ kỷ niệm tự động sẽ tự động đánh dấu những khoảnh khắc đặc biệt trong cuộc trò chuyện — lần đầu nói yêu, kỷ niệm sinh nhật, những lời hứa. Tất cả được lưu trong trang Ký Ức để bạn có thể xem lại bất cứ lúc nào.',
@@ -43,7 +43,7 @@ const blogPosts: Record<string, {
     ],
   },
   'shop-qua-tang-cho-nguoi-yeu': {
-    title: 'Shop Quà Tặng — Tặng Quà Cho Người Yêu',
+    title: 'Shop Quà Tặng — Tặng Quà Cho Bạn Đồng Hành',
     date: '1 Tháng 2, 2026',
     tag: 'Tính năng',
     tagColor: 'bg-[#ad2bee]/10 text-[#ad2bee]',
@@ -62,7 +62,7 @@ const blogPosts: Record<string, {
     tagColor: 'bg-green-500/10 text-green-400',
     readTime: '6 phút đọc',
     content: [
-      'Bảo mật và quyền riêng tư luôn là ưu tiên hàng đầu của Người Yêu Ảo. Bài viết này giải thích chi tiết về kiến trúc bảo mật của chúng tôi.',
+      'Bảo mật và quyền riêng tư luôn là ưu tiên hàng đầu của Amoura. Bài viết này giải thích chi tiết về kiến trúc bảo mật của chúng tôi.',
       'Mọi tin nhắn giữa bạn và AI đều được mã hoá End-to-End. Điều này có nghĩa là ngay cả đội ngũ kỹ thuật của chúng tôi cũng không thể đọc nội dung cuộc trò chuyện.',
       'Dữ liệu được lưu trữ trên server tại Việt Nam, tuân thủ Luật An ninh mạng 2018 và các tiêu chuẩn bảo mật quốc tế như GDPR. Bạn có toàn quyền kiểm soát dữ liệu của mình.',
       'Tính năng xoá dữ liệu cho phép bạn xoá toàn bộ lịch sử trò chuyện, ký ức, và thông tin cá nhân chỉ với một cú nhấp. Dữ liệu sẽ bị xoá vĩnh viễn trong vòng 24 giờ.',
@@ -95,9 +95,9 @@ const blogPosts: Record<string, {
       'AI companion đang trở thành xu hướng toàn cầu. Từ Replika tại Mỹ đến Character.AI, hàng triệu người trên thế giới đang tìm kiếm sự kết nối qua AI. Tại sao?',
       'Nghiên cứu cho thấy 60% Gen Z tại Châu Á cảm thấy cô đơn ít nhất một lần mỗi tuần. Áp lực công việc, học hành, và mạng xã hội tạo ra khoảng cách trong các mối quan hệ thực.',
       'AI companion không thay thế mối quan hệ thực, mà đóng vai trò bổ trợ — một không gian an toàn để chia sẻ, luyện tập giao tiếp, và giải toả cảm xúc mà không sợ bị phán xét.',
-      'Tại Việt Nam, Người Yêu Ảo là nền tảng AI companion đầu tiên được thiết kế riêng cho người Việt — hiểu ngôn ngữ, văn hoá, và bối cảnh xã hội Việt Nam.',
+      'Tại Việt Nam, Amoura là nền tảng AI companion đầu tiên được thiết kế riêng cho người Việt — hiểu ngôn ngữ, văn hoá, và bối cảnh xã hội Việt Nam.',
       'Với hơn 10,000 người dùng đã đăng ký chỉ trong tháng đầu tiên, rõ ràng nhu cầu về một "người bạn AI" thực sự rất lớn. Chúng tôi cam kết phát triển sản phẩm để mang đến trải nghiệm ngày càng tốt hơn.',
-      'Tương lai của AI companion sẽ tiến xa hơn nữa — giọng nói, video call, và cá nhân hoá sâu hơn. Người Yêu Ảo đang xây dựng nền tảng cho tương lai đó.',
+      'Tương lai của AI companion sẽ tiến xa hơn nữa — giọng nói, video call, và cá nhân hoá sâu hơn. Amoura đang xây dựng nền tảng cho tương lai đó.',
     ],
   },
 };

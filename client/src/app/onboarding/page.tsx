@@ -233,7 +233,7 @@ export default function OnboardingPage() {
                         <Heart className="w-10 h-10 text-white fill-white" />
                     </div>
                     <h1 className="text-4xl font-bold mb-2">
-                        Tạo <span className="text-love">Người Yêu Ảo</span>
+                        Tạo Nhân Vật <span className="text-love">AI</span>
                     </h1>
                     <p className="text-[#ba9cab]">
                         Hãy cho chúng tôi biết về bạn và người bạn đồng hành lý tưởng

@@ -116,7 +116,7 @@ export default function RegisterPage() {
       await register(email, password, username || undefined);
       toast({
         title: 'Đăng ký thành công!',
-        description: 'Chào mừng bạn đến với Người Yêu Ảo',
+        description: 'Chào mừng bạn đến với Amoura',
         variant: 'love',
       });
       router.push('/onboarding');
@@ -163,8 +163,8 @@ export default function RegisterPage() {
                     <Heart className="w-5 h-5 fill-white" />
                   </div>
                   <span className="text-xl font-bold">
-                    <span className="text-white">Người Yêu</span>
-                    <span className="text-love"> Ảo</span>
+<span className="text-white">Amou</span>
+                  <span className="text-love">ra</span>
                   </span>
                 </Link>
               </div>
@@ -421,8 +421,8 @@ export default function RegisterPage() {
                     <Heart className="w-6 h-6 fill-white" />
                   </div>
                   <span className="text-2xl font-bold">
-                    <span className="text-white">Người Yêu</span>
-                    <span className="text-love"> Ảo</span>
+<span className="text-white">Amou</span>
+                  <span className="text-love">ra</span>
                   </span>
                 </Link>
 

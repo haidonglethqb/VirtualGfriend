@@ -21,8 +21,8 @@ export function StaticPageLayout({ children, title, subtitle }: StaticPageLayout
               <Heart className="w-4 h-4 fill-white" />
             </div>
             <span className="text-lg font-bold">
-              <span className="text-white">Người Yêu</span>
-              <span className="text-love"> Ảo</span>
+              <span className="text-white">Amou</span>
+              <span className="text-love">ra</span>
             </span>
           </Link>
           <Link
@@ -90,7 +90,7 @@ export function StaticPageLayout({ children, title, subtitle }: StaticPageLayout
             className="text-center"
           >
             <h2 className="text-2xl md:text-3xl font-bold mb-4">
-              Sẵn sàng trải nghiệm <span className="text-love">Người Yêu Ảo</span>?
+              Sẵn sàng trải nghiệm <span className="text-love">Amoura</span>?
             </h2>
             <p className="text-gray-400 mb-8 max-w-lg mx-auto">
               Bắt đầu miễn phí ngay hôm nay. Không cần thẻ tín dụng.
@@ -181,7 +181,7 @@ export function StaticPageLayout({ children, title, subtitle }: StaticPageLayout
                 <Heart className="w-3.5 h-3.5 fill-white" />
               </div>
               <p className="text-xs text-gray-600">
-                &copy; 2026 Người Yêu Ảo. Được tạo với 💕 tại Việt Nam.
+                &copy; 2026 Amoura. Được tạo với 💕 tại Việt Nam.
               </p>
             </div>
             <div className="flex gap-4">

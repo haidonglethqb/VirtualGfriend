@@ -8,7 +8,7 @@ import { StaticPageLayout } from '@/components/layout/static-page-layout';
 const posts = [
   {
     slug: 'nguoi-yeu-ao-v2-ai-thong-minh-hon',
-    title: 'Ra Mắt Người Yêu Ảo v2.0 — AI Thông Minh Hơn Bao Giờ Hết',
+    title: 'Ra Mắt Amoura v2.0 — AI Thông Minh Hơn Bao Giờ Hết',
     excerpt: 'Phiên bản 2.0 mang đến hệ thống trí nhớ hoàn toàn mới, AI hiểu ngữ cảnh sâu hơn, và khả năng ghi nhớ kỷ niệm tự động.',
     date: '10 Tháng 2, 2026',
     tag: 'Cập nhật',
@@ -24,7 +24,7 @@ const posts = [
   },
   {
     slug: 'shop-qua-tang-cho-nguoi-yeu',
-    title: 'Shop Quà Tặng — Tặng Quà Cho Người Yêu',
+    title: 'Shop Quà Tặng — Tặng Quà Cho Bạn Đồng Hành',
     excerpt: 'Dùng xu kiếm được qua nhiệm vụ để mua hoa, socola, gấu bông... Mỗi món quà đều có phản hồi cảm xúc riêng từ AI.',
     date: '1 Tháng 2, 2026',
     tag: 'Tính năng',
@@ -49,7 +49,7 @@ const posts = [
   {
     slug: 'ai-companion-thay-doi-ket-noi',
     title: 'Tại Sao AI Companion Đang Thay Đổi Cách Chúng Ta Kết Nối',
-    excerpt: 'Khám phá xu hướng AI companion trên thế giới và tại sao Người Yêu Ảo đang dẫn đầu tại Việt Nam.',
+    excerpt: 'Khám phá xu hướng AI companion trên thế giới và tại sao Amoura đang dẫn đầu tại Việt Nam.',
     date: '20 Tháng 1, 2026',
     tag: 'Insight',
     tagColor: 'bg-cyan-500/10 text-cyan-400',
@@ -60,7 +60,7 @@ export default function BlogPage() {
   return (
     <StaticPageLayout
       title="Blog"
-      subtitle="Cập nhật tính năng mới, chia sẻ kiến thức và câu chuyện từ đội ngũ Người Yêu Ảo."
+      subtitle="Cập nhật tính năng mới, chia sẻ kiến thức và câu chuyện từ đội ngũ Amoura."
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {posts.map((post, i) => (
