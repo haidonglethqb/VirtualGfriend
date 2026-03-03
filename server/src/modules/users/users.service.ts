@@ -1,4 +1,4 @@
-import { prisma } from '../../lib/prisma';
+import { prisma, UserGender, DatingPreference } from '../../lib/prisma';
 import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 
@@ -7,6 +7,8 @@ interface UpdateProfileData {
   displayName?: string;
   avatar?: string;
   bio?: string;
+  userGender?: UserGender;
+  datingPreference?: DatingPreference;
 }
 
 interface UpdateSettingsData {

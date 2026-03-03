@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../lib/prisma';
+import { prisma, PremiumTier } from '../lib/prisma';
 import { cache, CacheKeys, CacheTTL } from '../lib/redis';
 import { AppError } from './error.middleware';
 
@@ -12,6 +12,8 @@ interface JwtPayload {
 interface CachedUser {
   id: string;
   email: string;
+  isPremium: boolean;
+  premiumTier: PremiumTier;
 }
 
 declare global {
@@ -20,6 +22,8 @@ declare global {
       user?: {
         id: string;
         email: string;
+        isPremium: boolean;
+        premiumTier: PremiumTier;
       };
     }
   }
@@ -37,15 +41,15 @@ async function getUserFromCacheOrDb(userId: string): Promise<CachedUser | null> 
   // Cache miss — query DB
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true },
+    select: { id: true, email: true, isPremium: true, premiumTier: true },
   });
 
   // Store in cache (TTL = access token lifetime)
   if (user) {
-    await cache.set(cacheKey, user, CacheTTL.USER_AUTH);
+    await cache.set(cacheKey, { ...user, premiumTier: user.premiumTier || 'FREE' }, CacheTTL.USER_AUTH);
   }
 
-  return user;
+  return user ? { ...user, premiumTier: user.premiumTier || 'FREE' } : null;
 }
 
 export const authenticate = async (

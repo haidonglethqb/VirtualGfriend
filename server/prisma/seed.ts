@@ -43,7 +43,7 @@ async function upsertTemplate(data: {
   name: string;
   description: string;
   avatarUrl: string;
-  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  gender?: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER';
   personality: string;
   style: string;
   isDefault?: boolean;
@@ -194,37 +194,123 @@ async function main() {
 
   // ============================================
   // SCENES - Using upsert (safe)
+  // Now with relationship stage progression
   // ============================================
   console.log('[Seed] Seeding scenes...');
   const scenesData = [
+    // STRANGER stage scenes (default/early access)
     {
-      name: 'Phòng khách ấm cúng',
-      description: 'Một phòng khách nhỏ xinh với ánh đèn ấm áp',
-      imageUrl: '/scenes/living-room.png',
-      category: 'indoor',
-      ambiance: 'cozy',
+      name: 'Lớp học',
+      description: 'Lớp học yên tĩnh, nơi hai người lần đầu gặp nhau',
+      imageUrl: '/scenes/classroom.png',
+      category: 'school',
+      ambiance: 'peaceful',
       isDefault: true,
       sortOrder: 1,
     },
     {
-      name: 'Quán cafe',
-      description: 'Quán cafe lãng mạn với nhạc nhẹ',
-      imageUrl: '/scenes/cafe.png',
-      category: 'indoor',
-      ambiance: 'romantic',
-      unlockMethod: 'level',
-      unlockValue: 5,
+      name: 'Trạm xe bus',
+      description: 'Trạm chờ xe bus, nơi tình cờ gặp nhau mỗi ngày',
+      imageUrl: '/scenes/bus-stop.png',
+      category: 'outdoor',
+      ambiance: 'casual',
+      isDefault: true,
       sortOrder: 2,
     },
+    // ACQUAINTANCE stage scenes
+    {
+      name: 'Quán cafe',
+      description: 'Quán cafe nhỏ xinh để trò chuyện',
+      imageUrl: '/scenes/cafe.png',
+      category: 'indoor',
+      ambiance: 'cozy',
+      unlockMethod: 'relationship',
+      unlockValue: 100, // ACQUAINTANCE threshold
+      sortOrder: 3,
+    },
+    {
+      name: 'Thư viện',
+      description: 'Thư viện yên tĩnh, học bài cùng nhau',
+      imageUrl: '/scenes/library.png',
+      category: 'indoor',
+      ambiance: 'peaceful',
+      unlockMethod: 'relationship',
+      unlockValue: 100,
+      sortOrder: 4,
+    },
+    // FRIEND stage scenes
+    {
+      name: 'Phòng khách',
+      description: 'Phòng khách ấm cúng tại nhà',
+      imageUrl: '/scenes/living-room.png',
+      category: 'indoor',
+      ambiance: 'cozy',
+      unlockMethod: 'relationship',
+      unlockValue: 250, // FRIEND threshold
+      sortOrder: 5,
+    },
+    {
+      name: 'Công viên ngày',
+      description: 'Công viên nắng đẹp để đi dạo',
+      imageUrl: '/scenes/park-day.png',
+      category: 'outdoor',
+      ambiance: 'energetic',
+      unlockMethod: 'relationship',
+      unlockValue: 250,
+      sortOrder: 6,
+    },
+    // CLOSE_FRIEND stage scenes
+    {
+      name: 'Bãi biển ngày',
+      description: 'Bãi biển trong xanh để vui chơi',
+      imageUrl: '/scenes/beach-day.png',
+      category: 'outdoor',
+      ambiance: 'energetic',
+      unlockMethod: 'relationship',
+      unlockValue: 450, // CLOSE_FRIEND threshold
+      sortOrder: 7,
+    },
+    {
+      name: 'Khu vui chơi',
+      description: 'Công viên giải trí với nhiều trò chơi',
+      imageUrl: '/scenes/amusement-park.png',
+      category: 'outdoor',
+      ambiance: 'energetic',
+      unlockMethod: 'relationship',
+      unlockValue: 450,
+      sortOrder: 8,
+    },
+    // CRUSH stage scenes
     {
       name: 'Công viên hoàng hôn',
       description: 'Công viên yên bình lúc hoàng hôn',
       imageUrl: '/scenes/park-sunset.png',
       category: 'outdoor',
-      ambiance: 'peaceful',
-      unlockMethod: 'level',
-      unlockValue: 10,
-      sortOrder: 3,
+      ambiance: 'romantic',
+      unlockMethod: 'relationship',
+      unlockValue: 600, // CRUSH threshold
+      sortOrder: 9,
+    },
+    {
+      name: 'Sân thượng',
+      description: 'Sân thượng với view thành phố đêm',
+      imageUrl: '/scenes/rooftop.png',
+      category: 'outdoor',
+      ambiance: 'romantic',
+      unlockMethod: 'relationship',
+      unlockValue: 600,
+      sortOrder: 10,
+    },
+    // DATING stage scenes
+    {
+      name: 'Nhà hàng sang trọng',
+      description: 'Nhà hàng lãng mạn cho buổi hẹn hò',
+      imageUrl: '/scenes/fancy-restaurant.png',
+      category: 'indoor',
+      ambiance: 'romantic',
+      unlockMethod: 'relationship',
+      unlockValue: 750, // DATING threshold
+      sortOrder: 11,
     },
     {
       name: 'Bãi biển đêm',
@@ -232,19 +318,43 @@ async function main() {
       imageUrl: '/scenes/beach-night.png',
       category: 'outdoor',
       ambiance: 'romantic',
-      unlockMethod: 'purchase',
-      priceGems: 50,
-      sortOrder: 4,
+      unlockMethod: 'relationship',
+      unlockValue: 750,
+      sortOrder: 12,
     },
+    // LOVER stage scenes (Premium)
     {
       name: 'Vườn hoa anh đào',
-      description: 'Vườn hoa anh đào nở rộ',
+      description: 'Vườn hoa anh đào nở rộ - nơi lãng mạn nhất',
       imageUrl: '/scenes/sakura.png',
       category: 'outdoor',
-      ambiance: 'peaceful',
-      unlockMethod: 'purchase',
+      ambiance: 'romantic',
+      unlockMethod: 'relationship',
+      unlockValue: 900, // LOVER threshold
+      priceGems: 50,
+      sortOrder: 13,
+    },
+    {
+      name: 'Resort nghỉ dưỡng',
+      description: 'Resort sang trọng bên bờ biển',
+      imageUrl: '/scenes/resort.png',
+      category: 'outdoor',
+      ambiance: 'romantic',
+      unlockMethod: 'relationship',
+      unlockValue: 900,
       priceGems: 100,
-      sortOrder: 5,
+      sortOrder: 14,
+    },
+    {
+      name: 'Ngắm sao',
+      description: 'Đồi cao ngắm sao trời đêm',
+      imageUrl: '/scenes/stargazing.png',
+      category: 'outdoor',
+      ambiance: 'romantic',
+      unlockMethod: 'relationship',
+      unlockValue: 900,
+      priceGems: 100,
+      sortOrder: 15,
     },
   ];
   for (const scene of scenesData) {
@@ -254,13 +364,15 @@ async function main() {
 
   // ============================================
   // CHARACTER TEMPLATES - Using upsert (safe)
+  // Now with diverse genders for all preferences
   // ============================================
   console.log('[Seed] Seeding character templates...');
   const templatesData = [
+    // FEMALE TEMPLATES
     {
       name: 'Mai',
-      description: 'Co gai diu dang, luon quan tam va cham soc ban',
-      avatarUrl: '/characters/template1.png',
+      description: 'Cô gái dịu dàng, luôn quan tâm và chăm sóc bạn',
+      avatarUrl: '/characters/female-caring.png',
       gender: 'FEMALE' as const,
       personality: 'caring',
       style: 'anime',
@@ -269,17 +381,17 @@ async function main() {
     },
     {
       name: 'Linh',
-      description: 'Co nang nang dong, vui ve va hay dua',
-      avatarUrl: '/characters/template2.png',
+      description: 'Cô nàng năng động, vui vẻ và hay đùa',
+      avatarUrl: '/characters/female-playful.png',
       gender: 'FEMALE' as const,
       personality: 'playful',
       style: 'anime',
       sortOrder: 2,
     },
     {
-      name: 'Huong',
-      description: 'Co gai nhut nhat, de thuong va de xau ho',
-      avatarUrl: '/characters/template3.png',
+      name: 'Hương',
+      description: 'Cô gái nhút nhát, dễ thương và dễ xấu hổ',
+      avatarUrl: '/characters/female-shy.png',
       gender: 'FEMALE' as const,
       personality: 'shy',
       style: 'anime',
@@ -287,8 +399,8 @@ async function main() {
     },
     {
       name: 'Trang',
-      description: 'Co nang manh me, quyet doan va day dam me',
-      avatarUrl: '/characters/template4.png',
+      description: 'Cô nàng mạnh mẽ, quyết đoán và đầy đam mê',
+      avatarUrl: '/characters/female-passionate.png',
       gender: 'FEMALE' as const,
       personality: 'passionate',
       style: 'anime',
@@ -296,12 +408,104 @@ async function main() {
     },
     {
       name: 'An',
-      description: 'Co gai thong minh, sau sac va triet ly',
-      avatarUrl: '/characters/template5.png',
+      description: 'Cô gái thông minh, sâu sắc và triết lý',
+      avatarUrl: '/characters/female-intellectual.png',
       gender: 'FEMALE' as const,
       personality: 'intellectual',
       style: 'anime',
       sortOrder: 5,
+    },
+    // MALE TEMPLATES
+    {
+      name: 'Minh',
+      description: 'Chàng trai ấm áp, luôn quan tâm và bảo vệ bạn',
+      avatarUrl: '/characters/male-caring.png',
+      gender: 'MALE' as const,
+      personality: 'caring',
+      style: 'anime',
+      sortOrder: 6,
+    },
+    {
+      name: 'Hùng',
+      description: 'Anh chàng vui vẻ, hài hước và thích đùa',
+      avatarUrl: '/characters/male-playful.png',
+      gender: 'MALE' as const,
+      personality: 'playful',
+      style: 'anime',
+      sortOrder: 7,
+    },
+    {
+      name: 'Khoa',
+      description: 'Chàng trai rụt rè, hiền lành và dễ thương',
+      avatarUrl: '/characters/male-shy.png',
+      gender: 'MALE' as const,
+      personality: 'shy',
+      style: 'anime',
+      sortOrder: 8,
+    },
+    {
+      name: 'Đức',
+      description: 'Anh chàng mạnh mẽ, quyết đoán và đam mê',
+      avatarUrl: '/characters/male-passionate.png',
+      gender: 'MALE' as const,
+      personality: 'passionate',
+      style: 'anime',
+      sortOrder: 9,
+    },
+    {
+      name: 'Tuấn',
+      description: 'Chàng trai thông minh, sâu sắc và hay suy nghĩ',
+      avatarUrl: '/characters/male-intellectual.png',
+      gender: 'MALE' as const,
+      personality: 'intellectual',
+      style: 'anime',
+      sortOrder: 10,
+    },
+    // NON-BINARY / OTHER TEMPLATES
+    {
+      name: 'Alex',
+      description: 'Người bạn thân thiện, quan tâm và thoải mái',
+      avatarUrl: '/characters/nb-caring.png',
+      gender: 'NON_BINARY' as const,
+      personality: 'caring',
+      style: 'anime',
+      sortOrder: 11,
+    },
+    {
+      name: 'Sam',
+      description: 'Tính cách vui vẻ, cởi mở và yêu cuộc sống',
+      avatarUrl: '/characters/nb-playful.png',
+      gender: 'NON_BINARY' as const,
+      personality: 'playful',
+      style: 'anime',
+      sortOrder: 12,
+    },
+    {
+      name: 'River',
+      description: 'Người nhẹ nhàng, thích sự yên bình và tự nhiên',
+      avatarUrl: '/characters/nb-shy.png',
+      gender: 'NON_BINARY' as const,
+      personality: 'shy',
+      style: 'anime',
+      sortOrder: 13,
+    },
+    {
+      name: 'Phoenix',
+      description: 'Tính cách mạnh mẽ, đầy năng lượng và quyết đoán',
+      avatarUrl: '/characters/nb-passionate.png',
+      gender: 'NON_BINARY' as const,
+      personality: 'passionate',
+      style: 'anime',
+      sortOrder: 14,
+    },
+    {
+      name: 'Sage',
+      description: 'Người thông thái, hiểu biết và hướng nội',
+      avatarUrl: '/characters/nb-intellectual.png',
+      gender: 'NON_BINARY' as const,
+      personality: 'intellectual',
+      style: 'anime',
+      sortOrder: 15,
     },
   ];
   for (const template of templatesData) {
