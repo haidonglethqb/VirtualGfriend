@@ -227,10 +227,42 @@ jobs:
               sleep 5
             done
 
-            # ── Bước 8: Cleanup images cũ (chỉ sau deploy thành công)
-            # Dùng -f thay vì -af để giữ lại images tagged (dễ rollback)
+            # ── Bước 8: Cleanup để tránh tràn bộ nhớ ──────────────
+            echo "Starting cleanup..."
+            
+            # 8.1: Xóa containers đã stopped (không ảnh hưởng running containers)
+            docker container prune -f
+            
+            # 8.2: Xóa dangling images (images không có tag)
             docker image prune -f
-
+            
+            # 8.3: Xóa images cũ của project (giữ lại 3 versions gần nhất để rollback)
+            # Lấy list tất cả images của project, sort theo thời gian, xóa từ image thứ 4 trở đi
+            echo "Cleaning old server images..."
+            docker images "ghcr.io/${{ needs.build-and-push.outputs.image_name_lower }}/server" --format "{{.ID}} {{.CreatedAt}}" | \
+              sort -k2 -r | tail -n +4 | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
+            
+            echo "Cleaning old client images..."
+            docker images "ghcr.io/${{ needs.build-and-push.outputs.image_name_lower }}/client" --format "{{.ID}} {{.CreatedAt}}" | \
+              sort -k2 -r | tail -n +4 | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
+            
+            # 8.4: Xóa build cache (giữ lại 500MB để tăng tốc build sau)
+            docker builder prune -f --keep-storage 500MB 2>/dev/null || true
+            
+            # 8.5: Xóa networks không sử dụng
+            docker network prune -f
+            
+            # 8.6: Dọn nginx logs cũ hơn 7 ngày (giữ logs gần đây để debug)
+            find ./nginx/logs -name "*.log" -type f -mtime +7 -exec truncate -s 0 {} \; 2>/dev/null || true
+            
+            # 8.7: Hiển thị disk usage sau cleanup
+            echo "Disk usage after cleanup:"
+            df -h / | tail -1
+            echo "Docker disk usage:"
+            docker system df
+            
+            # ⚠️  KHÔNG dùng 'docker volume prune' - sẽ xóa postgres_data và redis_data!
+            
             echo "Deployment completed successfully!"
 
       - name: Notify deployment status
