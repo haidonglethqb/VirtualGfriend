@@ -22,9 +22,15 @@ jobs:
   # ─────────────────────────────────────────────
   type-check:
     runs-on: ubuntu-latest
+    outputs:
+      image_name_lower: ${{ steps.lowercase.outputs.image_name }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Lowercase image name
+        id: lowercase
+        run: echo "image_name=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -46,25 +52,18 @@ jobs:
         run: npx tsc --noEmit
 
   # ─────────────────────────────────────────────
-  # Job 2: Build và push Docker images lên GHCR
+  # Job 2a: Build và push Server image (PARALLEL)
   # ─────────────────────────────────────────────
-  build-and-push:
+  build-server:
     needs: type-check
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    outputs:
-      # Export lowercase image name để dùng ở deploy step
-      image_name_lower: ${{ steps.lowercase.outputs.image_name }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Lowercase image name
-        id: lowercase
-        run: echo "image_name=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -80,7 +79,7 @@ jobs:
         id: meta-server
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.image_name }}/server
+          images: ${{ env.REGISTRY }}/${{ needs.type-check.outputs.image_name_lower }}/server
           tags: |
             type=sha,prefix=
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
@@ -96,11 +95,35 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ─────────────────────────────────────────────
+  # Job 2b: Build và push Client image (PARALLEL)
+  # ─────────────────────────────────────────────
+  build-client:
+    needs: type-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Extract metadata for Client
         id: meta-client
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.image_name }}/client
+          images: ${{ env.REGISTRY }}/${{ needs.type-check.outputs.image_name_lower }}/client
           tags: |
             type=sha,prefix=
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
@@ -120,10 +143,10 @@ jobs:
             NEXT_PUBLIC_WS_URL=${{ secrets.NEXT_PUBLIC_WS_URL }}
 
   # ─────────────────────────────────────────────
-  # Job 3: Deploy lên VPS
+  # Job 3: Deploy lên VPS (đợi cả 2 builds hoàn thành)
   # ─────────────────────────────────────────────
   deploy:
-    needs: build-and-push
+    needs: [type-check, build-server, build-client]
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
 
@@ -166,7 +189,7 @@ jobs:
             SMTP_USER=${{ secrets.SMTP_USER }}
             SMTP_PASS=${{ secrets.SMTP_PASS }}
             SMTP_FROM_NAME=${{ secrets.SMTP_FROM_NAME }}
-            GITHUB_REPOSITORY=${{ needs.build-and-push.outputs.image_name_lower }}
+            GITHUB_REPOSITORY=${{ needs.type-check.outputs.image_name_lower }}
             ENVEOF
             # Xóa leading whitespace do YAML indentation
             sed -i 's/^[[:space:]]*//' .env
@@ -239,11 +262,11 @@ jobs:
             # 8.3: Xóa images cũ của project (giữ lại 3 versions gần nhất để rollback)
             # Lấy list tất cả images của project, sort theo thời gian, xóa từ image thứ 4 trở đi
             echo "Cleaning old server images..."
-            docker images "ghcr.io/${{ needs.build-and-push.outputs.image_name_lower }}/server" --format "{{.ID}} {{.CreatedAt}}" | \
+            docker images "ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/server" --format "{{.ID}} {{.CreatedAt}}" | \
               sort -k2 -r | tail -n +4 | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
             
             echo "Cleaning old client images..."
-            docker images "ghcr.io/${{ needs.build-and-push.outputs.image_name_lower }}/client" --format "{{.ID}} {{.CreatedAt}}" | \
+            docker images "ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/client" --format "{{.ID}} {{.CreatedAt}}" | \
               sort -k2 -r | tail -n +4 | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
             
             # 8.4: Xóa build cache (giữ lại 500MB để tăng tốc build sau)
