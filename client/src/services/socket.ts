@@ -95,15 +95,21 @@ class SocketService {
 
     // Chat events - Socket.io room broadcast handles cross-tab sync
     // DO NOT broadcast via BroadcastChannel here - socket room already syncs all tabs
-    this.socket.on('message:receive', (message: Message & { sourceSocketId?: string }) => {
+    this.socket.on('message:receive', (message: Message & { sourceSocketId?: string; clientId?: string; isOwn?: boolean }) => {
       const processedMessage = {
         ...message,
         createdAt: new Date(message.createdAt),
       }
       
-      // Use addMessageIfUnique to prevent duplicates
-      useChatStore.getState().addMessageIfUnique(processedMessage)
-      useChatStore.getState().setTyping(false)
+      if (message.isOwn && message.clientId) {
+        // Replace the optimistic (temp) message the client added immediately on send
+        useChatStore.getState().replaceMessage(message.clientId, processedMessage)
+        // Don't clear typing here - AI hasn't responded yet
+      } else {
+        // AI message (or other tab's message) - add if unique and clear typing
+        useChatStore.getState().addMessageIfUnique(processedMessage)
+        useChatStore.getState().setTyping(false)
+      }
       
       // NO BroadcastChannel here - socket room already syncs all tabs
     })

@@ -29,6 +29,7 @@ interface ChatState {
   // Actions
   addMessage: (message: Message) => void
   addMessageIfUnique: (message: Message) => void
+  replaceMessage: (tempId: string, realMessage: Message) => void
   setMessages: (messages: Message[]) => void
   setTyping: (isTyping: boolean) => void
   setConnected: (isConnected: boolean) => void
@@ -57,6 +58,23 @@ export const useChatStore = create<ChatState>()(
             messages: trimmedMessages,
             lastSyncTimestamp: Date.now(),
           }
+        })
+      },
+
+      // Replace an optimistic (temp) message with the real server message
+      replaceMessage: (tempId: string, realMessage: Message) => {
+        set((state: ChatState) => {
+          const idx = state.messages.findIndex(m => m.id === tempId)
+          if (idx === -1) {
+            // Temp message not found, just add if unique
+            const exists = state.messages.some(m => m.id === realMessage.id)
+            if (exists) return state
+            const newMessages = [...state.messages, realMessage].slice(-MAX_PERSISTED_MESSAGES)
+            return { messages: newMessages, lastSyncTimestamp: Date.now() }
+          }
+          const newMessages = [...state.messages]
+          newMessages[idx] = realMessage
+          return { messages: newMessages, lastSyncTimestamp: Date.now() }
         })
       },
 
