@@ -56,6 +56,7 @@ const RELATIONSHIP_THRESHOLDS: Record<RelationshipStage, number> = {
   CLOSE_FRIEND: 450,
   CRUSH: 600,
   DATING: 750,
+  IN_LOVE: 850,
   LOVER: 900,
 };
 

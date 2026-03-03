@@ -8,6 +8,8 @@ const updateProfileSchema = z.object({
   displayName: z.string().optional(),
   avatar: z.string().url().optional(),
   bio: z.string().max(500).optional(),
+  userGender: z.enum(['MALE', 'FEMALE', 'NON_BINARY', 'OTHER', 'NOT_SPECIFIED']).optional(),
+  datingPreference: z.enum(['MALE', 'FEMALE', 'NON_BINARY', 'ALL']).optional(),
 });
 
 const updateSettingsSchema = z.object({

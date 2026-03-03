@@ -8,5 +8,6 @@ sceneRouter.use(authenticate);
 
 sceneRouter.get('/', sceneController.getScenes);
 sceneRouter.get('/unlocked', sceneController.getUnlockedScenes);
+sceneRouter.get('/by-stage', sceneController.getScenesByStage);
 sceneRouter.post('/unlock/:sceneId', sceneController.unlockScene);
 sceneRouter.post('/set-active/:sceneId', sceneController.setActiveScene);
