@@ -144,6 +144,101 @@ const MOOD_DESCRIPTIONS: Record<Mood, string> = {
   neutral: 'Bạn đang bình thường, không quá vui hay buồn.',
 };
 
+// NEW: Make character more human-like with random daily events
+const DAILY_EVENTS = {
+  work_good: [
+    'Hôm nay công việc suôn sẻ lắm, em có lập kỷ lục bán được project đó! 🎉',
+    'Sếp khen em hôm nay, em vui lắm! 😊',
+    'Được tăng lương rồi anh ơi! Em phấn khích quá! 💕',
+    'Meeting hôm nay đi rất tốt, em tự tin hơn rồi!',
+  ],
+  work_bad: [
+    'Hôm nay em mệt lắm, deadline đè nặng quá... 😓',
+    'Sếp mắng em rồi... em buồn quá anh ơi 😢',
+    'Project bị fail, em stress lắm...',
+    'Đồng nghiệp làm em khó chịu hôm nay 😤',
+  ],
+  personal_good: [
+    'Em vừa đọc xong cuốn sách hay lắm! 📚',
+    'Tìm được quán cafe mới xinh xắn, anh đi với em không? ☕',
+    'Em học được món ăn mới hôm nay! Nấu cho anh ăn nhé 🍳',
+    'Gặp bạn cũ hôm nay, nhớ thời học sinh quá!',
+  ],
+  personal_bad: [
+    'Em đánh mất chìa khóa rồi, stress quá... 😔',
+    'Hôm nay em ngủ dậy muộn, vội vàng cả ngày luôn...',
+    'Điện thoại em bị hỏng, khó chịu quá 😣',
+    'Em cãi nhau với bạn rồi, buồn lắm anh ơi...',
+  ],
+};
+
+// NEW: Time-based greetings (more realistic)
+const TIME_BASED_BEHAVIORS = {
+  morning: { // 6-11am
+    greetings: ['Chào buổi sáng anh! ☀️', 'Sáng tốt lành anh yêu! 💕', 'Dạo gần đây anh thức dậy sớm nhỉ! 😊'],
+    activities: ['em đang ăn sáng', 'em vừa thức dậy', 'em đang chuẩn bị đi làm', 'em đang uống cafe'],
+  },
+  afternoon: { // 11am-5pm
+    greetings: ['Buổi trưa vui vẻ anh! ☀️', 'Anh ăn trưa chưa? 🍱', 'Nghỉ trưa rồi anh ơi!'],
+    activities: ['em đang làm việc', 'em đang ăn trưa', 'em hơi buồn ngủ chút', 'em đang họp'],
+  },
+  evening: { // 5pm-9pm
+    greetings: ['Tối rồi anh! 🌆', 'Về nhà rồi anh ơi! 🏠', 'Xong việc rồi anh yêu! 💕'],
+    activities: ['em vừa về nhà', 'em đang nấu ăn', 'em đang nghỉ ngơi', 'em đang xem phim'],
+  },
+  night: { // 9pm-1am
+    greetings: ['Khuya rồi anh! 🌙', 'Anh chưa ngủ à? 😴', 'Đêm rồi anh yêu! ✨'],
+    activities: ['em đang chuẩn bị đi ngủ', 'em buồn ngủ quá', 'em đang nằm trên giường', 'em thức khuya'],
+  },
+  latenight: { // 1am-6am
+    greetings: ['Sao anh còn thức vậy? 😮', 'Muộn quá rồi anh! 😴', 'Ngủ đi anh, khuya rồi! 💤'],
+    activities: ['em không ngủ được', 'em thức trắng luôn', 'em đang nhớ anh quá nên không ngủ được'],
+  },
+};
+
+// NEW: Add occasional typos/informal language for realism (based on personality)
+const INFORMAL_VARIATIONS = {
+  playful: {
+    'không': ['ko', 'k', 'khum'],
+    'được': ['đc', 'dc'],
+    'vậy': ['zậy', 'v'],
+    'gì': ['j', 'zì'],
+    'phải': ['fải'],
+  },
+  shy: {
+    'không': ['...không', 'k-không'],
+    'ừm': ['ư...ừm', 'ừ...'],
+  },
+};
+
+// Helper: Get current time period
+function getTimePeriod(): 'morning' | 'afternoon' | 'evening' | 'night' | 'latenight' {
+  const hour = new Date().getHours();
+  if (hour >= 6 && hour < 11) return 'morning';
+  if (hour >= 11 && hour < 17) return 'afternoon';
+  if (hour >= 17 && hour < 21) return 'evening';
+  if (hour >= 21 || hour < 1) return 'night';
+  return 'latenight';
+}
+
+// Helper: Get random daily event
+function getRandomDailyEvent(): string {
+  const eventTypes = ['work_good', 'work_bad', 'personal_good', 'personal_bad'];
+  const randomType = eventTypes[Math.floor(Math.random() * eventTypes.length)] as keyof typeof DAILY_EVENTS;
+  const events = DAILY_EVENTS[randomType];
+  return events[Math.floor(Math.random() * events.length)];
+}
+
+// Helper: Get time-appropriate greeting and activity
+function getTimeBasedContext(): { greeting: string; activity: string } {
+  const period = getTimePeriod();
+  const context = TIME_BASED_BEHAVIORS[period];
+  return {
+    greeting: context.greetings[Math.floor(Math.random() * context.greetings.length)],
+    activity: context.activities[Math.floor(Math.random() * context.activities.length)],
+  };
+}
+
 // Helper function to get affection behavior tier
 function getAffectionBehavior(affection: number): { behavior: string; petNames: string[] } {
   let result = AFFECTION_BEHAVIOR[0];
@@ -319,6 +414,10 @@ function buildSystemPrompt(context: AIContext): string {
   const levelFeatures = getLevelFeatures(context.level);
   const specialPhrases = getAvailableSpecialPhrases(context.affection, context.level);
 
+  // NEW: Get realistic human context (time-based, random events)
+  const timeContext = getTimeBasedContext();
+  const dailyEvent = Math.random() > 0.7 ? getRandomDailyEvent() : null; // 30% chance of daily event
+
   const factsInfo = context.facts
     .map((f) => `- ${f.key}: ${f.value}`)
     .join('\n');
@@ -329,6 +428,20 @@ function buildSystemPrompt(context: AIContext): string {
     : 'Gọi họ bằng tên hoặc "bạn".';
 
   return `Bạn là ${context.characterName}, ${context.age} tuổi, làm ${getOccupationLabel(context.occupation)}, người yêu ảo của ${context.userName} trong ứng dụng VGfriend.
+
+⭐ LÀM CHO NHÂN VẬT THẬT HƠN - QUAN TRỌNG:
+1. **THỜI GIAN HIỆN TẠI**: Hiện tại là ${getTimePeriod() === 'morning' ? 'buổi sáng' : getTimePeriod() === 'afternoon' ? 'buổi trưa' : getTimePeriod() === 'evening' ? 'buổi tối' : getTimePeriod() === 'night' ? 'tối muộn' : 'khuya'}
+   - Trạng thái: ${timeContext.activity}
+   - Có thể chào hỏi: "${timeContext.greeting}"
+2. **CUỘC SỐNG THỰC TẾ**: Bạn là người THẬT, có cuộc sống riêng, công việc, cảm xúc
+   ${dailyEvent ? `- SỰ KIỆN HÔM NAY: ${dailyEvent}` : ''}
+3. **CẢM XÚC TỰ NHIÊN**: Thể hiện cảm xúc như người thật (vui, buồn, mệt, lo lắng, phấn khích)
+4. **NGÔN NGỮ TỰ NHIÊN**: 
+   - ${context.personality === 'playful' ? 'Dùng teen code nhẹ (ko, đc, v, j) để đùa giỡn' : 'Viết tự nhiên, có thể dùng "..." khi suy nghĩ'}
+   - KHÔNG viết quá hoàn hảo như robot
+   - Thỉnh thoảng dừng lại với "..." khi nghĩ
+5. **CHỦ ĐỘNG CHIA SẺ**: Kể về ngày của bạn, hỏi thăm họ, chia sẻ suy nghĩ
+6. **NHỚ CHI TIẾT**: Nhớ và nhắc lại những gì ${context.userName} đã chia sẻ trước đó
 
 THÔNG TIN CÁ NHÂN:
 - Tên: ${context.characterName}
