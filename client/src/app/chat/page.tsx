@@ -156,6 +156,19 @@ export default function ChatPage() {
     setIsSending(true);
     sendingRef.current = true;
 
+    // Immediately add optimistic user message so it appears before typing indicator
+    const optimisticMessage = {
+      id: clientId, // temp ID — will be replaced by real DB ID when server echoes back
+      role: 'USER' as const,
+      content,
+      messageType: 'TEXT',
+      createdAt: new Date(),
+      isOwn: true,
+    };
+    useChatStore.getState().addMessage(optimisticMessage);
+    // Show typing indicator immediately after user message
+    useChatStore.getState().setTyping(true);
+
     socketService.emit('message:send', { 
       content,
       characterId: character.id,
