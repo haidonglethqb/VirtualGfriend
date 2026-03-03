@@ -5,6 +5,80 @@ import Redis from 'ioredis';
 const prisma = new PrismaClient();
 
 // ============================================
+// HELPER: Normalize Vietnamese names (remove diacritics)
+// ============================================
+function normalizeVietnamese(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
+
+// ============================================
+// HELPER: Cleanup duplicate templates before seeding
+// This ensures we don't have both "Huong" and "Hương"
+// ============================================
+async function cleanupDuplicateTemplates() {
+  console.log('[Seed] Checking for duplicate templates...');
+  
+  const templates = await prisma.characterTemplate.findMany({
+    orderBy: [{ createdAt: 'asc' }],
+  });
+
+  const nameMap = new Map<string, typeof templates>();
+  
+  for (const template of templates) {
+    const normalizedName = normalizeVietnamese(template.name);
+    const existing = nameMap.get(normalizedName);
+    if (existing) {
+      existing.push(template);
+    } else {
+      nameMap.set(normalizedName, [template]);
+    }
+  }
+
+  let deleted = 0;
+  for (const [normalizedName, items] of nameMap.entries()) {
+    if (items.length > 1) {
+      console.log(`[Seed] Found duplicate for "${normalizedName}": ${items.map(i => `"${i.name}"`).join(', ')}`);
+      
+      // Keep the one WITH diacritics (proper Vietnamese), delete the one without
+      // "Hương" has diacritics, "Huong" doesn't
+      const withDiacritics = items.find(t => t.name !== normalizeVietnamese(t.name));
+      const keep = withDiacritics || items[0];
+      const toDelete = items.filter(t => t.id !== keep.id);
+      
+      console.log(`[Seed] Keeping "${keep.name}", deleting ${toDelete.length} duplicates`);
+      
+      for (const item of toDelete) {
+        // Migrate characters to the kept template
+        const migratedCount = await prisma.character.updateMany({
+          where: { templateId: item.id },
+          data: { templateId: keep.id },
+        });
+        
+        if (migratedCount.count > 0) {
+          console.log(`[Seed] Migrated ${migratedCount.count} characters from "${item.name}" to "${keep.name}"`);
+        }
+        
+        await prisma.characterTemplate.delete({ where: { id: item.id } });
+        console.log(`[Seed] Deleted duplicate template "${item.name}"`);
+        deleted++;
+      }
+    }
+  }
+  
+  if (deleted > 0) {
+    console.log(`[Seed] Cleaned up ${deleted} duplicate templates`);
+  } else {
+    console.log('[Seed] No duplicate templates found');
+  }
+}
+
+// ============================================
 // UPSERT HELPERS - Safe idempotent seeding
 // These functions only create/update system data
 // They DO NOT delete any user-generated content
@@ -364,6 +438,9 @@ async function main() {
   // CHARACTER TEMPLATES - Using upsert (safe)
   // Now with diverse genders for all preferences
   // ============================================
+  // First, cleanup any duplicate templates (e.g., "Huong" vs "Hương")
+  await cleanupDuplicateTemplates();
+  
   console.log('[Seed] Seeding character templates...');
   const templatesData = [
     // FEMALE TEMPLATES
