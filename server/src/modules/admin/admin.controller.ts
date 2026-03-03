@@ -564,60 +564,93 @@ export async function giveToUser(req: AdminRequest, res: Response) {
 
 // ============== ANALYTICS ==============
 export async function getAnalytics(req: AdminRequest, res: Response) {
-  const { days = 7 } = req.query;
-  const daysNum = Number(days);
+  try {
+    const { days = 7 } = req.query;
+    const daysNum = Number(days) || 7;
 
-  const startDate = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000);
+    const startDate = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000);
 
-  // Get daily stats
-  const dailyStats = await prisma.$queryRaw<Array<{ date: string; new_users: bigint; messages: bigint }>>`
-    SELECT 
-      DATE(created_at) as date,
-      COUNT(DISTINCT CASE WHEN created_at >= ${startDate} THEN id END) as new_users,
-      0 as messages
-    FROM users
-    WHERE created_at >= ${startDate}
-    GROUP BY DATE(created_at)
-    ORDER BY date ASC
-  `;
+    // Get all users created in the time range
+    const users = await prisma.user.findMany({
+      where: { createdAt: { gte: startDate } },
+      select: { createdAt: true },
+    });
 
-  // Get message counts per day
-  const messageStats = await prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
-    SELECT 
-      DATE(created_at) as date,
-      COUNT(*) as count
-    FROM messages
-    WHERE created_at >= ${startDate}
-    GROUP BY DATE(created_at)
-    ORDER BY date ASC
-  `;
+    // Get all messages in the time range
+    const messages = await prisma.message.findMany({
+      where: { createdAt: { gte: startDate } },
+      select: { createdAt: true },
+    });
 
-  // Get top users by messages
-  const topUsers = await prisma.user.findMany({
-    select: {
-      id: true,
-      username: true,
-      displayName: true,
-      email: true,
-      _count: { select: { messages: true } },
-    },
-    orderBy: { messages: { _count: 'desc' } },
-    take: 10,
-  });
+    // Group users by date
+    const usersByDate = new Map<string, number>();
+    for (const user of users) {
+      const dateKey = user.createdAt.toISOString().split('T')[0];
+      usersByDate.set(dateKey, (usersByDate.get(dateKey) || 0) + 1);
+    }
 
-  // Get premium tier distribution
-  const premiumDistribution = await prisma.user.groupBy({
-    by: ['premiumTier'],
-    _count: true,
-    where: { isPremium: true },
-  });
+    // Group messages by date
+    const messagesByDate = new Map<string, number>();
+    for (const msg of messages) {
+      const dateKey = msg.createdAt.toISOString().split('T')[0];
+      messagesByDate.set(dateKey, (messagesByDate.get(dateKey) || 0) + 1);
+    }
 
-  res.json({
-    dailyStats: dailyStats.map(d => ({ ...d, new_users: Number(d.new_users), messages: Number(d.messages) })),
-    messageStats: messageStats.map(m => ({ date: m.date, count: Number(m.count) })),
-    topUsers: topUsers.map(u => ({ ...u, messageCount: u._count.messages })),
-    premiumDistribution,
-  });
+    // Generate all dates in range
+    const allDates: string[] = [];
+    for (let i = 0; i < daysNum; i++) {
+      const d = new Date(Date.now() - (daysNum - 1 - i) * 24 * 60 * 60 * 1000);
+      allDates.push(d.toISOString().split('T')[0]);
+    }
+
+    // Build daily stats with all dates
+    const dailyStats = allDates.map(date => ({
+      date,
+      new_users: usersByDate.get(date) || 0,
+      messages: 0,
+    }));
+
+    // Build message stats with all dates
+    const messageStats = allDates.map(date => ({
+      date,
+      count: messagesByDate.get(date) || 0,
+    }));
+
+    // Get top users by messages (using Prisma)
+    const topUsers = await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        email: true,
+        _count: { select: { messages: true } },
+      },
+      orderBy: { messages: { _count: 'desc' } },
+      take: 10,
+    });
+
+    // Get premium tier distribution (all users, not just premium)
+    const premiumDistribution = await prisma.user.groupBy({
+      by: ['premiumTier'],
+      _count: true,
+    });
+
+    res.json({
+      dailyStats,
+      messageStats,
+      topUsers: topUsers.map(u => ({ 
+        id: u.id,
+        username: u.username,
+        displayName: u.displayName,
+        email: u.email,
+        messageCount: u._count.messages 
+      })),
+      premiumDistribution,
+    });
+  } catch (error) {
+    console.error('[Admin] Analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
 }
 
 // ============== SYSTEM ==============
