@@ -786,3 +786,93 @@ export async function deleteMemory(req: AdminRequest, res: Response) {
   await prisma.memory.delete({ where: { id } });
   res.json({ message: 'Memory deleted' });
 }
+
+// ============== CLEANUP DUPLICATES ==============
+// Normalize Vietnamese names (remove diacritics for comparison)
+function normalizeVietnamese(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
+
+export async function cleanupDuplicateTemplates(req: AdminRequest, res: Response) {
+  // Find all templates grouped by normalized name (catches "Hương" vs "Huong")
+  const templates = await prisma.characterTemplate.findMany({
+    orderBy: [{ name: 'asc' }, { createdAt: 'asc' }],
+  });
+
+  const nameMap = new Map<string, typeof templates>();
+  
+  for (const template of templates) {
+    const normalizedName = normalizeVietnamese(template.name);
+    const existing = nameMap.get(normalizedName);
+    if (existing) {
+      existing.push(template);
+    } else {
+      nameMap.set(normalizedName, [template]);
+    }
+  }
+
+  const duplicates: string[] = [];
+  const deleted: string[] = [];
+
+  for (const [normalizedName, items] of nameMap.entries()) {
+    if (items.length > 1) {
+      duplicates.push(`${normalizedName}: ${items.map(i => `"${i.name}"`).join(', ')}`);
+      
+      // Keep the one with Vietnamese diacritics (proper name) and valid avatar
+      const withDiacritics = items.find(t => t.name !== normalizeVietnamese(t.name));
+      const withAvatar = items.find(t => t.avatarUrl && t.avatarUrl.trim() !== '');
+      const keep = withDiacritics || withAvatar || items[0];
+      const toDelete = items.filter(t => t.id !== keep.id);
+      
+      for (const item of toDelete) {
+        // Check if any characters use this template
+        const usageCount = await prisma.character.count({
+          where: { templateId: item.id },
+        });
+        
+        if (usageCount > 0) {
+          // Update characters to use the kept template
+          await prisma.character.updateMany({
+            where: { templateId: item.id },
+            data: { templateId: keep.id },
+          });
+          deleted.push(`"${item.name}" - migrated ${usageCount} characters to "${keep.name}"`);
+        } else {
+          deleted.push(`"${item.name}"`);
+        }
+        
+        await prisma.characterTemplate.delete({ where: { id: item.id } });
+      }
+    }
+  }
+
+  res.json({
+    message: 'Duplicate cleanup completed',
+    duplicatesFound: duplicates,
+    deleted,
+  });
+}
+
+export async function fixMissingAvatars(req: AdminRequest, res: Response) {
+  // Find templates with empty or invalid avatar URLs
+  const templates = await prisma.characterTemplate.findMany();
+  
+  const issues: string[] = [];
+  
+  for (const template of templates) {
+    if (!template.avatarUrl || template.avatarUrl.trim() === '') {
+      issues.push(`${template.name}: Missing avatar URL`);
+    }
+  }
+
+  res.json({
+    totalTemplates: templates.length,
+    issues,
+  });
+}
