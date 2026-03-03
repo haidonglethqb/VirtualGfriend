@@ -95,11 +95,180 @@ interface SystemInfo {
   memoryUsage: { heapUsed: number; heapTotal: number; rss: number };
 }
 
+interface AnalyticsData {
+  dailyStats: Array<{ date: string; new_users: number; messages: number }>;
+  messageStats: Array<{ date: string; count: number }>;
+  topUsers: Array<{ id: string; username: string | null; displayName: string | null; email: string; messageCount: number }>;
+  premiumDistribution: Array<{ premiumTier: string; _count: number }>;
+}
+
 interface Pagination {
   page: number;
   limit: number;
   total: number;
   totalPages: number;
+}
+
+// Simple Bar Chart Component (no external dependencies)
+function BarChart({ 
+  data, 
+  dataKey, 
+  color 
+}: { 
+  data: Array<{ date: string; [key: string]: string | number }>; 
+  dataKey: string; 
+  color: string 
+}) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-500">
+        No data available
+      </div>
+    );
+  }
+
+  const maxValue = Math.max(...data.map(d => Number(d[dataKey]) || 0), 1);
+  
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Chart Area */}
+      <div className="flex-1 flex items-end gap-1 pb-8 relative">
+        {/* Y-axis labels */}
+        <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-gray-500">
+          <span>{maxValue}</span>
+          <span>{Math.round(maxValue / 2)}</span>
+          <span>0</span>
+        </div>
+        
+        {/* Bars */}
+        <div className="flex-1 ml-14 flex items-end gap-1 h-full">
+          {data.map((item, idx) => {
+            const value = Number(item[dataKey]) || 0;
+            const heightPercent = (value / maxValue) * 100;
+            
+            return (
+              <div key={idx} className="flex-1 flex flex-col items-center group relative">
+                {/* Tooltip */}
+                <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
+                  <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm whitespace-nowrap shadow-xl">
+                    <p className="text-white font-medium">{value.toLocaleString()}</p>
+                    <p className="text-gray-400 text-xs">{formatDate(item.date)}</p>
+                  </div>
+                </div>
+                
+                {/* Bar */}
+                <div 
+                  className="w-full rounded-t-md transition-all duration-300 hover:opacity-80 cursor-pointer relative"
+                  style={{ 
+                    height: `${Math.max(heightPercent, 2)}%`,
+                    backgroundColor: color,
+                    minHeight: '4px'
+                  }}
+                >
+                  {/* Value label on hover */}
+                  {heightPercent > 15 && (
+                    <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white/80 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {value}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      
+      {/* X-axis labels */}
+      <div className="ml-14 flex gap-1">
+        {data.map((item, idx) => (
+          <div key={idx} className="flex-1 text-center">
+            <span className="text-xs text-gray-500 truncate block">
+              {data.length <= 14 ? formatDate(item.date) : (idx % Math.ceil(data.length / 7) === 0 ? formatDate(item.date) : '')}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Pagination Controls Component
+function PaginationControls({ 
+  pagination, 
+  setPagination 
+}: { 
+  pagination: Pagination; 
+  setPagination: React.Dispatch<React.SetStateAction<Pagination>> 
+}) {
+  return (
+    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700/50">
+      <p className="text-sm text-gray-400">
+        Showing {Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total)} to{' '}
+        {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
+          disabled={pagination.page === 1}
+          className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <span className="px-4 py-2 bg-gray-700/50 rounded-lg">
+          {pagination.page} / {pagination.totalPages || 1}
+        </span>
+        <button
+          onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
+          disabled={pagination.page >= pagination.totalPages}
+          className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Modal Component
+function Modal({ 
+  title, 
+  onClose, 
+  children 
+}: { 
+  title: string; 
+  onClose: () => void; 
+  children: React.ReactNode 
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-gray-800 rounded-2xl p-6 max-w-md w-full border border-gray-700"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold">{title}</h3>
+          <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-lg">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        {children}
+      </motion.div>
+    </motion.div>
+  );
 }
 
 export default function AdminPage() {
@@ -114,6 +283,8 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [stats, setStats] = useState<Stats | null>(null);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [analyticsDays, setAnalyticsDays] = useState(7);
   
   // Data states
   const [users, setUsers] = useState<User[]>([]);
@@ -209,6 +380,9 @@ export default function AdminPage() {
           case 'templates':
             fetchTemplates();
             break;
+          case 'analytics':
+            fetchAnalytics();
+            break;
           case 'system':
             fetchSystemInfo();
             break;
@@ -296,6 +470,12 @@ export default function AdminPage() {
   const fetchQuests = async () => {
     const res = await apiCall('/quests');
     if (res.ok) setQuests(await res.json());
+  };
+
+  const fetchAnalytics = async (days?: number) => {
+    const d = days ?? analyticsDays;
+    const res = await apiCall(`/analytics?days=${d}`);
+    if (res.ok) setAnalytics(await res.json());
   };
 
   const fetchTemplates = async () => {
@@ -1034,6 +1214,159 @@ export default function AdminPage() {
             </motion.div>
           )}
 
+          {/* ANALYTICS */}
+          {activeTab === 'analytics' && (
+            <motion.div key="analytics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={analyticsDays}
+                    onChange={(e) => {
+                      const days = Number(e.target.value);
+                      setAnalyticsDays(days);
+                      fetchAnalytics(days);
+                    }}
+                    className="px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  >
+                    <option value={7}>Last 7 days</option>
+                    <option value={14}>Last 14 days</option>
+                    <option value={30}>Last 30 days</option>
+                    <option value={90}>Last 90 days</option>
+                  </select>
+                  <button onClick={() => fetchAnalytics()} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
+                    <RefreshCw className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {!analytics ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* User Growth Chart */}
+                  <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-blue-400" />
+                      New User Registrations
+                    </h3>
+                    <div className="h-64">
+                      <BarChart data={analytics.dailyStats} dataKey="new_users" color="#3b82f6" />
+                    </div>
+                  </div>
+
+                  {/* Message Activity Chart */}
+                  <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5 text-green-400" />
+                      Message Activity
+                    </h3>
+                    <div className="h-64">
+                      <BarChart data={analytics.messageStats} dataKey="count" color="#22c55e" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Top Users */}
+                    <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Crown className="w-5 h-5 text-yellow-400" />
+                        Top Users by Messages
+                      </h3>
+                      <div className="space-y-3">
+                        {analytics.topUsers.map((user, idx) => (
+                          <div key={user.id} className="flex items-center justify-between p-3 bg-gray-700/30 rounded-xl">
+                            <div className="flex items-center gap-3">
+                              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                idx === 0 ? 'bg-yellow-500/20 text-yellow-400' :
+                                idx === 1 ? 'bg-gray-400/20 text-gray-300' :
+                                idx === 2 ? 'bg-orange-500/20 text-orange-400' :
+                                'bg-gray-600/30 text-gray-400'
+                              }`}>
+                                {idx + 1}
+                              </span>
+                              <div>
+                                <p className="font-medium">{user.displayName || user.username || 'Anonymous'}</p>
+                                <p className="text-sm text-gray-400">{user.email}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-purple-400">{user.messageCount.toLocaleString()}</p>
+                              <p className="text-xs text-gray-500">messages</p>
+                            </div>
+                          </div>
+                        ))}
+                        {analytics.topUsers.length === 0 && (
+                          <p className="text-gray-500 text-center py-4">No data available</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Premium Distribution */}
+                    <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-purple-400" />
+                        Premium Distribution
+                      </h3>
+                      <div className="space-y-4">
+                        {analytics.premiumDistribution.length > 0 ? (
+                          <>
+                            {analytics.premiumDistribution.map((tier) => {
+                              const total = analytics.premiumDistribution.reduce((acc, t) => acc + t._count, 0);
+                              const percentage = total > 0 ? (tier._count / total) * 100 : 0;
+                              const tierColors: Record<string, string> = {
+                                FREE: 'bg-gray-500',
+                                BASIC: 'bg-blue-500',
+                                PRO: 'bg-purple-500',
+                                ULTIMATE: 'bg-gradient-to-r from-yellow-400 to-pink-500',
+                              };
+                              return (
+                                <div key={tier.premiumTier}>
+                                  <div className="flex justify-between mb-1">
+                                    <span className="text-sm font-medium">{tier.premiumTier}</span>
+                                    <span className="text-sm text-gray-400">{tier._count} users ({percentage.toFixed(1)}%)</span>
+                                  </div>
+                                  <div className="w-full h-3 bg-gray-700 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full ${tierColors[tier.premiumTier] || 'bg-gray-500'} transition-all duration-500`}
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </>
+                        ) : (
+                          <p className="text-gray-500 text-center py-4">No premium users yet</p>
+                        )}
+                      </div>
+
+                      {/* Summary Stats */}
+                      <div className="mt-6 pt-4 border-t border-gray-700">
+                        <div className="grid grid-cols-2 gap-4 text-center">
+                          <div>
+                            <p className="text-2xl font-bold text-blue-400">
+                              {analytics.dailyStats.reduce((acc, d) => acc + d.new_users, 0)}
+                            </p>
+                            <p className="text-xs text-gray-500">New users ({analyticsDays}d)</p>
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold text-green-400">
+                              {analytics.messageStats.reduce((acc, d) => acc + d.count, 0).toLocaleString()}
+                            </p>
+                            <p className="text-xs text-gray-500">Messages ({analyticsDays}d)</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {/* SYSTEM */}
           {activeTab === 'system' && systemInfo && (
             <motion.div key="system" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -1262,64 +1595,5 @@ export default function AdminPage() {
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-// Helper Components
-function PaginationControls({ pagination, setPagination }: { pagination: Pagination; setPagination: React.Dispatch<React.SetStateAction<Pagination>> }) {
-  return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700/50">
-      <p className="text-sm text-gray-400">
-        Showing {Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total)} to{' '}
-        {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
-      </p>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
-          disabled={pagination.page === 1}
-          className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <span className="px-4 py-2 bg-gray-700/50 rounded-lg">
-          {pagination.page} / {pagination.totalPages || 1}
-        </span>
-        <button
-          onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
-          disabled={pagination.page >= pagination.totalPages}
-          className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-gray-800 rounded-2xl p-6 w-full max-w-md border border-gray-700"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold">{title}</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        {children}
-      </motion.div>
-    </motion.div>
   );
 }
