@@ -35,6 +35,8 @@ import {
   getGiftHistory,
   getMemories,
   deleteMemory,
+  cleanupDuplicateTemplates,
+  fixMissingAvatars,
 } from './admin.controller';
 
 const router = Router();
@@ -97,5 +99,9 @@ router.get('/gifts', getGiftHistory);
 // Memories
 router.get('/memories', getMemories);
 router.delete('/memories/:id', deleteMemory);
+
+// Cleanup utilities
+router.post('/cleanup/duplicate-templates', cleanupDuplicateTemplates);
+router.get('/cleanup/check-avatars', fixMissingAvatars);
 
 export { router as adminRouter };

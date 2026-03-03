@@ -505,6 +505,33 @@ export default function AdminPage() {
     }
   };
 
+  const handleCleanupDuplicates = async () => {
+    if (!confirm('Clean up duplicate templates? This will:\n- Remove duplicate templates with the same name\n- Migrate characters to the kept template\n\nContinue?')) return;
+    
+    setActionLoading(true);
+    try {
+      const res = await apiCall('/cleanup/duplicate-templates', {
+        method: 'POST',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const message = data.deleted.length > 0 
+          ? `Deleted ${data.deleted.length} duplicates: ${data.deleted.join(', ')}`
+          : 'No duplicates found';
+        showToast(message);
+        // Refresh templates list
+        fetchTemplates();
+      } else {
+        const error = await res.json();
+        showToast(error.message || 'Cleanup failed', 'error');
+      }
+    } catch {
+      showToast('Cleanup failed', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Loading state - checking token
   if (isLoggedIn === null) {
     return (
@@ -1080,6 +1107,14 @@ export default function AdminPage() {
                     >
                       <p className="font-medium">Find Inactive Users</p>
                       <p className="text-sm text-gray-400">List users inactive for 90+ days</p>
+                    </button>
+                    <button
+                      onClick={handleCleanupDuplicates}
+                      disabled={actionLoading}
+                      className="w-full p-4 bg-red-700/50 rounded-xl hover:bg-red-700 text-left"
+                    >
+                      <p className="font-medium">Clean Duplicate Templates</p>
+                      <p className="text-sm text-gray-400">Remove duplicate character templates and migrate characters</p>
                     </button>
                   </div>
                 </div>
