@@ -201,6 +201,12 @@ jobs:
             docker compose run --rm --no-deps server npx prisma migrate deploy
             echo "Migrations completed."
 
+            # ── Bước 5.5: Seed database (idempotent - safe to run multiple times)
+            # This uses upsert so it won't duplicate or delete user data
+            echo "Seeding database..."
+            docker compose run --rm --no-deps server npx prisma db seed
+            echo "Seeding completed."
+
             # ── Bước 6: Start tất cả services ─────────────────────
             docker compose --profile production up -d --force-recreate
 
