@@ -415,14 +415,18 @@ export default function ChatPage() {
           )}
 
           {/* Message list */}
-          <AnimatePresence>
+          <AnimatePresence initial={false}>
             {messages.map((message, index) => {
               const isUser = message.role === 'USER' || (message.role === 'SYSTEM' && message.messageType === 'GIFT');
               const showTimestamp = index === 0 || 
                 new Date(messages[index - 1].createdAt).toDateString() !== new Date(message.createdAt).toDateString();
               
+              // Use stable key based on index for user messages to prevent re-animation
+              // when optimistic message is replaced with real one
+              const stableKey = isUser ? `user-${index}` : message.id || `msg-${index}`;
+              
               return (
-                <div key={message.id || index}>
+                <div key={stableKey}>
                   {/* Timestamp */}
                   {showTimestamp && (
                     <div className="flex justify-center my-4">
@@ -440,6 +444,7 @@ export default function ChatPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
+                    layout="position"
                     className={`relative z-10 flex ${isUser ? 'flex-col items-end self-end' : 'gap-4 items-end'}`}
                   >
                     {!isUser && (
