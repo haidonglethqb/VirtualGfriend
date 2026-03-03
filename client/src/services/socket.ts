@@ -6,12 +6,20 @@ import { crossTabSync } from './cross-tab-sync'
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
+// Store external listeners to re-register after reconnection
+type EventCallback = (...args: unknown[]) => void
+interface ExternalListener {
+  event: string
+  callback: EventCallback
+}
+
 class SocketService {
   private socket: Socket | null = null
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private socketId: string | null = null
   private currentToken: string | null = null
+  private externalListeners: ExternalListener[] = []
 
   connect(token: string) {
     // If already connected with the same token, do nothing
@@ -39,6 +47,7 @@ class SocketService {
     })
 
     this.setupEventHandlers()
+    this.reRegisterExternalListeners()
   }
 
   // Reconnect with a new token (used after token refresh)
@@ -61,6 +70,7 @@ class SocketService {
     })
 
     this.setupEventHandlers()
+    this.reRegisterExternalListeners()
   }
 
   private setupEventHandlers() {
@@ -260,23 +270,44 @@ class SocketService {
     })
   }
 
-  // Generic event handlers
+  // Generic event handlers - track external listeners for re-registration after reconnect
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   on(event: string, callback: (...args: any[]) => void) {
+    // Store for re-registration after reconnect
+    this.externalListeners.push({ event, callback: callback as EventCallback })
     this.socket?.on(event, callback)
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   off(event: string, callback?: (...args: any[]) => void) {
     if (callback) {
+      // Remove from external listeners
+      this.externalListeners = this.externalListeners.filter(
+        l => !(l.event === event && l.callback === callback)
+      )
       this.socket?.off(event, callback)
     } else {
+      // Remove all listeners for this event
+      this.externalListeners = this.externalListeners.filter(l => l.event !== event)
       this.socket?.off(event)
     }
   }
 
-  emit(event: string, data?: unknown) {
-    this.socket?.emit(event, data)
+  // Re-register all external listeners after reconnection
+  private reRegisterExternalListeners() {
+    if (!this.socket) return
+    this.externalListeners.forEach(({ event, callback }) => {
+      this.socket?.on(event, callback)
+    })
+  }
+
+  emit(event: string, data?: unknown): boolean {
+    if (!this.socket?.connected) {
+      console.warn(`[Socket] Cannot emit '${event}': socket not connected`)
+      return false
+    }
+    this.socket.emit(event, data)
+    return true
   }
 
   sendMessage(characterId: string, content: string, messageType: string = 'TEXT') {
