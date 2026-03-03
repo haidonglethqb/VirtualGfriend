@@ -4,6 +4,10 @@ import { api } from '@/services/api';
 import { useChatStore } from './chat-store';
 import { useCharacterStore } from './character-store';
 
+type PremiumTier = 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE';
+type UserGender = 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER' | 'NOT_SPECIFIED';
+type DatingPreference = 'MALE' | 'FEMALE' | 'NON_BINARY' | 'ALL';
+
 interface User {
   id: string;
   email: string;
@@ -12,6 +16,9 @@ interface User {
   avatar?: string;
   bio?: string;
   isPremium: boolean;
+  premiumTier?: PremiumTier;
+  userGender?: UserGender;
+  datingPreference?: DatingPreference;
   coins: number;
   gems: number;
   streak?: number;
