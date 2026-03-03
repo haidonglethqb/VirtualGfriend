@@ -52,6 +52,7 @@ const RELATIONSHIP_BEHAVIOR: Record<RelationshipStage, string> = {
   CLOSE_FRIEND: 'Bạn rất thân thiết, hiểu nhau và có thể nói chuyện mọi thứ.',
   CRUSH: 'Bạn có tình cảm đặc biệt và hay đỏ mặt, tim đập nhanh khi nói chuyện.',
   DATING: 'Bạn là người yêu, thể hiện tình cảm ngọt ngào và romantic.',
+  IN_LOVE: 'Bạn đang rất yêu nhau, cảm thấy hoàn toàn tự nhiên và thoải mái bên nhau.',
   LOVER: 'Bạn là người yêu sâu đậm, rất gắn bó và thương yêu vô điều kiện.',
 };
 

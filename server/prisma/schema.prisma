@@ -26,12 +26,18 @@ model User {
   bio               String?   @db.Text
   isEmailVerified   Boolean   @default(false)
   isPremium         Boolean   @default(false)
+  premiumTier       PremiumTier @default(FREE)  // Free, Basic, Pro, Ultimate
   premiumExpiresAt  DateTime?
   coins             Int       @default(0)
   gems              Int       @default(0)
   streak            Int       @default(0)       // Daily login streak
   lastActiveAt      DateTime?                   // Last activity for streak calculation
   lastLoginAt       DateTime?
+  
+  // User identity & preference for matching
+  userGender        UserGender @default(NOT_SPECIFIED)  // How user identifies
+  datingPreference  DatingPreference @default(ALL)      // Who user wants to date
+  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -47,6 +53,7 @@ model User {
   notifications     Notification[]
   settings          UserSettings?
   dailyRewards      DailyReward[]
+  relationshipHistory RelationshipHistory[]
   // DM system
   conversations     ConversationMember[]
   directMessages    DirectMessage[]
@@ -54,6 +61,31 @@ model User {
   @@index([streak])               // Leaderboard: top by streak
   @@index([username])             // Search: find user by username
   @@map("users")
+}
+
+// Premium tiers with clear feature differentiation
+enum PremiumTier {
+  FREE        // Basic features
+  BASIC       // Some premium features
+  PRO         // Most premium features
+  ULTIMATE    // All features
+}
+
+// User gender identity
+enum UserGender {
+  MALE
+  FEMALE
+  NON_BINARY
+  OTHER
+  NOT_SPECIFIED
+}
+
+// User dating preference
+enum DatingPreference {
+  MALE
+  FEMALE
+  NON_BINARY
+  ALL         // Open to all
 }
 
 model RefreshToken {
@@ -135,6 +167,11 @@ model Character {
   experience        Int             @default(0)
   affection         Int             @default(0) // 0-1000
   relationshipStage RelationshipStage @default(STRANGER)
+  
+  // Relationship timeline
+  relationshipStartedAt DateTime?   // When relationship officially started (DATING stage)
+  firstMetAt         DateTime       @default(now())  // When first created/met
+  
   birthday          DateTime?
   bio               String?
   age               Int             @default(22) // 18-30
@@ -157,7 +194,12 @@ model Character {
   responseStyle     String          @default("romantic") // romantic, friendly, flirty, caring
   creativityLevel   Float           @default(0.7) // 0-1
   
+  // Relationship status
   isActive          Boolean         @default(true)
+  isEnded           Boolean         @default(false)  // If relationship was ended/broken up
+  endedAt           DateTime?       // When relationship ended
+  endReason         String?         // Reason for ending (user_choice, other)
+  
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
@@ -168,28 +210,63 @@ model Character {
   scenes            CharacterScene[]
   receivedGifts     GiftHistory[]
   memories          Memory[]
+  relationshipHistory RelationshipHistory[]
 
   @@index([userId, isActive])
   @@index([isActive, level, experience])  // Leaderboard: top by level
   @@index([isActive, affection])          // Leaderboard: top by affection
   @@index([templateId])                   // Optimize reverse lookups from template to characters
+  @@index([userId, isEnded])              // Find ended relationships
   @@map("characters")
 }
 
 enum Gender {
   MALE
   FEMALE
+  NON_BINARY
   OTHER
 }
 
 enum RelationshipStage {
-  STRANGER    // 0-99 affection
-  ACQUAINTANCE // 100-249
-  FRIEND      // 250-449
-  CLOSE_FRIEND // 450-599
-  CRUSH       // 600-749
-  DATING      // 750-899
-  LOVER       // 900-1000
+  STRANGER       // 0-99 affection - Mới gặp
+  ACQUAINTANCE   // 100-249 - Quen biết
+  FRIEND         // 250-449 - Bạn bè
+  CLOSE_FRIEND   // 450-599 - Bạn thân
+  CRUSH          // 600-749 - Thầm thương
+  DATING         // 750-849 - Hẹn hò
+  IN_LOVE        // 850-899 - Đang yêu
+  LOVER          // 900-1000 - Người yêu
+}
+
+// Track relationship milestones and history
+model RelationshipHistory {
+  id            String   @id @default(uuid())
+  userId        String
+  characterId   String
+  eventType     RelationshipEventType
+  fromStage     RelationshipStage?
+  toStage       RelationshipStage?
+  note          String?
+  metadata      Json?    // Extra data like gifts given, scene unlocked, etc.
+  createdAt     DateTime @default(now())
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character     Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([userId, characterId, createdAt])
+  @@index([characterId, eventType])
+  @@map("relationship_history")
+}
+
+enum RelationshipEventType {
+  STAGE_UP           // Progressed to new stage
+  FIRST_DATE         // First date event
+  CONFESSION         // Confession of feelings
+  STARTED_DATING     // Official start of relationship
+  ANNIVERSARY        // Anniversary milestone
+  BREAKUP            // Relationship ended
+  RECONCILIATION     // Got back together
+  SPECIAL_MOMENT     // Special memory created
 }
 
 model CharacterFact {
@@ -279,6 +356,11 @@ model Quest {
   rewardAffection Int       @default(0)
   rewardItems     String[]  @default([])
   unlockLevel     Int       @default(1)
+  
+  // Premium gating
+  requiresPremium Boolean   @default(false)
+  minimumTier     PremiumTier @default(FREE)
+  
   sortOrder       Int       @default(0)
   isActive        Boolean   @default(true)
   startsAt        DateTime?
@@ -300,6 +382,7 @@ enum QuestType {
   STORY
   ACHIEVEMENT
   EVENT
+  RELATIONSHIP   // New: quests tied to relationship stages
 }
 
 model UserQuest {
@@ -341,6 +424,11 @@ model Gift {
   imageUrl        String
   category        String   // flower, jewelry, food, experience, special
   rarity          Rarity   @default(COMMON)
+  
+  // Premium gating
+  requiresPremium Boolean  @default(false)
+  minimumTier     PremiumTier @default(FREE)
+  
   priceCoins      Int      @default(0)
   priceGems       Int      @default(0)
   affectionBonus  Int      @default(10)
@@ -409,19 +497,27 @@ model GiftHistory {
 // ============================================
 
 model Scene {
-  id            String   @id @default(uuid())
-  name          String
-  description   String
-  imageUrl      String
-  category      String   // indoor, outdoor, romantic, adventure
-  ambiance      String   // cozy, romantic, energetic, peaceful
-  unlockMethod  String   @default("level") // level, purchase, quest, event
-  unlockValue   Int      @default(1)
-  priceGems     Int      @default(0)
-  isDefault     Boolean  @default(false)
-  sortOrder     Int      @default(0)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
+  id               String   @id @default(uuid())
+  name             String
+  description      String
+  imageUrl         String
+  category         String   // indoor, outdoor, romantic, adventure, school, work
+  ambiance         String   // cozy, romantic, energetic, peaceful
+  
+  // Unlock requirements - can combine multiple
+  unlockMethod     String   @default("level") // level, purchase, quest, event, relationship
+  unlockValue      Int      @default(1)       // Level required if method is "level"
+  requiredStage    RelationshipStage? @default(STRANGER)  // Required relationship stage
+  priceGems        Int      @default(0)
+  
+  // Premium gating
+  requiresPremium  Boolean  @default(false)
+  minimumTier      PremiumTier @default(FREE)  // Minimum tier required
+  
+  isDefault        Boolean  @default(false)
+  sortOrder        Int      @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   characterScenes CharacterScene[]
