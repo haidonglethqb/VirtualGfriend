@@ -10,7 +10,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
+# Install dependencies (including devDependencies for tsx to run seed)
 RUN npm ci
 
 # Copy source code
