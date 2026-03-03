@@ -101,6 +101,16 @@ export default function MessagesPage() {
     if (accessToken) {
       socketService.connect(accessToken)
     }
+
+    // Periodic connection check - ensure socket stays connected
+    const connectionCheck = setInterval(() => {
+      if (!socketService.isConnected() && accessToken) {
+        console.log('[DM] Socket disconnected, reconnecting...')
+        socketService.connect(accessToken)
+      }
+    }, 5000) // Check every 5 seconds
+
+    return () => clearInterval(connectionCheck)
   }, [isAuthenticated, router, fetchConversations, accessToken])
 
   // DM socket listeners
@@ -175,6 +185,20 @@ export default function MessagesPage() {
   // Send message
   const handleSend = async () => {
     if (!inputMessage.trim() || sendingRef.current || !activeConvo) return
+    
+    // Check socket connection, try to reconnect if needed
+    if (!socketService.isConnected()) {
+      if (accessToken) {
+        socketService.connect(accessToken)
+        // Wait a bit for connection
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+      if (!socketService.isConnected()) {
+        toast({ title: 'Lỗi kết nối', description: 'Không thể kết nối server. Vui lòng thử lại.', variant: 'destructive' })
+        return
+      }
+    }
+
     const content = inputMessage.trim()
     const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
     setInputMessage('')
@@ -198,11 +222,17 @@ export default function MessagesPage() {
     }
     setMessages(prev => [...prev, optimisticMsg])
 
-    socketService.emit('dm:send', {
+    const emitSuccess = socketService.emit('dm:send', {
       conversationId: activeConvo.id,
       content,
       clientId,
     })
+
+    if (!emitSuccess) {
+      // Remove optimistic message and show error
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
+      toast({ title: 'Lỗi', description: 'Không thể gửi tin nhắn. Vui lòng thử lại.', variant: 'destructive' })
+    }
 
     setTimeout(() => {
       sendingRef.current = false
