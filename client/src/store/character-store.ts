@@ -6,7 +6,7 @@ export interface CharacterTemplate {
   name: string;
   description: string;
   avatarUrl: string;
-  gender: 'MALE' | 'FEMALE' | 'OTHER';
+  gender: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER';
   personality: string;
   style: string;
   isDefault: boolean;
@@ -17,7 +17,7 @@ interface Character {
   id: string;
   name: string;
   nickname?: string;
-  gender: 'MALE' | 'FEMALE';
+  gender: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER';
   avatar?: string;
   avatarUrl?: string;
   templateId?: string;
@@ -58,7 +58,7 @@ interface CharacterState {
   fetchCharacter: () => Promise<void>;
   createCharacter: (data: {
     name: string;
-    gender?: 'MALE' | 'FEMALE';
+    gender?: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER';
     personality?: string;
     age?: number;
     occupation?: string;
