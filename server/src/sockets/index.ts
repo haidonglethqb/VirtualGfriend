@@ -203,10 +203,11 @@ export function setupSocketHandlers(io: Server) {
           messageType: (data.messageType as 'TEXT') || 'TEXT',
         })
 
-        // Broadcast user message to ALL user's tabs
+        // Broadcast user message to ALL user's tabs (echo clientId so client can replace optimistic)
         io.to(userRoom).emit('message:receive', {
           ...result.userMessage,
           isOwn: true,
+          clientId: data.clientId,
           sourceSocketId: socket.id,
         })
 
