@@ -161,8 +161,8 @@ export default function LoginPage() {
                     <Heart className="w-6 h-6 fill-white" />
                   </div>
                   <span className="text-2xl font-bold">
-                    <span className="text-white">Người Yêu</span>
-                    <span className="text-love"> Ảo</span>
+<span className="text-white">Amou</span>
+                  <span className="text-love">ra</span>
                   </span>
                 </Link>
 
@@ -217,7 +217,7 @@ export default function LoginPage() {
                         <Heart className="w-4 h-4 text-white fill-white" />
                       </div>
                       <div>
-                        <p className="text-white text-sm font-medium">Người Yêu Ảo</p>
+                        <p className="text-white text-sm font-medium">Amoura</p>
                         <p className="text-green-400 text-xs flex items-center gap-1">
                           <span className="w-1.5 h-1.5 bg-green-400 rounded-full" />
                           Đang hoạt động
@@ -291,8 +291,8 @@ export default function LoginPage() {
                     <Heart className="w-5 h-5 fill-white" />
                   </div>
                   <span className="text-xl font-bold">
-                    <span className="text-white">Người Yêu</span>
-                    <span className="text-love"> Ảo</span>
+<span className="text-white">Amou</span>
+                  <span className="text-love">ra</span>
                   </span>
                 </Link>
               </div>
