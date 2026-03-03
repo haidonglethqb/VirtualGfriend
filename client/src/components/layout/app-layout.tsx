@@ -108,7 +108,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
             <div className="flex items-center justify-center text-love">
               <Heart className="w-7 h-7 fill-love" />
             </div>
-            <h2 className="text-white text-lg font-bold leading-tight tracking-tight">Người Yêu Ảo</h2>
+            <h2 className="text-white text-lg font-bold leading-tight tracking-tight">Amoura</h2>
           </Link>
         </div>
         

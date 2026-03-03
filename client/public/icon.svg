@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ec4899"/>
+      <stop offset="50%" style="stop-color:#a855f7"/>
+      <stop offset="100%" style="stop-color:#ec4899"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#heartGrad)" filter="url(#glow)"/>
+  
+  <!-- Heart shape -->
+  <path d="M256 410c-8 0-16-3-22-8C168 346 100 284 100 208c0-50 40-90 90-90 30 0 58 15 76 40 18-25 46-40 76-40 50 0 90 40 90 90 0 76-68 138-134 194-6 5-14 8-22 8z" 
+        fill="white" 
+        opacity="0.95"/>
+</svg>

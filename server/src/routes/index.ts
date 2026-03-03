@@ -11,6 +11,7 @@ import { gameRouter } from '../modules/game/game.routes';
 import analyticsRouter from '../modules/analytics/analytics.routes';
 import { dmRouter } from '../modules/dm/dm.routes';
 import { leaderboardRouter } from '../modules/leaderboard/leaderboard.routes';
+import { adminRouter } from '../modules/admin';
 
 export const router = Router();
 
@@ -28,11 +29,12 @@ router.use('/game', gameRouter);
 router.use('/analytics', analyticsRouter);
 router.use('/dm', dmRouter);
 router.use('/leaderboard', leaderboardRouter);
+router.use('/admin', adminRouter);
 
 // API info
 router.get('/', (_: Request, res: Response) => {
   res.json({
-    name: 'VGfriend API',
+    name: 'Amoura API',
     version: '1.0.0',
     endpoints: [
       '/api/auth',
@@ -48,6 +50,7 @@ router.get('/', (_: Request, res: Response) => {
       '/api/analytics',
       '/api/dm',
       '/api/leaderboard',
+      '/api/admin',
     ],
   });
 });

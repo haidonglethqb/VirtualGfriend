@@ -63,7 +63,7 @@ export default function HelpPage() {
   return (
     <StaticPageLayout
       title="Trung Tâm Trợ Giúp"
-      subtitle="Tìm câu trả lời cho mọi thắc mắc về Người Yêu Ảo."
+      subtitle="Tìm câu trả lời cho mọi thắc mắc về Amoura."
     >
       <div className="flex flex-col gap-10">
         {categories.map((cat, i) => (
