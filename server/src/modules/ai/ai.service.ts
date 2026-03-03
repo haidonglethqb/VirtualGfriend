@@ -569,27 +569,47 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
     log.warn('Failed to parse JSON response, using fallback:', error);
     log.warn('Raw response was:', rawResponse);
 
-    // Use simple heuristics as fallback
-    let affectionChange = 1;
-    const userMessage = context.userMessage.toLowerCase();
+    // Try to extract message text before any JSON evaluation block
+    // Handles case: "AI message text... { "evaluation": {...} }"
+    const evalJsonMatch = rawResponse.match(/^([\s\S]*?)\s*\{[^{]*?["']?evaluation["']?[\s\S]*\}\s*$/s);
+    let cleanMessage = rawResponse;
+    let extractedAffectionChange = 1;
+    let extractedQualityScore = 5;
 
-    // Romantic messages
-    if (userMessage.includes('yêu') || userMessage.includes('thương') || userMessage.includes('nhớ')) {
-      affectionChange = 3;
-    }
-    // Long messages
-    else if (context.userMessage.length > 50) {
-      affectionChange = 2;
-    }
-    // Very short messages
-    else if (context.userMessage.length < 5) {
-      affectionChange = 0;
+    if (evalJsonMatch && evalJsonMatch[1].trim()) {
+      // Found message text + evaluation JSON
+      cleanMessage = evalJsonMatch[1].trim();
+      // Try to extract affection_change from the JSON part
+      try {
+        const evalPart = rawResponse.substring(evalJsonMatch[1].length).trim();
+        const evalParsed = JSON.parse(evalPart);
+        if (evalParsed.evaluation) {
+          extractedAffectionChange = Math.max(-5, Math.min(5, evalParsed.evaluation.affection_change || 1));
+          extractedQualityScore = evalParsed.evaluation.quality_score || 5;
+        }
+      } catch { /* ignore */ }
+    } else {
+      // Strip any remaining JSON-like blocks from the message
+      cleanMessage = rawResponse
+        .replace(/\s*\{[^{]*?["']?evaluation["']?[\s\S]*?\}\s*\}\s*$/gs, '')
+        .replace(/\s*\{[^{]*?["']?quality_score["']?[\s\S]*?\}\s*$/gs, '')
+        .trim() || rawResponse;
+
+      // Use simple heuristics for affection
+      const userMessage = context.userMessage.toLowerCase();
+      if (userMessage.includes('yêu') || userMessage.includes('thương') || userMessage.includes('nhớ')) {
+        extractedAffectionChange = 3;
+      } else if (context.userMessage.length > 50) {
+        extractedAffectionChange = 2;
+      } else if (context.userMessage.length < 5) {
+        extractedAffectionChange = 0;
+      }
     }
 
     return {
-      message: rawResponse,
-      affection_change: affectionChange,
-      quality_score: 5,
+      message: cleanMessage,
+      affection_change: extractedAffectionChange,
+      quality_score: extractedQualityScore,
       reason: 'Fallback evaluation',
     };
   }
