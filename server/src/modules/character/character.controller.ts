@@ -9,7 +9,7 @@ const log = createModuleLogger('CharacterController');
 const createCharacterSchema = z.object({
   name: z.string().min(1).max(50),
   nickname: z.string().optional(),
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
+  gender: z.enum(['MALE', 'FEMALE', 'NON_BINARY', 'OTHER']).optional(),
   personality: z.enum(['caring', 'playful', 'shy', 'passionate', 'intellectual']).optional(),
   birthday: z.string().optional(),
   bio: z.string().max(500).optional(),
