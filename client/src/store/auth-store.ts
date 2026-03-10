@@ -40,7 +40,8 @@ interface AuthState {
   
   // Actions
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, username?: string) => Promise<void>;
+  register: (email: string, password: string, username?: string) => Promise<{ status: string; email: string } | undefined>;
+  completeRegistration: (email: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   setUser: (user: User) => void;
@@ -70,7 +71,16 @@ export const useAuthStore = create<AuthState>()(
       },
 
       register: async (email: string, password: string, username?: string) => {
-        const response = await api.post<AuthResponseData>('/auth/register', { email, password, username });
+        const response = await api.post<{ status: string; email: string }>('/auth/register', { email, password, username });
+        if (response.success && response.data) {
+          // Registration now returns OTP_SENT status — don't set auth state yet
+          // User needs to verify OTP first
+          return response.data;
+        }
+      },
+
+      completeRegistration: async (email: string, otp: string) => {
+        const response = await api.post<AuthResponseData>('/auth/verify-registration', { email, otp });
         if (response.success && response.data) {
           const { user, tokens } = response.data;
           set({

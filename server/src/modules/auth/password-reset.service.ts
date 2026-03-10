@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { emailService } from '../../lib/email';
+import { cache } from '../../lib/redis';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { createModuleLogger } from '../../lib/logger';
@@ -206,6 +207,106 @@ export const passwordResetService = {
     return {
       success: true,
       message: 'Mật khẩu đã được đặt lại thành công',
+    };
+  },
+
+  /**
+   * Send OTP for registration email verification
+   */
+  async sendRegistrationOTP(email: string): Promise<{ success: boolean; message: string }> {
+    // Generate OTP
+    const otp = this.generateOTP();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    // Invalidate old registration OTPs for this email
+    await prisma.passwordResetOTP.updateMany({
+      where: {
+        email: email.toLowerCase(),
+        type: 'REGISTRATION',
+        used: false,
+      },
+      data: {
+        used: true,
+      },
+    });
+
+    // Save new OTP
+    await prisma.passwordResetOTP.create({
+      data: {
+        email: email.toLowerCase(),
+        otp,
+        type: 'REGISTRATION',
+        expiresAt,
+      },
+    });
+
+    // Send email
+    const sent = await emailService.sendRegistrationOTP(email, otp);
+
+    if (!sent) {
+      throw new Error('Không thể gửi email xác nhận. Vui lòng thử lại sau.');
+    }
+
+    return {
+      success: true,
+      message: 'Mã OTP đã được gửi đến email của bạn',
+    };
+  },
+
+  /**
+   * Verify OTP for registration
+   */
+  async verifyRegistrationOTP(email: string, otp: string): Promise<{ success: boolean; message: string }> {
+    log.debug('Verify Registration OTP attempt:', { email, otp });
+
+    const otpRecord = await prisma.passwordResetOTP.findFirst({
+      where: {
+        email: email.toLowerCase(),
+        otp,
+        type: 'REGISTRATION',
+        used: false,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (!otpRecord) {
+      const usedOtp = await prisma.passwordResetOTP.findFirst({
+        where: { otp, type: 'REGISTRATION', used: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      
+      if (usedOtp) {
+        return {
+          success: false,
+          message: 'Mã OTP đã được sử dụng. Vui lòng yêu cầu mã mới.',
+        };
+      }
+
+      return {
+        success: false,
+        message: 'Mã OTP không hợp lệ',
+      };
+    }
+
+    // Check if expired
+    if (new Date() > otpRecord.expiresAt) {
+      return {
+        success: false,
+        message: 'Mã OTP đã hết hạn',
+      };
+    }
+
+    // Mark as used
+    await prisma.passwordResetOTP.update({
+      where: { id: otpRecord.id },
+      data: { used: true },
+    });
+
+    return {
+      success: true,
+      message: 'Xác thực email thành công',
     };
   },
 

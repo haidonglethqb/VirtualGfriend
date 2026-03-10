@@ -91,6 +91,8 @@ export const factsLearningService = {
               value: fact.value,
               category: fact.category,
               importance,
+              sourceType: 'ai_batch',
+              learnedAt: new Date(),
             },
           });
 

@@ -268,6 +268,7 @@ function ResetPasswordContent() {
                           { check: /[A-Z]/.test(newPassword), label: 'Chữ hoa' },
                           { check: /[a-z]/.test(newPassword), label: 'Chữ thường' },
                           { check: /[0-9]/.test(newPassword), label: 'Số' },
+                          { check: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword), label: 'Ký tự đặc biệt' },
                         ].map((req, i) => (
                           <div 
                             key={i}

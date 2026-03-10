@@ -29,12 +29,20 @@ interface AIContext {
   userMessage: string;
 }
 
+interface InlineFact {
+  key: string;
+  value: string;
+  category: 'preference' | 'memory' | 'trait' | 'event';
+  importance?: number;
+}
+
 interface AIResponse {
   content: string;
   emotion?: string;
   moodChange?: Mood;
   affectionChange?: number;
   suggestedActions?: string[];
+  inlineFacts?: InlineFact[];
 }
 
 const PERSONALITY_TRAITS: Record<Personality, string> = {
@@ -587,8 +595,22 @@ Bạn PHẢI trả lời theo đúng format JSON sau, KHÔNG được thêm text
     "quality_score": 8,
     "affection_change": 3,
     "reason": "Lý do đánh giá ngắn gọn"
-  }
+  },
+  "facts": [
+    {"key": "tên_thông_tin", "value": "giá trị", "category": "preference|memory|trait|event"}
+  ]
 }
+
+TRÍCH XUẤT FACTS (QUAN TRỌNG):
+- Mỗi tin nhắn, hãy xem ${context.userName} có chia sẻ thông tin cá nhân nào không
+- Nếu có, thêm vào "facts" array (tối đa 3 facts mỗi tin nhắn)
+- Nếu không có thông tin mới, "facts" là mảng rỗng []
+- Chỉ trích xuất thông tin RÕ RÀNG, không suy đoán
+- Categories: preference (sở thích), memory (kỷ niệm), trait (tính cách), event (sự kiện)
+- VÍ DỤ facts:
+  + User nói "anh thích ăn phở" → {"key": "món_ăn_yêu_thích", "value": "phở", "category": "preference"}
+  + User nói "anh là dev" → {"key": "nghề_nghiệp", "value": "developer", "category": "trait"}
+  + User nói "hôm nay anh thi xong" → {"key": "sự_kiện_gần_đây", "value": "vừa thi xong", "category": "event"}
 
 VÍ DỤ:
 User: "Anh yêu em nhiều lắm 💕"
@@ -599,7 +621,8 @@ Response:
     "quality_score": 10,
     "affection_change": 5,
     "reason": "Lời tỏ tình chân thành và ngọt ngào"
-  }
+  },
+  "facts": []
 }
 
 User: "ừ"
@@ -610,7 +633,22 @@ Response:
     "quality_score": 2,
     "affection_change": 0,
     "reason": "Câu trả lời quá ngắn, thiếu cảm xúc"
-  }
+  },
+  "facts": []
+}
+
+User: "Hôm nay anh vừa đi ăn bún bò Huế, ngon lắm em ơi"
+Response:
+{
+  "message": "Ôi ngon ghê! Em cũng thích bún bò Huế lắm 😋 Lần sau anh dẫn em đi ăn nha!",
+  "evaluation": {
+    "quality_score": 7,
+    "affection_change": 2,
+    "reason": "Chia sẻ hoạt động thú vị, tạo cơ hội kết nối"
+  },
+  "facts": [
+    {"key": "món_ăn_gần_đây", "value": "bún bò Huế", "category": "event"}
+  ]
 }
 
 CHÚ Ý: Chỉ trả về JSON, không thêm bất kỳ text nào khác!`;
@@ -641,6 +679,7 @@ interface AIJsonResponse {
     affection_change: number;
     reason: string;
   };
+  facts?: Array<{ key: string; value: string; category: string }>;
 }
 
 function parseAIJsonResponse(rawResponse: string, context: AIContext): {
@@ -648,6 +687,7 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
   affection_change: number;
   quality_score: number;
   reason: string;
+  facts: Array<{ key: string; value: string; category: string }>;
 } {
   try {
     // Extract JSON from response (AI might add extra text)
@@ -672,11 +712,17 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
     // Clamp affection_change to reasonable bounds (-5 to +5)
     const affectionChange = Math.max(-5, Math.min(5, parsed.evaluation.affection_change || 0));
 
+    // Extract inline facts (validate structure)
+    const facts = Array.isArray(parsed.facts)
+      ? parsed.facts.filter(f => f.key && f.value && f.category).slice(0, 3)
+      : [];
+
     return {
       message: parsed.message,
       affection_change: affectionChange,
       quality_score: parsed.evaluation.quality_score || 5,
       reason: parsed.evaluation.reason || 'No reason provided',
+      facts,
     };
   } catch (error) {
     // Fallback: If AI doesn't return JSON, use old logic
@@ -725,6 +771,7 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
       affection_change: extractedAffectionChange,
       quality_score: extractedQualityScore,
       reason: 'Fallback evaluation',
+      facts: [],
     };
   }
 }
@@ -806,6 +853,11 @@ export const aiService = {
         emotion,
         affectionChange: parsed.affection_change,
         moodChange,
+        inlineFacts: parsed.facts.length > 0 ? parsed.facts.map(f => ({
+          key: f.key,
+          value: f.value,
+          category: f.category as InlineFact['category'],
+        })) : undefined,
       };
     } catch (error) {
       log.error('Generation error:', error);

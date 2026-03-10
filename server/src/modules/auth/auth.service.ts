@@ -5,6 +5,7 @@ import { prisma } from '../../lib/prisma';
 import { cache, CacheKeys } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { validatePassword } from '../../lib/constants';
+import { passwordResetService } from './password-reset.service';
 
 interface RegisterData {
   email: string;
@@ -54,6 +55,9 @@ function generateTokens(userId: string, email: string): AuthTokens {
 }
 
 export const authService = {
+  /**
+   * Step 1: Validate registration data, store pending in Redis, send OTP
+   */
   async register(data: RegisterData) {
     // Validate password
     const passwordValidation = validatePassword(data.password);
@@ -67,7 +71,7 @@ export const authService = {
 
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email: data.email.toLowerCase().trim() },
     });
 
     if (existingUser) {
@@ -88,16 +92,63 @@ export const authService = {
     // Hash password
     const hashedPassword = await bcrypt.hash(data.password, 12);
 
-    // Create user with default settings and character
+    // Store pending registration data in Redis (TTL 15 minutes)
+    const pendingKey = `pending_registration:${data.email.toLowerCase().trim()}`;
+    await cache.set(pendingKey, {
+      email: data.email.toLowerCase().trim(),
+      hashedPassword,
+      username: data.username,
+      displayName: data.displayName || data.username,
+      userGender: data.userGender || 'NOT_SPECIFIED',
+      datingPreference: data.datingPreference || 'ALL',
+    }, 15 * 60); // 15 minutes
+
+    // Send registration OTP
+    await passwordResetService.sendRegistrationOTP(data.email.toLowerCase().trim());
+
+    return { status: 'OTP_SENT', email: data.email.toLowerCase().trim() };
+  },
+
+  /**
+   * Step 2: Verify OTP and complete registration
+   */
+  async verifyRegistration(email: string, otp: string) {
+    // Verify OTP
+    const otpResult = await passwordResetService.verifyRegistrationOTP(email, otp);
+    if (!otpResult.success) {
+      throw new AppError(otpResult.message, 400, 'INVALID_OTP');
+    }
+
+    // Get pending registration data from Redis
+    const pendingKey = `pending_registration:${email.toLowerCase().trim()}`;
+    const pendingData = await cache.get<{
+      email: string;
+      hashedPassword: string;
+      username?: string;
+      displayName?: string;
+      userGender: string;
+      datingPreference: string;
+    }>(pendingKey);
+
+    if (!pendingData) {
+      throw new AppError(
+        'Phiên đăng ký đã hết hạn. Vui lòng đăng ký lại.',
+        400,
+        'REGISTRATION_EXPIRED'
+      );
+    }
+
+    // Create user
     const user = await prisma.user.create({
       data: {
-        email: data.email,
-        password: hashedPassword,
-        username: data.username,
-        displayName: data.displayName || data.username,
-        userGender: data.userGender || 'NOT_SPECIFIED',
-        datingPreference: data.datingPreference || 'ALL',
-        coins: 100, // Starting bonus
+        email: pendingData.email,
+        password: pendingData.hashedPassword,
+        username: pendingData.username,
+        displayName: pendingData.displayName || pendingData.username,
+        userGender: pendingData.userGender as any,
+        datingPreference: pendingData.datingPreference as any,
+        isEmailVerified: true,
+        coins: 100,
         gems: 10,
         settings: {
           create: {
@@ -105,7 +156,6 @@ export const authService = {
             theme: 'dark',
           },
         },
-        // Don't create default character - let onboarding handle it
       },
       select: {
         id: true,
@@ -136,6 +186,9 @@ export const authService = {
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRES * 1000),
       },
     });
+
+    // Cleanup pending data from Redis
+    await cache.del(pendingKey);
 
     return { user, tokens };
   },
