@@ -18,7 +18,7 @@ export const PASSWORD_REQUIREMENTS = {
   REQUIRE_UPPERCASE: true,
   REQUIRE_LOWERCASE: true,
   REQUIRE_NUMBER: true,
-  REQUIRE_SPECIAL: false, // Optional: special characters
+  REQUIRE_SPECIAL: true, // Required: at least 1 special character
 } as const;
 
 // Password validation regex patterns

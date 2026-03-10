@@ -115,11 +115,11 @@ export default function RegisterPage() {
     try {
       await register(email, password, username || undefined);
       toast({
-        title: 'Đăng ký thành công!',
-        description: 'Chào mừng bạn đến với Amoura',
+        title: 'Mã OTP đã được gửi!',
+        description: 'Kiểm tra email của bạn để xác nhận đăng ký',
         variant: 'love',
       });
-      router.push('/onboarding');
+      router.push(`/auth/verify-otp?type=registration&email=${encodeURIComponent(email)}`);
     } catch (error) {
       toast({
         title: 'Đăng ký thất bại',
@@ -290,6 +290,7 @@ export default function RegisterPage() {
                               { check: /[A-Z]/.test(password), label: 'Chữ hoa' },
                               { check: /[a-z]/.test(password), label: 'Chữ thường' },
                               { check: /[0-9]/.test(password), label: 'Số' },
+                              { check: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password), label: 'Ký tự đặc biệt' },
                             ].map((req, i) => (
                               <div 
                                 key={i}

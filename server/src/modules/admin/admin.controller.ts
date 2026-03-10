@@ -566,35 +566,59 @@ export async function giveToUser(req: AdminRequest, res: Response) {
 export async function getAnalytics(req: AdminRequest, res: Response) {
   try {
     const { days = 7 } = req.query;
-    const daysNum = Number(days) || 7;
+    const daysNum = Math.min(Number(days) || 7, 365);
 
     const startDate = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000);
 
-    // Get all users created in the time range
-    const users = await prisma.user.findMany({
-      where: { createdAt: { gte: startDate } },
-      select: { createdAt: true },
-    });
+    // Use SQL aggregation instead of loading all records into memory
+    const [usersByDate, messagesByDate, topUsers, premiumDistribution, activeUsersPerDay] = await Promise.all([
+      // User registrations per day
+      prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+        SELECT DATE("createdAt") as date, COUNT(*)::bigint as count
+        FROM "users"
+        WHERE "createdAt" >= ${startDate}
+        GROUP BY DATE("createdAt")
+        ORDER BY date
+      `,
+      // Messages per day
+      prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+        SELECT DATE("createdAt") as date, COUNT(*)::bigint as count
+        FROM "messages"
+        WHERE "createdAt" >= ${startDate}
+        GROUP BY DATE("createdAt")
+        ORDER BY date
+      `,
+      // Top users by messages
+      prisma.user.findMany({
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          email: true,
+          _count: { select: { messages: true } },
+        },
+        orderBy: { messages: { _count: 'desc' } },
+        take: 10,
+      }),
+      // Premium tier distribution
+      prisma.user.groupBy({
+        by: ['premiumTier'],
+        _count: true,
+      }),
+      // Active users per day (users who sent messages)
+      prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+        SELECT DATE("createdAt") as date, COUNT(DISTINCT "userId")::bigint as count
+        FROM "messages"
+        WHERE "createdAt" >= ${startDate}
+        GROUP BY DATE("createdAt")
+        ORDER BY date
+      `,
+    ]);
 
-    // Get all messages in the time range
-    const messages = await prisma.message.findMany({
-      where: { createdAt: { gte: startDate } },
-      select: { createdAt: true },
-    });
-
-    // Group users by date
-    const usersByDate = new Map<string, number>();
-    for (const user of users) {
-      const dateKey = user.createdAt.toISOString().split('T')[0];
-      usersByDate.set(dateKey, (usersByDate.get(dateKey) || 0) + 1);
-    }
-
-    // Group messages by date
-    const messagesByDate = new Map<string, number>();
-    for (const msg of messages) {
-      const dateKey = msg.createdAt.toISOString().split('T')[0];
-      messagesByDate.set(dateKey, (messagesByDate.get(dateKey) || 0) + 1);
-    }
+    // Build date maps for quick lookup
+    const userMap = new Map(usersByDate.map(d => [new Date(d.date).toISOString().split('T')[0], Number(d.count)]));
+    const messageMap = new Map(messagesByDate.map(d => [new Date(d.date).toISOString().split('T')[0], Number(d.count)]));
+    const activeUserMap = new Map(activeUsersPerDay.map(d => [new Date(d.date).toISOString().split('T')[0], Number(d.count)]));
 
     // Generate all dates in range
     const allDates: string[] = [];
@@ -606,34 +630,16 @@ export async function getAnalytics(req: AdminRequest, res: Response) {
     // Build daily stats with all dates
     const dailyStats = allDates.map(date => ({
       date,
-      new_users: usersByDate.get(date) || 0,
-      messages: 0,
+      new_users: userMap.get(date) || 0,
+      messages: messageMap.get(date) || 0,
+      active_users: activeUserMap.get(date) || 0,
     }));
 
     // Build message stats with all dates
     const messageStats = allDates.map(date => ({
       date,
-      count: messagesByDate.get(date) || 0,
+      count: messageMap.get(date) || 0,
     }));
-
-    // Get top users by messages (using Prisma)
-    const topUsers = await prisma.user.findMany({
-      select: {
-        id: true,
-        username: true,
-        displayName: true,
-        email: true,
-        _count: { select: { messages: true } },
-      },
-      orderBy: { messages: { _count: 'desc' } },
-      take: 10,
-    });
-
-    // Get premium tier distribution (all users, not just premium)
-    const premiumDistribution = await prisma.user.groupBy({
-      by: ['premiumTier'],
-      _count: true,
-    });
 
     res.json({
       dailyStats,
