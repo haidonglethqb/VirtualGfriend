@@ -187,7 +187,7 @@ jobs:
             SMTP_PORT=${{ secrets.SMTP_PORT }}
             SMTP_SECURE=${{ secrets.SMTP_SECURE }}
             SMTP_USER=${{ secrets.SMTP_USER }}
-            SMTP_PASS=${{ secrets.SMTP_PASS }}
+            SMTP_PASS="${{ secrets.SMTP_PASS }}"
             SMTP_FROM_NAME=${{ secrets.SMTP_FROM_NAME }}
             GITHUB_REPOSITORY=${{ needs.type-check.outputs.image_name_lower }}
             ENVEOF
