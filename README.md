@@ -91,7 +91,7 @@ Mở file `server/.env` và thay các giá trị sau:
 # BẮT BUỘC: Groq AI key (miễn phí tại https://console.groq.com)
 GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxx
 
-# Email cho tính năng quên mật khẩu (xem hướng dẫn SMTP bên dưới)
+# Email cho tính năng OTP (đăng ký + quên mật khẩu)
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-gmail-app-password
 ```
@@ -130,7 +130,7 @@ Tài khoản test sau khi seed: `test@example.com` / `password123`
 
 ## Cấu hình Email (SMTP)
 
-Email được dùng cho tính năng **quên mật khẩu** (gửi OTP). Nếu không cấu hình, tính năng này sẽ bị disable nhưng app vẫn chạy bình thường.
+Email được dùng cho tính năng **OTP đăng ký** và **quên mật khẩu**. Nếu không cấu hình SMTP, người dùng mới sẽ không đăng ký được vì hệ thống bắt buộc xác minh OTP qua email.
 
 ### SMTP là gì và tại sao cần nhiều biến?
 
@@ -320,7 +320,7 @@ cat ~/.ssh/vgfriend_deploy
 | `SMTP_PASS` | App Password (không phải mật khẩu Google) | `abcd efgh ijkl mnop` |
 | `SMTP_FROM_NAME` | Tên hiển thị | `VGfriend` |
 
-> Email là **optional** — nếu không thêm SMTP secrets, app vẫn deploy bình thường, chỉ tính năng quên mật khẩu bị disable.
+> Email gần như **bắt buộc** cho production vì luồng đăng ký cần OTP qua email.
 
 ### Bước 4: Chạy pipeline deploy
 
