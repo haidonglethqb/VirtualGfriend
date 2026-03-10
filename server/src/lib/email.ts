@@ -139,6 +139,85 @@ Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua emai
     return this.sendEmail({ to: email, subject, html, text });
   }
 
+  async sendRegistrationOTP(email: string, otp: string): Promise<boolean> {
+    const subject = 'Xác nhận đăng ký tài khoản - Amoura';
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
+          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #f4258c 0%, #8b5cf6 100%); padding: 40px 20px; text-align: center; }
+          .header h1 { color: white; margin: 0; font-size: 28px; }
+          .content { padding: 40px 30px; }
+          .otp-box { background: linear-gradient(135deg, #f4258c 0%, #8b5cf6 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; margin: 30px 0; }
+          .otp-code { font-size: 36px; font-weight: bold; letter-spacing: 8px; margin: 10px 0; }
+          .info { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
+          .warning { color: #f44336; font-weight: 500; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>💕 Amoura</h1>
+          </div>
+          <div class="content">
+            <h2 style="color: #333;">Xác nhận đăng ký tài khoản</h2>
+            <p style="color: #666; line-height: 1.6;">
+              Chào bạn,<br><br>
+              Cảm ơn bạn đã đăng ký tài khoản Amoura!
+              Sử dụng mã OTP bên dưới để xác nhận email của bạn:
+            </p>
+            
+            <div class="otp-box">
+              <div style="font-size: 14px; opacity: 0.9;">Mã xác nhận của bạn</div>
+              <div class="otp-code">${otp}</div>
+              <div style="font-size: 12px; opacity: 0.8; margin-top: 10px;">Có hiệu lực trong 10 phút</div>
+            </div>
+
+            <div class="info">
+              <p style="margin: 0; color: #666;">
+                <strong>Lưu ý:</strong>
+              </p>
+              <ul style="color: #666; margin: 10px 0;">
+                <li>Mã OTP này chỉ có hiệu lực trong <strong>10 phút</strong></li>
+                <li>Không chia sẻ mã này với bất kỳ ai</li>
+                <li>Nếu bạn không đăng ký tài khoản, vui lòng bỏ qua email này</li>
+              </ul>
+            </div>
+
+            <p class="warning" style="text-align: center; margin-top: 30px;">
+              ⚠️ Không chia sẻ mã OTP này với bất kỳ ai!
+            </p>
+          </div>
+          <div class="footer">
+            <p>Email này được gửi tự động, vui lòng không reply.</p>
+            <p style="margin-top: 10px;">© 2026 Amoura</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `
+Xác nhận đăng ký tài khoản Amoura
+
+Mã xác nhận của bạn: ${otp}
+
+Mã này có hiệu lực trong 10 phút.
+Không chia sẻ mã này với bất kỳ ai.
+
+Nếu bạn không đăng ký tài khoản, vui lòng bỏ qua email này.
+
+© 2026 Amoura
+    `;
+
+    return this.sendEmail({ to: email, subject, html, text });
+  }
+
   async sendPasswordResetSuccess(email: string): Promise<boolean> {
     const subject = 'Mật khẩu đã được đặt lại thành công - VGfriend';
     

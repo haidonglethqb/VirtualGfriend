@@ -8,7 +8,7 @@ export const PASSWORD_REQUIREMENTS = {
   REQUIRE_UPPERCASE: true,
   REQUIRE_LOWERCASE: true,
   REQUIRE_NUMBER: true,
-  REQUIRE_SPECIAL: false,
+  REQUIRE_SPECIAL: true,
 }
 
 export const PASSWORD_PATTERNS = {

@@ -10,6 +10,25 @@ import {
   Plus, X, Check, AlertTriangle, Megaphone, Server, HardDrive,
   Zap, Clock, Activity,
 } from 'lucide-react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale, LinearScale, BarElement, LineElement,
+  PointElement, ArcElement, Title, Tooltip, Legend, Filler,
+);
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -96,7 +115,7 @@ interface SystemInfo {
 }
 
 interface AnalyticsData {
-  dailyStats: Array<{ date: string; new_users: number; messages: number }>;
+  dailyStats: Array<{ date: string; new_users: number; messages: number; active_users: number }>;
   messageStats: Array<{ date: string; count: number }>;
   topUsers: Array<{ id: string; username: string | null; displayName: string | null; email: string; messageCount: number }>;
   premiumDistribution: Array<{ premiumTier: string; _count: number }>;
@@ -109,93 +128,11 @@ interface Pagination {
   totalPages: number;
 }
 
-// Simple Bar Chart Component (no external dependencies)
-function BarChart({ 
-  data, 
-  dataKey, 
-  color 
-}: { 
-  data: Array<{ date: string; [key: string]: string | number }>; 
-  dataKey: string; 
-  color: string 
-}) {
-  if (!data || data.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center text-gray-500">
-        No data available
-      </div>
-    );
-  }
-
-  const maxValue = Math.max(...data.map(d => Number(d[dataKey]) || 0), 1);
-  
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-  };
-
-  return (
-    <div className="h-full flex flex-col">
-      {/* Chart Area */}
-      <div className="flex-1 flex items-end gap-1 pb-8 relative">
-        {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-gray-500">
-          <span>{maxValue}</span>
-          <span>{Math.round(maxValue / 2)}</span>
-          <span>0</span>
-        </div>
-        
-        {/* Bars */}
-        <div className="flex-1 ml-14 flex items-end gap-1 h-full">
-          {data.map((item, idx) => {
-            const value = Number(item[dataKey]) || 0;
-            const heightPercent = (value / maxValue) * 100;
-            
-            return (
-              <div key={idx} className="flex-1 flex flex-col items-center group relative">
-                {/* Tooltip */}
-                <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
-                  <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm whitespace-nowrap shadow-xl">
-                    <p className="text-white font-medium">{value.toLocaleString()}</p>
-                    <p className="text-gray-400 text-xs">{formatDate(item.date)}</p>
-                  </div>
-                </div>
-                
-                {/* Bar */}
-                <div 
-                  className="w-full rounded-t-md transition-all duration-300 hover:opacity-80 cursor-pointer relative"
-                  style={{ 
-                    height: `${Math.max(heightPercent, 2)}%`,
-                    backgroundColor: color,
-                    minHeight: '4px'
-                  }}
-                >
-                  {/* Value label on hover */}
-                  {heightPercent > 15 && (
-                    <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white/80 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {value}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      
-      {/* X-axis labels */}
-      <div className="ml-14 flex gap-1">
-        {data.map((item, idx) => (
-          <div key={idx} className="flex-1 text-center">
-            <span className="text-xs text-gray-500 truncate block">
-              {data.length <= 14 ? formatDate(item.date) : (idx % Math.ceil(data.length / 7) === 0 ? formatDate(item.date) : '')}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+// Chart.js dark theme defaults
+const chartDefaults = {
+  color: '#9ca3af',
+  borderColor: 'rgba(255,255,255,0.06)',
+};
 
 // Pagination Controls Component
 function PaginationControls({ 
@@ -1246,36 +1183,229 @@ export default function AdminPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* User Growth Chart */}
-                  <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <Users className="w-5 h-5 text-blue-400" />
-                      New User Registrations
-                    </h3>
-                    <div className="h-64">
-                      <BarChart data={analytics.dailyStats} dataKey="new_users" color="#3b82f6" />
+                  {/* Summary Stats Cards */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
+                      <p className="text-sm text-gray-400 mb-1">New Users ({analyticsDays}d)</p>
+                      <p className="text-2xl font-bold text-blue-400">
+                        {analytics.dailyStats.reduce((acc, d) => acc + d.new_users, 0)}
+                      </p>
+                    </div>
+                    <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
+                      <p className="text-sm text-gray-400 mb-1">Messages ({analyticsDays}d)</p>
+                      <p className="text-2xl font-bold text-green-400">
+                        {analytics.messageStats.reduce((acc, d) => acc + d.count, 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
+                      <p className="text-sm text-gray-400 mb-1">Avg Messages/Day</p>
+                      <p className="text-2xl font-bold text-purple-400">
+                        {analytics.messageStats.length > 0
+                          ? Math.round(analytics.messageStats.reduce((acc, d) => acc + d.count, 0) / analytics.messageStats.length).toLocaleString()
+                          : 0}
+                      </p>
+                    </div>
+                    <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
+                      <p className="text-sm text-gray-400 mb-1">Avg Active Users/Day</p>
+                      <p className="text-2xl font-bold text-amber-400">
+                        {analytics.dailyStats.length > 0
+                          ? Math.round(analytics.dailyStats.reduce((acc, d) => acc + (d.active_users || 0), 0) / analytics.dailyStats.length)
+                          : 0}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Message Activity Chart */}
+                  {/* User Growth & Messages - Combined Line Chart */}
                   <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <MessageSquare className="w-5 h-5 text-green-400" />
-                      Message Activity
+                      <TrendingUp className="w-5 h-5 text-blue-400" />
+                      User Registrations & Messages
+                    </h3>
+                    <div className="h-72">
+                      <Line
+                        data={{
+                          labels: analytics.dailyStats.map(d => {
+                            const date = new Date(d.date);
+                            return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+                          }),
+                          datasets: [
+                            {
+                              label: 'New Users',
+                              data: analytics.dailyStats.map(d => d.new_users),
+                              borderColor: '#3b82f6',
+                              backgroundColor: 'rgba(59,130,246,0.1)',
+                              fill: true,
+                              tension: 0.4,
+                              pointRadius: 3,
+                              pointHoverRadius: 6,
+                              yAxisID: 'y',
+                            },
+                            {
+                              label: 'Messages',
+                              data: analytics.dailyStats.map(d => d.messages),
+                              borderColor: '#22c55e',
+                              backgroundColor: 'rgba(34,197,94,0.1)',
+                              fill: true,
+                              tension: 0.4,
+                              pointRadius: 3,
+                              pointHoverRadius: 6,
+                              yAxisID: 'y1',
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          interaction: { mode: 'index', intersect: false },
+                          plugins: {
+                            legend: { labels: { color: chartDefaults.color, usePointStyle: true, padding: 20 } },
+                            tooltip: {
+                              backgroundColor: '#1f2937',
+                              titleColor: '#fff',
+                              bodyColor: '#9ca3af',
+                              borderColor: '#374151',
+                              borderWidth: 1,
+                              padding: 12,
+                            },
+                          },
+                          scales: {
+                            x: { ticks: { color: chartDefaults.color }, grid: { color: chartDefaults.borderColor } },
+                            y: {
+                              type: 'linear', position: 'left',
+                              title: { display: true, text: 'New Users', color: '#3b82f6' },
+                              ticks: { color: '#3b82f6' },
+                              grid: { color: chartDefaults.borderColor },
+                              beginAtZero: true,
+                            },
+                            y1: {
+                              type: 'linear', position: 'right',
+                              title: { display: true, text: 'Messages', color: '#22c55e' },
+                              ticks: { color: '#22c55e' },
+                              grid: { drawOnChartArea: false },
+                              beginAtZero: true,
+                            },
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Active Users Bar Chart */}
+                  <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Activity className="w-5 h-5 text-amber-400" />
+                      Daily Active Users
                     </h3>
                     <div className="h-64">
-                      <BarChart data={analytics.messageStats} dataKey="count" color="#22c55e" />
+                      <Bar
+                        data={{
+                          labels: analytics.dailyStats.map(d => {
+                            const date = new Date(d.date);
+                            return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+                          }),
+                          datasets: [{
+                            label: 'Active Users',
+                            data: analytics.dailyStats.map(d => d.active_users || 0),
+                            backgroundColor: 'rgba(251,191,36,0.6)',
+                            borderColor: '#fbbf24',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                          }],
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                              backgroundColor: '#1f2937',
+                              titleColor: '#fff',
+                              bodyColor: '#9ca3af',
+                              borderColor: '#374151',
+                              borderWidth: 1,
+                            },
+                          },
+                          scales: {
+                            x: { ticks: { color: chartDefaults.color }, grid: { color: chartDefaults.borderColor } },
+                            y: { ticks: { color: chartDefaults.color }, grid: { color: chartDefaults.borderColor }, beginAtZero: true },
+                          },
+                        }}
+                      />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Premium Distribution - Doughnut */}
+                    <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-purple-400" />
+                        Premium Distribution
+                      </h3>
+                      {analytics.premiumDistribution.length > 0 ? (
+                        <div className="h-64 flex items-center justify-center">
+                          <Doughnut
+                            data={{
+                              labels: analytics.premiumDistribution.map(t => t.premiumTier),
+                              datasets: [{
+                                data: analytics.premiumDistribution.map(t => t._count),
+                                backgroundColor: [
+                                  'rgba(107,114,128,0.7)',  // FREE - gray
+                                  'rgba(59,130,246,0.7)',   // BASIC - blue
+                                  'rgba(168,85,247,0.7)',   // PRO - purple
+                                  'rgba(251,191,36,0.7)',   // ULTIMATE - yellow
+                                ],
+                                borderColor: [
+                                  '#6b7280',
+                                  '#3b82f6',
+                                  '#a855f7',
+                                  '#fbbf24',
+                                ],
+                                borderWidth: 2,
+                              }],
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: {
+                                  position: 'bottom',
+                                  labels: {
+                                    color: chartDefaults.color,
+                                    usePointStyle: true,
+                                    padding: 16,
+                                    font: { size: 13 },
+                                  },
+                                },
+                                tooltip: {
+                                  backgroundColor: '#1f2937',
+                                  titleColor: '#fff',
+                                  bodyColor: '#9ca3af',
+                                  borderColor: '#374151',
+                                  borderWidth: 1,
+                                  callbacks: {
+                                    label: (ctx) => {
+                                      const total = analytics.premiumDistribution.reduce((acc, t) => acc + t._count, 0);
+                                      const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0';
+                                      return ` ${ctx.label}: ${ctx.parsed} users (${pct}%)`;
+                                    },
+                                  },
+                                },
+                              },
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-center py-4">No premium users yet</p>
+                      )}
+                    </div>
+
                     {/* Top Users */}
                     <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
                       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Crown className="w-5 h-5 text-yellow-400" />
                         Top Users by Messages
                       </h3>
-                      <div className="space-y-3">
+                      <div className="space-y-3 max-h-64 overflow-y-auto">
                         {analytics.topUsers.map((user, idx) => (
                           <div key={user.id} className="flex items-center justify-between p-3 bg-gray-700/30 rounded-xl">
                             <div className="flex items-center gap-3">
@@ -1288,8 +1418,8 @@ export default function AdminPage() {
                                 {idx + 1}
                               </span>
                               <div>
-                                <p className="font-medium">{user.displayName || user.username || 'Anonymous'}</p>
-                                <p className="text-sm text-gray-400">{user.email}</p>
+                                <p className="font-medium text-sm">{user.displayName || user.username || 'Anonymous'}</p>
+                                <p className="text-xs text-gray-400">{user.email}</p>
                               </div>
                             </div>
                             <div className="text-right">
@@ -1301,64 +1431,6 @@ export default function AdminPage() {
                         {analytics.topUsers.length === 0 && (
                           <p className="text-gray-500 text-center py-4">No data available</p>
                         )}
-                      </div>
-                    </div>
-
-                    {/* Premium Distribution */}
-                    <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-purple-400" />
-                        Premium Distribution
-                      </h3>
-                      <div className="space-y-4">
-                        {analytics.premiumDistribution.length > 0 ? (
-                          <>
-                            {analytics.premiumDistribution.map((tier) => {
-                              const total = analytics.premiumDistribution.reduce((acc, t) => acc + t._count, 0);
-                              const percentage = total > 0 ? (tier._count / total) * 100 : 0;
-                              const tierColors: Record<string, string> = {
-                                FREE: 'bg-gray-500',
-                                BASIC: 'bg-blue-500',
-                                PRO: 'bg-purple-500',
-                                ULTIMATE: 'bg-gradient-to-r from-yellow-400 to-pink-500',
-                              };
-                              return (
-                                <div key={tier.premiumTier}>
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-sm font-medium">{tier.premiumTier}</span>
-                                    <span className="text-sm text-gray-400">{tier._count} users ({percentage.toFixed(1)}%)</span>
-                                  </div>
-                                  <div className="w-full h-3 bg-gray-700 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`h-full ${tierColors[tier.premiumTier] || 'bg-gray-500'} transition-all duration-500`}
-                                      style={{ width: `${percentage}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </>
-                        ) : (
-                          <p className="text-gray-500 text-center py-4">No premium users yet</p>
-                        )}
-                      </div>
-
-                      {/* Summary Stats */}
-                      <div className="mt-6 pt-4 border-t border-gray-700">
-                        <div className="grid grid-cols-2 gap-4 text-center">
-                          <div>
-                            <p className="text-2xl font-bold text-blue-400">
-                              {analytics.dailyStats.reduce((acc, d) => acc + d.new_users, 0)}
-                            </p>
-                            <p className="text-xs text-gray-500">New users ({analyticsDays}d)</p>
-                          </div>
-                          <div>
-                            <p className="text-2xl font-bold text-green-400">
-                              {analytics.messageStats.reduce((acc, d) => acc + d.count, 0).toLocaleString()}
-                            </p>
-                            <p className="text-xs text-gray-500">Messages ({analyticsDays}d)</p>
-                          </div>
-                        </div>
                       </div>
                     </div>
                   </div>
