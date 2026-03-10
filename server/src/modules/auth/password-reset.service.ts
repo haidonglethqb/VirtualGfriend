@@ -41,10 +41,11 @@ export const passwordResetService = {
     const otp = this.generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Invalidate old OTPs for this email
+    // Invalidate old PASSWORD_RESET OTPs for this email only
     await prisma.passwordResetOTP.updateMany({
       where: {
         email: email.toLowerCase(),
+        type: 'PASSWORD_RESET',
         used: false,
       },
       data: {
@@ -57,6 +58,7 @@ export const passwordResetService = {
       data: {
         email: email.toLowerCase(),
         otp,
+        type: 'PASSWORD_RESET',
         expiresAt,
       },
     });

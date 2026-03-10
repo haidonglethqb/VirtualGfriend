@@ -12,36 +12,55 @@ interface SendEmailOptions {
 
 class EmailService {
   private transporter: nodemailer.Transporter | null = null;
+  private initialized = false;
 
   constructor() {
     this.initializeTransporter();
   }
 
   private initializeTransporter() {
+    const user = process.env.SMTP_USER?.trim();
+    const pass = process.env.SMTP_PASS?.trim();
+
     const emailConfig = {
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      host: process.env.SMTP_HOST?.trim() || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      secure: process.env.SMTP_SECURE === 'true',
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user,
+        pass,
       },
     };
 
     // Only initialize if credentials are provided
-    if (emailConfig.auth.user && emailConfig.auth.pass) {
+    if (user && pass) {
       this.transporter = nodemailer.createTransport(emailConfig);
-      log.info('Service initialized');
+      this.initialized = true;
+      log.info('Service initialized with user:', user);
     } else {
-      log.warn('Service not configured - email sending disabled');
+      log.warn('Service not configured - SMTP_USER: ' + (user ? 'SET' : 'MISSING') + ', SMTP_PASS: ' + (pass ? 'SET' : 'MISSING'));
+    }
+  }
+
+  /**
+   * Lazy re-check: if not initialized at startup, try again now
+   * (handles case where env vars weren't ready at module load time)
+   */
+  private ensureInitialized() {
+    if (!this.initialized) {
+      log.info('Re-attempting SMTP initialization...');
+      this.initializeTransporter();
     }
   }
 
   isConfigured(): boolean {
+    this.ensureInitialized();
     return this.transporter !== null;
   }
 
   async sendEmail({ to, subject, html, text }: SendEmailOptions): Promise<boolean> {
+    this.ensureInitialized();
+
     if (!this.transporter) {
       log.error('Cannot send email - service not configured');
       return false;

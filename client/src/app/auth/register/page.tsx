@@ -101,6 +101,15 @@ export default function RegisterPage() {
       return;
     }
 
+    if (username && username.trim().length < 5) {
+      toast({
+        title: 'Tên người dùng không hợp lệ',
+        description: 'Tên người dùng phải có ít nhất 5 ký tự',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (password !== confirmPassword) {
       toast({
         title: 'Lỗi',
@@ -208,17 +217,17 @@ export default function RegisterPage() {
                     {/* Username field */}
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-300">
-                        Tên người dùng <span className="text-gray-600 text-xs">(tuỳ chọn)</span>
+                        Tên người dùng <span className="text-gray-600 text-xs">(tuỳ chọn, tối thiểu 5 ký tự)</span>
                       </label>
                       <div className={`relative rounded-xl transition-all duration-300 ${
                         focusedField === 'username' ? 'ring-2 ring-love/50' : ''
-                      }`}>
+                      } ${username && username.trim().length < 5 ? 'ring-2 ring-red-500/50' : ''}`}>
                         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
                           <User className="w-5 h-5" />
                         </div>
                         <input
                           type="text"
-                          placeholder="username"
+                          placeholder="username (tối thiểu 5 ký tự)"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
                           onFocus={() => setFocusedField('username')}
@@ -227,6 +236,12 @@ export default function RegisterPage() {
                           className="w-full h-11 sm:h-12 pl-12 pr-4 bg-white/[0.03] border border-white/[0.08] rounded-xl text-white placeholder:text-gray-600 outline-none transition-all duration-300 hover:bg-white/[0.05] focus:bg-white/[0.05] focus:border-love/30 disabled:opacity-50 text-sm sm:text-base"
                         />
                       </div>
+                      {username && username.trim().length < 5 && (
+                        <p className="text-xs text-red-400 flex items-center gap-1">
+                          <X className="w-3 h-3" />
+                          Tên người dùng phải có ít nhất 5 ký tự ({username.trim().length}/5)
+                        </p>
+                      )}
                     </div>
 
                     {/* Password field */}
@@ -353,7 +368,7 @@ export default function RegisterPage() {
                     {/* Submit button */}
                     <button
                       type="submit"
-                      disabled={isLoading || !passwordValidation.valid || !passwordsMatch}
+                      disabled={isLoading || !passwordValidation.valid || !passwordsMatch || (!!username && username.trim().length < 5)}
                       className="group relative w-full h-11 sm:h-12 rounded-xl bg-gradient-to-r from-love to-purple-500 text-white font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 shadow-lg shadow-love/25 hover:shadow-love/40 mt-4"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
