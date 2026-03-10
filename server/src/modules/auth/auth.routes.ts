@@ -33,6 +33,8 @@ const verifyOtpLimiter = rateLimit({
 
 // Public routes
 authRouter.post('/register', authController.register);
+authRouter.post('/verify-registration', verifyOtpLimiter, authController.verifyRegistration);
+authRouter.post('/resend-registration-otp', otpLimiter, authController.resendRegistrationOTP);
 authRouter.post('/login', loginLimiter, authController.login);
 authRouter.post('/refresh', authController.refreshToken);
 

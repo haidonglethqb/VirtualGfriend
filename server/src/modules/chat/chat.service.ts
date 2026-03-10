@@ -179,6 +179,32 @@ export const chatService = {
     });
     log.debug('AI response generated:', aiResponse.content.substring(0, 50));
 
+    // Save inline facts extracted by AI (runs in background)
+    if (aiResponse.inlineFacts && aiResponse.inlineFacts.length > 0) {
+      const inlineFacts = aiResponse.inlineFacts;
+      Promise.resolve().then(async () => {
+        for (const fact of inlineFacts) {
+          try {
+            const normalizedKey = fact.key
+              .toLowerCase()
+              .replace(/\s+/g, '_')
+              .replace(/[^a-z0-9_]/g, '');
+            const importance = factsLearningService.calculateImportance(fact.category, fact.value);
+            await prisma.characterFact.upsert({
+              where: { characterId_key: { characterId: data.characterId, key: normalizedKey } },
+              update: { value: fact.value, category: fact.category, importance, sourceType: 'ai_inline', updatedAt: new Date() },
+              create: { characterId: data.characterId, key: normalizedKey, value: fact.value, category: fact.category, importance, sourceType: 'ai_inline', learnedAt: new Date() },
+            });
+          } catch (err) {
+            log.error('Error saving inline fact:', err);
+          }
+        }
+        // Invalidate cache after saving facts
+        await cache.del(CacheKeys.characterWithFacts(data.characterId));
+        log.info('Saved ' + inlineFacts.length + ' inline facts');
+      }).catch(err => log.error('Inline facts save error:', err));
+    }
+
     // Save AI message
     const aiMessage = await prisma.message.create({
       data: {

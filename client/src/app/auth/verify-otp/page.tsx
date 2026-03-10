@@ -7,6 +7,7 @@ import { Shield, ArrowLeft, Loader2, RotateCcw, Heart, Clock } from 'lucide-reac
 import Link from 'next/link';
 import api from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthStore } from '@/store/auth-store';
 
 function LoadingOverlay() {
   return (
@@ -62,8 +63,11 @@ function VerifyOTPContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const completeRegistration = useAuthStore((state) => state.completeRegistration);
   
   const emailFromUrl = searchParams.get('email') || '';
+  const otpType = searchParams.get('type') || 'password-reset'; // 'registration' or 'password-reset'
+  const isRegistration = otpType === 'registration';
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -72,9 +76,9 @@ function VerifyOTPContent() {
 
   useEffect(() => {
     if (!emailFromUrl) {
-      router.push('/auth/forgot-password');
+      router.push(isRegistration ? '/auth/register' : '/auth/forgot-password');
     }
-  }, [emailFromUrl, router]);
+  }, [emailFromUrl, router, isRegistration]);
 
   useEffect(() => {
     if (countdown > 0) {
@@ -133,27 +137,39 @@ function VerifyOTPContent() {
     setIsLoading(true);
 
     try {
-      const response = await api.post<{ token?: string }>('/auth/verify-otp', {
-        email: emailFromUrl,
-        otp: otpString,
-      });
-
-      const token = response.data?.token || (response as unknown as Record<string, string>).token;
-      
-      if (token) {
+      if (isRegistration) {
+        // Registration flow: verify OTP and complete registration
+        await completeRegistration(emailFromUrl, otpString);
         toast({
-          title: 'Thành công',
-          description: 'Mã OTP xác thực thành công',
+          title: 'Đăng ký thành công!',
+          description: 'Chào mừng bạn đến với Amoura',
+          variant: 'love',
         });
-        router.push(
-          `/auth/reset-password?email=${encodeURIComponent(emailFromUrl)}&token=${token}`
-        );
+        router.push('/onboarding');
       } else {
-        toast({
-          title: 'Lỗi',
-          description: 'Không nhận được token. Vui lòng thử lại.',
-          variant: 'destructive',
+        // Password reset flow: verify OTP and get reset token
+        const response = await api.post<{ token?: string }>('/auth/verify-otp', {
+          email: emailFromUrl,
+          otp: otpString,
         });
+
+        const token = response.data?.token || (response as unknown as Record<string, string>).token;
+        
+        if (token) {
+          toast({
+            title: 'Thành công',
+            description: 'Mã OTP xác thực thành công',
+          });
+          router.push(
+            `/auth/reset-password?email=${encodeURIComponent(emailFromUrl)}&token=${token}`
+          );
+        } else {
+          toast({
+            title: 'Lỗi',
+            description: 'Không nhận được token. Vui lòng thử lại.',
+            variant: 'destructive',
+          });
+        }
       }
     } catch (error) {
       console.error('OTP Verification Error:', error);
@@ -174,7 +190,8 @@ function VerifyOTPContent() {
     setIsResending(true);
 
     try {
-      const response = await api.post('/auth/forgot-password', { email: emailFromUrl });
+      const endpoint = isRegistration ? '/auth/resend-registration-otp' : '/auth/forgot-password';
+      const response = await api.post(endpoint, { email: emailFromUrl });
 
       if (response.success) {
         toast({
@@ -244,7 +261,7 @@ function VerifyOTPContent() {
 
         {/* Back button */}
         <Link 
-          href="/auth/forgot-password"
+          href={isRegistration ? '/auth/register' : '/auth/forgot-password'}
           className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-white mb-6 transition-colors group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -267,9 +284,11 @@ function VerifyOTPContent() {
               >
                 <Shield className="w-8 h-8 text-purple-400" />
               </motion.div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Xác thực OTP</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+                {isRegistration ? 'Xác nhận email' : 'Xác thực OTP'}
+              </h1>
               <p className="text-gray-500">
-                Nhập mã 6 số được gửi đến
+                {isRegistration ? 'Nhập mã 6 số được gửi đến email để hoàn tất đăng ký' : 'Nhập mã 6 số được gửi đến'}
               </p>
               <p className="text-love font-medium mt-1">{emailFromUrl}</p>
             </div>

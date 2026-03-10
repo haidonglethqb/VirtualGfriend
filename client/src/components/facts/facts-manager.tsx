@@ -146,10 +146,12 @@ function FactItem({ fact, onEdit, onDelete }: FactItemProps) {
           'text-xs px-1.5 py-0.5 rounded',
           fact.source === 'user_added' ? 'bg-green-500/20 text-green-400' :
           fact.source === 'user_edited' ? 'bg-blue-500/20 text-blue-400' :
+          fact.source === 'ai_inline' ? 'bg-amber-500/20 text-amber-400' :
           'bg-purple-500/20 text-purple-400'
         )}>
           {fact.source === 'user_added' ? 'Tự thêm' :
-           fact.source === 'user_edited' ? 'Đã sửa' : 'AI học'}
+           fact.source === 'user_edited' ? 'Đã sửa' :
+           fact.source === 'ai_inline' ? 'AI tự động' : 'AI học'}
         </span>
         <span className="text-xs text-white/30">
           {new Date(fact.updatedAt).toLocaleDateString('vi-VN')}
