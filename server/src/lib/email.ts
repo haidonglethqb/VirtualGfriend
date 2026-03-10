@@ -37,6 +37,10 @@ class EmailService {
     }
   }
 
+  isConfigured(): boolean {
+    return this.transporter !== null;
+  }
+
   async sendEmail({ to, subject, html, text }: SendEmailOptions): Promise<boolean> {
     if (!this.transporter) {
       log.error('Cannot send email - service not configured');
