@@ -4,6 +4,7 @@ import { cache } from '../../lib/redis';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { createModuleLogger } from '../../lib/logger';
+import { AppError } from '../../middlewares/error.middleware';
 
 const log = createModuleLogger('PasswordReset');
 
@@ -32,6 +33,10 @@ export const passwordResetService = {
       };
     }
 
+    if (!emailService.isConfigured()) {
+      throw new AppError('Email service is not configured', 503, 'EMAIL_SERVICE_UNAVAILABLE');
+    }
+
     // Generate OTP
     const otp = this.generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -48,7 +53,7 @@ export const passwordResetService = {
     });
 
     // Save new OTP
-    await prisma.passwordResetOTP.create({
+    const createdOtp = await prisma.passwordResetOTP.create({
       data: {
         email: email.toLowerCase(),
         otp,
@@ -60,7 +65,11 @@ export const passwordResetService = {
     const sent = await emailService.sendOTP(email, otp);
 
     if (!sent) {
-      throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
+      await prisma.passwordResetOTP.update({
+        where: { id: createdOtp.id },
+        data: { used: true },
+      });
+      throw new AppError('Không thể gửi email. Vui lòng thử lại sau.', 503, 'EMAIL_SEND_FAILED');
     }
 
     return {
@@ -214,6 +223,10 @@ export const passwordResetService = {
    * Send OTP for registration email verification
    */
   async sendRegistrationOTP(email: string): Promise<{ success: boolean; message: string }> {
+    if (!emailService.isConfigured()) {
+      throw new AppError('Email service is not configured', 503, 'EMAIL_SERVICE_UNAVAILABLE');
+    }
+
     // Generate OTP
     const otp = this.generateOTP();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
@@ -231,7 +244,7 @@ export const passwordResetService = {
     });
 
     // Save new OTP
-    await prisma.passwordResetOTP.create({
+    const createdOtp = await prisma.passwordResetOTP.create({
       data: {
         email: email.toLowerCase(),
         otp,
@@ -244,7 +257,11 @@ export const passwordResetService = {
     const sent = await emailService.sendRegistrationOTP(email, otp);
 
     if (!sent) {
-      throw new Error('Không thể gửi email xác nhận. Vui lòng thử lại sau.');
+      await prisma.passwordResetOTP.update({
+        where: { id: createdOtp.id },
+        data: { used: true },
+      });
+      throw new AppError('Không thể gửi email xác nhận. Vui lòng thử lại sau.', 503, 'EMAIL_SEND_FAILED');
     }
 
     return {
