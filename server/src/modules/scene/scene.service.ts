@@ -1,7 +1,8 @@
 import { prisma, RelationshipStage, PremiumTier } from '../../lib/prisma';
 import { cache } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
-import { RELATIONSHIP_THRESHOLDS, SCENE_PROGRESSION, PREMIUM_FEATURES } from '../../lib/constants';
+import { RELATIONSHIP_THRESHOLDS, SCENE_PROGRESSION } from '../../lib/constants';
+import { getTierConfig, PremiumTier as ConfigPremiumTier } from '../admin/tier-config.service';
 
 // Scenes rarely change, cache for 1 hour
 const SCENE_CACHE_TTL = 3600;
@@ -25,6 +26,62 @@ const STAGE_ORDER: RelationshipStage[] = [
 
 function isStageReached(currentStage: RelationshipStage, requiredStage: RelationshipStage): boolean {
   return STAGE_ORDER.indexOf(currentStage) >= STAGE_ORDER.indexOf(requiredStage);
+}
+
+function getSceneLockState(params: {
+  isDefault: boolean;
+  isManuallyUnlocked: boolean;
+  stageReached: boolean;
+  premiumOk: boolean;
+  unlockMethod: string;
+  unlockValue: number;
+  characterLevel: number;
+  requiredStage: string | null;
+}) {
+  const {
+    isDefault,
+    isManuallyUnlocked,
+    stageReached,
+    premiumOk,
+    unlockMethod,
+    unlockValue,
+    characterLevel,
+    requiredStage,
+  } = params;
+
+  if (isDefault || isManuallyUnlocked) {
+    return { isUnlocked: true, lockReason: null as string | null };
+  }
+
+  if (!stageReached) {
+    return { isUnlocked: false, lockReason: `Yeu cau giai doan: ${requiredStage}` };
+  }
+
+  if (!premiumOk) {
+    return { isUnlocked: false, lockReason: 'Yeu cau goi Premium' };
+  }
+
+  if (unlockMethod === 'level') {
+    if (characterLevel < unlockValue) {
+      return { isUnlocked: false, lockReason: `Yeu cau level ${unlockValue}` };
+    }
+    return { isUnlocked: true, lockReason: null };
+  }
+
+  if (unlockMethod === 'purchase') {
+    return { isUnlocked: false, lockReason: 'Can mo khoa bang gems' };
+  }
+
+  return { isUnlocked: true, lockReason: null };
+}
+
+async function canAccessPremiumScenesByTier(
+  tier: PremiumTier | null | undefined,
+  isPremiumFlag?: boolean | null,
+): Promise<boolean> {
+  const resolvedTier = (tier || (isPremiumFlag ? 'BASIC' : 'FREE')) as ConfigPremiumTier;
+  const config = await getTierConfig(resolvedTier);
+  return config.canAccessPremiumScenes;
 }
 
 export const sceneService = {
@@ -53,19 +110,29 @@ export const sceneService = {
 
     const unlockedSceneIds = new Set(character?.scenes.map((s) => s.sceneId) || []);
     const currentStage = character ? getRelationshipStage(character.affection) : 'STRANGER';
-    const userTier = user?.premiumTier || 'FREE';
+    const characterLevel = character?.level ?? 1;
+    const canAccessPremiumScenes = await canAccessPremiumScenesByTier(user?.premiumTier, user?.isPremium);
 
     return scenes.map((scene) => {
       const isManuallyUnlocked = unlockedSceneIds.has(scene.id);
       const stageReached = scene.requiredStage ? isStageReached(currentStage, scene.requiredStage as RelationshipStage) : true;
-      const premiumOk = !scene.requiresPremium || user?.isPremium || userTier !== 'FREE';
+      const premiumOk = !scene.requiresPremium || canAccessPremiumScenes;
+      const lockState = getSceneLockState({
+        isDefault: scene.isDefault,
+        isManuallyUnlocked,
+        stageReached,
+        premiumOk,
+        unlockMethod: scene.unlockMethod,
+        unlockValue: scene.unlockValue,
+        characterLevel,
+        requiredStage: scene.requiredStage,
+      });
       
       return {
         ...scene,
-        isUnlocked: scene.isDefault || isManuallyUnlocked || (stageReached && premiumOk),
-        isLocked: !scene.isDefault && !isManuallyUnlocked && (!stageReached || !premiumOk),
-        lockReason: !stageReached ? `Yêu cầu giai đoạn: ${scene.requiredStage}` : 
-                   !premiumOk ? 'Yêu cầu gói Premium' : null,
+        isUnlocked: lockState.isUnlocked,
+        isLocked: !lockState.isUnlocked,
+        lockReason: lockState.lockReason,
         currentStage,
         requiredStage: scene.requiredStage,
       };
@@ -112,7 +179,9 @@ export const sceneService = {
       }),
       prisma.character.findFirst({
         where: { userId, isActive: true },
-        select: { id: true, affection: true },
+        include: {
+          scenes: { select: { sceneId: true } },
+        },
       }),
     ]);
 
@@ -121,25 +190,34 @@ export const sceneService = {
     }
 
     const currentStage = getRelationshipStage(character.affection);
-    const allowedStages = STAGE_ORDER.slice(0, STAGE_ORDER.indexOf(currentStage) + 1);
-    const isPremium = user?.isPremium || (user?.premiumTier && user.premiumTier !== 'FREE');
+    const characterLevel = character.level;
+    const canAccessPremiumScenes = await canAccessPremiumScenesByTier(user?.premiumTier, user?.isPremium);
+    const unlockedSceneIds = new Set(character.scenes.map((s) => s.sceneId));
 
-    // Single query with OR: default scenes OR unlocked scenes OR stage-allowed scenes
-    return prisma.scene.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          { isDefault: true },
-          { characterScenes: { some: { characterId: character.id } } },
-          { 
-            AND: [
-              { requiredStage: { in: allowedStages } },
-              isPremium ? {} : { requiresPremium: false },
-            ]
-          },
-        ],
-      },
-      orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
+    const scenes = await cache.getOrSet(
+      'scenes:all_active',
+      () => prisma.scene.findMany({
+        where: { isActive: true },
+        orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }],
+      }),
+      SCENE_CACHE_TTL,
+    );
+
+    return scenes.filter((scene) => {
+      const isManuallyUnlocked = unlockedSceneIds.has(scene.id);
+      const stageReached = scene.requiredStage ? isStageReached(currentStage, scene.requiredStage as RelationshipStage) : true;
+      const premiumOk = !scene.requiresPremium || canAccessPremiumScenes;
+      const lockState = getSceneLockState({
+        isDefault: scene.isDefault,
+        isManuallyUnlocked,
+        stageReached,
+        premiumOk,
+        unlockMethod: scene.unlockMethod,
+        unlockValue: scene.unlockValue,
+        characterLevel,
+        requiredStage: scene.requiredStage,
+      });
+      return lockState.isUnlocked;
     });
   },
 
@@ -177,8 +255,8 @@ export const sceneService = {
 
     // Check premium requirement
     if (scene.requiresPremium) {
-      const isPremium = user?.isPremium || (user?.premiumTier && user.premiumTier !== 'FREE');
-      if (!isPremium) {
+      const canAccessPremiumScenes = await canAccessPremiumScenesByTier(user?.premiumTier, user?.isPremium);
+      if (!canAccessPremiumScenes) {
         throw new AppError('Premium subscription required for this scene', 403, 'PREMIUM_REQUIRED');
       }
     }
@@ -254,8 +332,8 @@ export const sceneService = {
 
     // Check premium requirement
     if (scene.requiresPremium) {
-      const isPremium = user?.isPremium || (user?.premiumTier && user.premiumTier !== 'FREE');
-      if (!isPremium) {
+      const canAccessPremiumScenes = await canAccessPremiumScenesByTier(user?.premiumTier, user?.isPremium);
+      if (!canAccessPremiumScenes) {
         throw new AppError('Premium subscription required for this scene', 403, 'PREMIUM_REQUIRED');
       }
     }
@@ -276,15 +354,23 @@ export const sceneService = {
       const unlocked = await prisma.characterScene.findUnique({
         where: { characterId_sceneId: { characterId: character.id, sceneId } },
       });
+      const currentStage = getRelationshipStage(character.affection);
+      const stageReached = scene.requiredStage ? isStageReached(currentStage, scene.requiredStage as RelationshipStage) : true;
+      const canAccessPremiumScenes = await canAccessPremiumScenesByTier(user?.premiumTier, user?.isPremium);
+      const premiumOk = !scene.requiresPremium || canAccessPremiumScenes;
+      const lockState = getSceneLockState({
+        isDefault: scene.isDefault,
+        isManuallyUnlocked: Boolean(unlocked),
+        stageReached,
+        premiumOk,
+        unlockMethod: scene.unlockMethod,
+        unlockValue: scene.unlockValue,
+        characterLevel: character.level,
+        requiredStage: scene.requiredStage,
+      });
 
-      // If not manually unlocked, check if stage allows it
-      if (!unlocked && scene.requiredStage) {
-        const currentStage = getRelationshipStage(character.affection);
-        if (!isStageReached(currentStage, scene.requiredStage as RelationshipStage)) {
-          throw new AppError('Scene not unlocked', 400, 'SCENE_NOT_UNLOCKED');
-        }
-      } else if (!unlocked) {
-        throw new AppError('Scene not unlocked', 400, 'SCENE_NOT_UNLOCKED');
+      if (!lockState.isUnlocked) {
+        throw new AppError(lockState.lockReason || 'Scene not unlocked', 400, 'SCENE_NOT_UNLOCKED');
       }
     }
 
@@ -305,14 +391,14 @@ export const sceneService = {
       select: { isPremium: true, premiumTier: true },
     });
 
-    const isPremium = user?.isPremium || (user?.premiumTier && user.premiumTier !== 'FREE');
+    const canAccessPremiumScenes = await canAccessPremiumScenesByTier(user?.premiumTier, user?.isPremium);
 
     // Get scenes that require exactly this stage
     const scenes = await prisma.scene.findMany({
       where: {
         isActive: true,
         requiredStage: newStage,
-        ...(isPremium ? {} : { requiresPremium: false }),
+        ...(canAccessPremiumScenes ? {} : { requiresPremium: false }),
       },
     });
 

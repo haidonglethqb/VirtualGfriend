@@ -7,9 +7,10 @@ import {
   Check, X, Mail, ExternalLink, Loader2, Mic, Paperclip
 } from 'lucide-react';
 import AppLayout from '@/components/layout/app-layout';
-import { useAuthStore } from '@/store/auth-store';
 import { PremiumBadge } from '@/components/PremiumGate';
-import { isVipTier, PREMIUM_FEATURES, TIER_INFO, type PremiumTier } from '@/lib/premium';
+import { useLanguageStore } from '@/store/language-store';
+import { usePremiumStore } from '@/store/premium-store';
+import { type PremiumTier, type PremiumFeatures } from '@/lib/premium';
 import api from '@/services/api';
 
 interface PremiumStatus {
@@ -38,26 +39,112 @@ interface PremiumStatus {
   };
 }
 
-// Feature comparison data
-const PLAN_FEATURES = [
-  { key: 'messages', label: 'Tin nhắn/ngày', free: 'Không giới hạn', vip: 'Không giới hạn', icon: MessageCircle },
-  { key: 'characters', label: 'Số nhân vật', free: '1', vip: '5', icon: Users },
-  { key: 'voice', label: 'Gửi giọng nói', free: 'Không', vip: 'Có', icon: Mic, freeHasX: true },
-  { key: 'images', label: 'Gửi ảnh & video', free: 'Không', vip: 'Có', icon: Paperclip, freeHasX: true },
-  { key: 'stickers', label: 'Sticker độc quyền', free: 'Không', vip: 'Có', icon: Sparkles, freeHasX: true },
-  { key: 'ads', label: 'Quảng cáo', free: 'Có', vip: 'Không', icon: Image, freeHasX: true },
-  { key: 'gifts', label: 'Quà tặng Premium', free: 'Không', vip: 'Đầy đủ', icon: Crown, freeHasX: true },
-  { key: 'scenes', label: 'Khung cảnh độc quyền', free: 'Không', vip: 'Đầy đủ', icon: Image, freeHasX: true },
-];
+function formatFeatureValue(value: boolean | number, isVi: boolean): string {
+  if (typeof value === 'boolean') {
+    return value ? (isVi ? 'Co' : 'Yes') : (isVi ? 'Khong' : 'No');
+  }
+  if (value === -1) {
+    return isVi ? 'Khong gioi han' : 'Unlimited';
+  }
+  return String(value);
+}
+
+function getPlanFeatures(isVi: boolean, freeConfig: PremiumFeatures, vipConfig: PremiumFeatures) {
+  return [
+    {
+      key: 'messages',
+      label: isVi ? 'Tin nhan/ngay' : 'Messages/day',
+      free: formatFeatureValue(freeConfig.maxMessagesPerDay, isVi),
+      vip: formatFeatureValue(vipConfig.maxMessagesPerDay, isVi),
+      icon: MessageCircle,
+      freeHasX: false,
+      vipHasX: false,
+    },
+    {
+      key: 'characters',
+      label: isVi ? 'So nhan vat' : 'Character slots',
+      free: formatFeatureValue(freeConfig.maxCharacters, isVi),
+      vip: formatFeatureValue(vipConfig.maxCharacters, isVi),
+      icon: Users,
+      freeHasX: false,
+      vipHasX: false,
+    },
+    {
+      key: 'voice',
+      label: isVi ? 'Gui giong noi' : 'Voice messages',
+      free: formatFeatureValue(freeConfig.voiceMessages, isVi),
+      vip: formatFeatureValue(vipConfig.voiceMessages, isVi),
+      icon: Mic,
+      freeHasX: !freeConfig.voiceMessages,
+      vipHasX: !vipConfig.voiceMessages,
+    },
+    {
+      key: 'images',
+      label: isVi ? 'Gui anh & video' : 'Send images & videos',
+      free: formatFeatureValue(freeConfig.sendImages && freeConfig.sendVideos, isVi),
+      vip: formatFeatureValue(vipConfig.sendImages && vipConfig.sendVideos, isVi),
+      icon: Paperclip,
+      freeHasX: !(freeConfig.sendImages && freeConfig.sendVideos),
+      vipHasX: !(vipConfig.sendImages && vipConfig.sendVideos),
+    },
+    {
+      key: 'stickers',
+      label: isVi ? 'Sticker doc quyen' : 'Premium stickers',
+      free: formatFeatureValue(freeConfig.sendStickers, isVi),
+      vip: formatFeatureValue(vipConfig.sendStickers, isVi),
+      icon: Sparkles,
+      freeHasX: !freeConfig.sendStickers,
+      vipHasX: !vipConfig.sendStickers,
+    },
+    {
+      key: 'ads',
+      label: isVi ? 'Quang cao' : 'Ads',
+      free: freeConfig.adFree ? (isVi ? 'An' : 'Hidden') : (isVi ? 'Hien' : 'Shown'),
+      vip: vipConfig.adFree ? (isVi ? 'An' : 'Hidden') : (isVi ? 'Hien' : 'Shown'),
+      icon: Image,
+      freeHasX: !freeConfig.adFree,
+      vipHasX: !vipConfig.adFree,
+    },
+    {
+      key: 'gifts',
+      label: isVi ? 'Qua tang Premium' : 'Premium gifts',
+      free: formatFeatureValue(freeConfig.canAccessPremiumGifts, isVi),
+      vip: formatFeatureValue(vipConfig.canAccessPremiumGifts, isVi),
+      icon: Crown,
+      freeHasX: !freeConfig.canAccessPremiumGifts,
+      vipHasX: !vipConfig.canAccessPremiumGifts,
+    },
+    {
+      key: 'scenes',
+      label: isVi ? 'Khung canh doc quyen' : 'Premium scenes',
+      free: formatFeatureValue(freeConfig.canAccessPremiumScenes, isVi),
+      vip: formatFeatureValue(vipConfig.canAccessPremiumScenes, isVi),
+      icon: Image,
+      freeHasX: !freeConfig.canAccessPremiumScenes,
+      vipHasX: !vipConfig.canAccessPremiumScenes,
+    },
+  ];
+}
 
 export default function SubscriptionPage() {
-  const { user } = useAuthStore();
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
+  const { allTierConfigs, fetchTierConfigs, lastFetchedAt } = usePremiumStore();
+  const freeConfig = allTierConfigs.FREE;
+  const vipConfig = allTierConfigs.BASIC;
+  const planFeatures = getPlanFeatures(isVi, freeConfig, vipConfig);
   const [status, setStatus] = useState<PremiumStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchPremiumStatus();
   }, []);
+
+  useEffect(() => {
+    if (!lastFetchedAt) {
+      void fetchTierConfigs();
+    }
+  }, [fetchTierConfigs, lastFetchedAt]);
 
   async function fetchPremiumStatus() {
     try {
@@ -73,7 +160,7 @@ export default function SubscriptionPage() {
   }
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('vi-VN', {
+    return new Date(dateStr).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -89,8 +176,8 @@ export default function SubscriptionPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <h1 className="text-2xl font-bold mb-2">Gói Đăng Ký</h1>
-          <p className="text-[#ba9cab]">Nâng cấp để trải nghiệm đầy đủ tính năng</p>
+          <h1 className="text-2xl font-bold mb-2">{isVi ? 'Goi Dang Ky' : 'Subscription Plans'}</h1>
+          <p className="text-[#ba9cab]">{isVi ? 'Nang cap de mo khoa day du tinh nang' : 'Upgrade to unlock the full experience'}</p>
         </motion.div>
 
         {loading ? (
@@ -108,35 +195,35 @@ export default function SubscriptionPage() {
             >
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Crown className="w-5 h-5 text-love" />
-                Trạng thái hiện tại
+                {isVi ? 'Trang thai hien tai' : 'Current status'}
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Tier Info */}
                 <div className="bg-[#251820]/50 rounded-xl p-4">
-                  <p className="text-sm text-[#ba9cab] mb-1">Gói của bạn</p>
+                  <p className="text-sm text-[#ba9cab] mb-1">{isVi ? 'Goi cua ban' : 'Your plan'}</p>
                   <div className="flex items-center gap-2">
                     <PremiumBadge tier={status?.tier} showFree />
                   </div>
                   {status?.expiresAt && (
                     <p className="text-xs text-[#ba9cab] mt-2">
                       {status.expired ? (
-                        <span className="text-red-400">Đã hết hạn</span>
+                        <span className="text-red-400">{isVi ? 'Da het han' : 'Expired'}</span>
                       ) : (
-                        <>Hết hạn: {formatDate(status.expiresAt)} ({status.daysRemaining} ngày)</>
+                        <>{isVi ? 'Het han' : 'Expires'}: {formatDate(status.expiresAt)} ({status.daysRemaining} {isVi ? 'ngay' : 'days'})</>
                       )}
                     </p>
                   )}
                   {status?.isVip && !status?.expiresAt && (
-                    <p className="text-xs text-green-400 mt-2">Vĩnh viễn</p>
+                    <p className="text-xs text-green-400 mt-2">{isVi ? 'Vinh vien' : 'Lifetime'}</p>
                   )}
                 </div>
 
                 {/* Message Usage */}
                 <div className="bg-[#251820]/50 rounded-xl p-4">
-                  <p className="text-sm text-[#ba9cab] mb-1">Tin nhắn hôm nay</p>
+                  <p className="text-sm text-[#ba9cab] mb-1">{isVi ? 'Tin nhan hom nay' : 'Messages today'}</p>
                   {status?.usage.isUnlimitedMessages ? (
-                    <p className="text-xl font-bold text-love">Không giới hạn</p>
+                    <p className="text-xl font-bold text-love">{isVi ? 'Khong gioi han' : 'Unlimited'}</p>
                   ) : (
                     <>
                       <p className="text-xl font-bold">
@@ -151,7 +238,7 @@ export default function SubscriptionPage() {
                         />
                       </div>
                       <p className="text-xs text-[#ba9cab] mt-1">
-                        Còn lại: {status?.usage.messagesRemaining} tin
+                        {isVi ? 'Con lai' : 'Remaining'}: {status?.usage.messagesRemaining} {isVi ? 'tin' : 'messages'}
                       </p>
                     </>
                   )}
@@ -159,16 +246,16 @@ export default function SubscriptionPage() {
 
                 {/* Character Usage */}
                 <div className="bg-[#251820]/50 rounded-xl p-4">
-                  <p className="text-sm text-[#ba9cab] mb-1">Nhân vật</p>
+                  <p className="text-sm text-[#ba9cab] mb-1">{isVi ? 'Nhan vat' : 'Characters'}</p>
                   {status?.usage.charactersLimit === -1 ? (
-                    <p className="text-xl font-bold text-love">Không giới hạn</p>
+                    <p className="text-xl font-bold text-love">{isVi ? 'Khong gioi han' : 'Unlimited'}</p>
                   ) : (
                     <>
                       <p className="text-xl font-bold">
                         {status?.usage.charactersUsed}/{status?.usage.charactersLimit}
                       </p>
                       <p className="text-xs text-[#ba9cab] mt-1">
-                        Còn lại: {status?.usage.charactersRemaining} slot
+                        {isVi ? 'Con lai' : 'Remaining'}: {status?.usage.charactersRemaining} {isVi ? 'slot' : 'slots'}
                       </p>
                     </>
                   )}
@@ -186,13 +273,13 @@ export default function SubscriptionPage() {
               {/* FREE Plan */}
               <div className="glass rounded-2xl p-6 border border-[#3a2832]">
                 <div className="text-center mb-6">
-                  <h3 className="text-xl font-bold mb-2">Miễn Phí</h3>
+                  <h3 className="text-xl font-bold mb-2">{isVi ? 'Mien Phi' : 'Free'}</h3>
                   <p className="text-3xl font-bold">0đ</p>
-                  <p className="text-sm text-[#ba9cab]">Mãi mãi</p>
+                  <p className="text-sm text-[#ba9cab]">{isVi ? 'Mai mai' : 'Forever'}</p>
                 </div>
 
                 <ul className="space-y-3 mb-6">
-                  {PLAN_FEATURES.map((feature) => (
+                  {planFeatures.map((feature) => (
                     <li key={feature.key} className="flex items-center gap-3">
                       {feature.freeHasX ? (
                         <X className="w-5 h-5 text-red-400 flex-shrink-0" />
@@ -211,7 +298,7 @@ export default function SubscriptionPage() {
                     disabled
                     className="w-full py-3 rounded-xl bg-[#3a2832] text-[#ba9cab] font-medium cursor-not-allowed"
                   >
-                    Gói hiện tại
+                    {isVi ? 'Goi hien tai' : 'Current plan'}
                   </button>
                 )}
               </div>
@@ -219,7 +306,7 @@ export default function SubscriptionPage() {
               {/* VIP Plan */}
               <div className="glass rounded-2xl p-6 border-2 border-love relative overflow-hidden">
                 <div className="absolute top-0 right-0 bg-love text-white text-xs px-3 py-1 rounded-bl-lg font-medium">
-                  Khuyên dùng
+                  {isVi ? 'Khuyen dung' : 'Recommended'}
                 </div>
 
                 <div className="text-center mb-6">
@@ -228,13 +315,17 @@ export default function SubscriptionPage() {
                     VIP Premium
                   </h3>
                   <p className="text-3xl font-bold text-love">99.000đ</p>
-                  <p className="text-sm text-[#ba9cab]">/tháng</p>
+                  <p className="text-sm text-[#ba9cab]">{isVi ? '/thang' : '/month'}</p>
                 </div>
 
                 <ul className="space-y-3 mb-6">
-                  {PLAN_FEATURES.map((feature) => (
+                  {planFeatures.map((feature) => (
                     <li key={feature.key} className="flex items-center gap-3">
-                      <Check className="w-5 h-5 text-love flex-shrink-0" />
+                      {feature.vipHasX ? (
+                        <X className="w-5 h-5 text-red-400 flex-shrink-0" />
+                      ) : (
+                        <Check className="w-5 h-5 text-love flex-shrink-0" />
+                      )}
                       <span className="text-sm">
                         {feature.label}: <span className="text-love font-medium">{feature.vip}</span>
                       </span>
@@ -248,7 +339,7 @@ export default function SubscriptionPage() {
                     className="w-full py-3 rounded-xl bg-love/20 text-love font-medium cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <Crown className="w-4 h-4" />
-                    Đang sử dụng
+                    {isVi ? 'Dang su dung' : 'Active plan'}
                   </button>
                 ) : (
                   <a
@@ -256,7 +347,7 @@ export default function SubscriptionPage() {
                     className="w-full py-3 rounded-xl bg-love hover:bg-love/90 text-white font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     <Crown className="w-4 h-4" />
-                    Liên hệ nâng cấp
+                    {isVi ? 'Lien he nang cap' : 'Contact for upgrade'}
                   </a>
                 )}
               </div>
@@ -272,11 +363,13 @@ export default function SubscriptionPage() {
             >
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Mail className="w-5 h-5 text-love" />
-                Liên hệ nâng cấp VIP
+                {isVi ? 'Lien he nang cap VIP' : 'Contact for VIP upgrade'}
               </h2>
 
               <p className="text-[#ba9cab] mb-4">
-                Để nâng cấp lên VIP Premium, vui lòng liên hệ với chúng tôi qua các kênh sau:
+                {isVi
+                  ? 'De nang cap len VIP Premium, vui long lien he qua cac kenh sau:'
+                  : 'To upgrade to VIP Premium, please contact us via these channels:'}
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -311,8 +404,10 @@ export default function SubscriptionPage() {
 
               <div className="mt-6 p-4 bg-love/10 rounded-xl border border-love/30">
                 <p className="text-sm">
-                  <strong className="text-love">Lưu ý:</strong> Sau khi thanh toán, gửi ảnh chụp màn hình kèm email đăng ký của bạn.
-                  Chúng tôi sẽ kích hoạt VIP trong vòng 24 giờ.
+                  <strong className="text-love">{isVi ? 'Luu y:' : 'Note:'}</strong>{' '}
+                  {isVi
+                    ? 'Sau khi thanh toan, gui anh chup man hinh kem email dang ky cua ban. Chung toi se kich hoat VIP trong 24 gio.'
+                    : 'After payment, send your receipt screenshot with the registered email. We will activate VIP within 24 hours.'}
                 </p>
               </div>
             </motion.div>

@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Heart, MessageCircle, Gift, Target, ImageIcon,
-  Settings, Star, LogOut, Users, Trophy, Crown
+  Settings, Star, LogOut, Users, Trophy, Crown, Languages
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
+import { useLanguageStore } from '@/store/language-store';
 import { formatNumber } from '@/lib/utils';
 import api from '@/services/api';
 import { socketService } from '@/services/socket';
@@ -21,20 +22,59 @@ interface AppLayoutProps {
 }
 
 const navItems = [
-  { href: '/dashboard', icon: Heart, label: 'Trang chủ' },
-  { href: '/chat', icon: MessageCircle, label: 'Trò chuyện' },
-  { href: '/messages', icon: Users, label: 'Nhắn tin' },
-  { href: '/quests', icon: Target, label: 'Nhiệm vụ' },
-  { href: '/shop', icon: Gift, label: 'Cửa hàng' },
-  { href: '/leaderboard', icon: Trophy, label: 'Xếp hạng' },
-  { href: '/memories', icon: ImageIcon, label: 'Kỷ niệm' },
+  { href: '/dashboard', icon: Heart, key: 'dashboard' },
+  { href: '/chat', icon: MessageCircle, key: 'chat' },
+  { href: '/messages', icon: Users, key: 'messages' },
+  { href: '/quests', icon: Target, key: 'quests' },
+  { href: '/shop', icon: Gift, key: 'shop' },
+  { href: '/leaderboard', icon: Trophy, key: 'leaderboard' },
+  { href: '/memories', icon: ImageIcon, key: 'memories' },
 ];
+
+const APP_LAYOUT_I18N = {
+  vi: {
+    nav: {
+      dashboard: 'Trang chủ',
+      chat: 'Trò chuyện',
+      messages: 'Nhắn tin',
+      quests: 'Nhiệm vụ',
+      shop: 'Cửa hàng',
+      leaderboard: 'Xếp hạng',
+      memories: 'Kỷ niệm',
+    },
+    level: 'Cấp',
+    navigateTitle: 'Điều hướng',
+    navigateSubtitle: 'Chọn trang bạn muốn',
+    subscription: 'Gói đăng ký',
+    settings: 'Cài đặt',
+    logout: 'Đăng xuất',
+  },
+  en: {
+    nav: {
+      dashboard: 'Dashboard',
+      chat: 'Chat',
+      messages: 'Messages',
+      quests: 'Quests',
+      shop: 'Shop',
+      leaderboard: 'Leaderboard',
+      memories: 'Memories',
+    },
+    level: 'Level',
+    navigateTitle: 'Navigation',
+    navigateSubtitle: 'Choose your destination',
+    subscription: 'Subscription',
+    settings: 'Settings',
+    logout: 'Logout',
+  },
+} as const;
 
 export default function AppLayout({ children, showSidebar = true }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout, isAuthenticated } = useAuthStore();
   const { character } = useCharacterStore();
+  const { language, toggleLanguage } = useLanguageStore();
+  const t = APP_LAYOUT_I18N[language];
 
   const [unreadDmCount, setUnreadDmCount] = useState(0);
   const [activeQuestCount, setActiveQuestCount] = useState(0);
@@ -128,7 +168,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                 }`}
               >
                 <item.icon className="w-4 h-4" />
-                <span>{item.label}</span>
+                <span>{t.nav[item.key as keyof typeof t.nav]}</span>
                 {badge > 0 && (
                   <span className="absolute -top-2 -right-3 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-love text-white text-[10px] font-bold animate-pulse">
                     {badge > 99 ? '99+' : badge}
@@ -141,6 +181,14 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
 
         {/* Right side - Only coins */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={toggleLanguage}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-[#271b21] border border-[#392830] text-[#d8c1cd] hover:text-white hover:border-love/40 transition-colors"
+            title={language === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt'}
+          >
+            <Languages className="w-4 h-4" />
+            <span className="text-xs font-semibold uppercase">{language}</span>
+          </button>
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#271b21] border border-[#392830]">
             <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
             <span className="font-bold text-sm">{formatNumber(user?.coins || 0)}</span>
@@ -160,9 +208,9 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                     {character?.gender === 'FEMALE' ? '👩' : '👨'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm truncate">{character?.name || 'Người yêu'}</p>
+                    <p className="font-bold text-sm truncate">{character?.name || (language === 'vi' ? 'Nguoi yeu' : 'Companion')}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-xs text-[#ba9cab]">Level {Math.floor((character?.affection || 0) / 100) + 1}</p>
+                        <p className="text-xs text-[#ba9cab]">{t.level} {Math.floor((character?.affection || 0) / 100) + 1}</p>
                       <PremiumBadge tier={user?.premiumTier as PremiumTier} />
                     </div>
                   </div>
@@ -170,8 +218,8 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
               </Link>
 
               <div>
-                <h1 className="text-white text-lg font-bold mb-1">Điều hướng</h1>
-                <p className="text-[#ba9cab] text-sm">Chọn trang bạn muốn</p>
+                <h1 className="text-white text-lg font-bold mb-1">{t.navigateTitle}</h1>
+                <p className="text-[#ba9cab] text-sm">{t.navigateSubtitle}</p>
               </div>
               
               <div className="flex flex-col gap-2">
@@ -188,7 +236,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                         }`}
                       >
                         <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-                        <span className={`text-sm flex-1 ${isActive ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
+                        <span className={`text-sm flex-1 ${isActive ? 'font-bold' : 'font-medium'}`}>{t.nav[item.key as keyof typeof t.nav]}</span>
                         {badge > 0 && (
                           <span className="min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full bg-love text-white text-[10px] font-bold shadow-[0_0_8px_rgba(173,43,238,0.4)]">
                             {badge > 99 ? '99+' : badge}
@@ -211,7 +259,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                     }`}
                   >
                     <Crown className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-                    <span className="text-sm font-medium">Gói đăng ký</span>
+                    <span className="text-sm font-medium">{t.subscription}</span>
                   </button>
                 </Link>
                 <Link href="/settings">
@@ -223,7 +271,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                     }`}
                   >
                     <Settings className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-                    <span className="text-sm font-medium">Cài đặt</span>
+                    <span className="text-sm font-medium">{t.settings}</span>
                   </button>
                 </Link>
                 <button 
@@ -231,7 +279,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group hover:bg-red-500/10 text-[#ba9cab] hover:text-red-400 border border-transparent hover:border-red-500/20 hover:translate-x-1 hover:shadow-[0_0_8px_rgba(239,68,68,0.1)]"
                 >
                   <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-                  <span className="text-sm font-medium">Đăng xuất</span>
+                  <span className="text-sm font-medium">{t.logout}</span>
                 </button>
               </div>
             </div>
@@ -266,7 +314,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                     </span>
                   )}
                 </div>
-                <span className="text-xs">{item.label}</span>
+                <span className="text-xs">{t.nav[item.key as keyof typeof t.nav]}</span>
                 {isActive && (
                   <span className="absolute -bottom-1 w-1 h-1 rounded-full bg-love" />
                 )}

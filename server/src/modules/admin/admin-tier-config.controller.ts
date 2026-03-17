@@ -3,7 +3,8 @@
  * Handlers for reading and updating per-tier feature configs.
  */
 
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
+import { z } from 'zod';
 import type { AdminRequest } from './admin.middleware';
 import {
   getAllTierConfigs,
@@ -14,33 +15,52 @@ import {
 
 const VALID_TIERS: PremiumTier[] = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
 
+const tierConfigPatchSchema = z.object({
+  maxCharacters: z.number().int().min(-1).optional(),
+  maxMessagesPerDay: z.number().int().min(-1).optional(),
+  adFree: z.boolean().optional(),
+  voiceMessages: z.boolean().optional(),
+  sendImages: z.boolean().optional(),
+  sendVideos: z.boolean().optional(),
+  sendStickers: z.boolean().optional(),
+  canAccessPremiumScenes: z.boolean().optional(),
+  canAccessPremiumGifts: z.boolean().optional(),
+  canAccessPremiumQuests: z.boolean().optional(),
+  prioritySupport: z.boolean().optional(),
+  earlyAccess: z.boolean().optional(),
+}).strict();
+
 /** GET /admin/tier-configs — return all 4 tier configs */
-export async function getTierConfigs(req: AdminRequest, res: Response) {
-  const configs = await getAllTierConfigs();
-  res.json({ success: true, data: configs });
+export async function getTierConfigs(req: AdminRequest, res: Response, next: NextFunction) {
+  try {
+    const configs = await getAllTierConfigs();
+    res.json({ success: true, data: configs });
+  } catch (error) {
+    next(error);
+  }
 }
 
 /** PUT /admin/tier-configs/:tier — patch one tier's config */
-export async function updateTierConfigHandler(req: AdminRequest, res: Response) {
-  const { tier } = req.params as { tier: string };
+export async function updateTierConfigHandler(req: AdminRequest, res: Response, next: NextFunction) {
+  try {
+    const { tier } = req.params as { tier: string };
 
-  if (!VALID_TIERS.includes(tier as PremiumTier)) {
-    return res.status(400).json({ success: false, error: `Invalid tier: ${tier}. Must be FREE | BASIC | PRO | ULTIMATE` });
-  }
-
-  const patch = req.body as Partial<TierConfig>;
-
-  // Validate numeric fields: must be integer and >= -1
-  const numericFields: (keyof TierConfig)[] = ['maxCharacters', 'maxMessagesPerDay'];
-  for (const field of numericFields) {
-    if (patch[field] !== undefined) {
-      const val = Number(patch[field]);
-      if (!Number.isInteger(val) || val < -1) {
-        return res.status(400).json({ success: false, error: `${field} must be an integer >= -1 (-1 = unlimited)` });
-      }
+    if (!VALID_TIERS.includes(tier as PremiumTier)) {
+      return res.status(400).json({ success: false, error: `Invalid tier: ${tier}. Must be FREE | BASIC | PRO | ULTIMATE` });
     }
-  }
 
-  const updated = await updateTierConfig(tier as PremiumTier, patch);
-  res.json({ success: true, data: updated, message: `Tier "${tier}" config updated successfully` });
+    const parsed = tierConfigPatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: parsed.error.issues[0]?.message || 'Invalid tier config payload',
+      });
+    }
+    const patch = parsed.data as Partial<TierConfig>;
+
+    const updated = await updateTierConfig(tier as PremiumTier, patch);
+    res.json({ success: true, data: updated, message: `Tier "${tier}" config updated successfully` });
+  } catch (error) {
+    next(error);
+  }
 }
