@@ -24,6 +24,7 @@ import {
   Filler,
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { TierConfigTab } from './tier-config-tab';
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement,
@@ -32,7 +33,7 @@ ChartJS.register(
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-type TabType = 'dashboard' | 'users' | 'characters' | 'messages' | 'quests' | 'templates' | 'analytics' | 'system';
+type TabType = 'dashboard' | 'users' | 'characters' | 'messages' | 'quests' | 'templates' | 'analytics' | 'system' | 'tier-configs';
 
 interface User {
   id: string;
@@ -322,6 +323,8 @@ export default function AdminPage() {
             break;
           case 'system':
             fetchSystemInfo();
+            break;
+          case 'tier-configs':
             break;
         }
       } catch (err) {
@@ -724,6 +727,7 @@ export default function AdminPage() {
     { id: 'templates', icon: Image, label: 'Templates' },
     { id: 'analytics', icon: BarChart3, label: 'Analytics' },
     { id: 'system', icon: Server, label: 'System' },
+    { id: 'tier-configs', icon: Settings, label: 'Cau hinh VIP' },
   ];
 
   return (
@@ -1524,6 +1528,13 @@ export default function AdminPage() {
                   </div>
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          {/* TIER CONFIGS */}
+          {activeTab === 'tier-configs' && (
+            <motion.div key="tier-configs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <TierConfigTab apiCall={apiCall} showToast={showToast} />
             </motion.div>
           )}
         </AnimatePresence>

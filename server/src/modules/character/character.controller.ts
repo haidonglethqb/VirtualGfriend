@@ -3,7 +3,6 @@ import { characterService } from './character.service';
 import { z } from 'zod';
 import { AppError } from '../../middlewares/error.middleware';
 import { createModuleLogger } from '../../lib/logger';
-import { PREMIUM_FEATURES } from '../../lib/constants';
 import { prisma } from '../../lib/prisma';
 
 const log = createModuleLogger('CharacterController');
@@ -65,9 +64,8 @@ export const characterController = {
       const data = createCharacterSchema.parse(req.body);
       log.debug('Validated data:', data);
 
-      // Check character limit based on premium tier
-      const tier = req.premiumInfo?.tier || 'FREE';
-      const maxCharacters = PREMIUM_FEATURES[tier].maxCharacters;
+      // Check character limit based on dynamic tier config (resolved in premium middleware)
+      const maxCharacters = req.premiumInfo?.features?.maxCharacters ?? 1;
 
       // Count existing characters (including inactive ones)
       const existingCount = await prisma.character.count({
