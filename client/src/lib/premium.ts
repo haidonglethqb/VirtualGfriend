@@ -18,6 +18,10 @@ export interface PremiumFeatures {
   earlyAccess: boolean;
 }
 
+export type PremiumBooleanFeature = {
+  [K in keyof PremiumFeatures]: PremiumFeatures[K] extends boolean ? K : never;
+}[keyof PremiumFeatures];
+
 export type AllTierConfigs = Record<PremiumTier, PremiumFeatures>;
 
 // Feature definitions by tier
@@ -124,7 +128,7 @@ export function getFeatureValue<K extends keyof PremiumFeatures>(
  * Get minimum tier required for a feature
  */
 export function getMinimumTierForFeature(
-  feature: keyof PremiumFeatures,
+  feature: PremiumBooleanFeature,
   configs: AllTierConfigs = PREMIUM_FEATURES,
 ): PremiumTier {
   for (const tier of TIER_HIERARCHY) {
@@ -140,7 +144,7 @@ export function getMinimumTierForFeature(
  */
 export function shouldShowUpsell(
   userTier: PremiumTier,
-  feature: keyof PremiumFeatures,
+  feature: PremiumBooleanFeature,
   configs: AllTierConfigs = PREMIUM_FEATURES,
 ): boolean {
   return !hasFeatureAccess(userTier, feature, configs);
@@ -159,7 +163,7 @@ export function formatMessageLimit(limit: number): string {
  */
 export function getUpgradeSuggestion(
   currentTier: PremiumTier,
-  desiredFeature: keyof PremiumFeatures,
+  desiredFeature: PremiumBooleanFeature,
   configs: AllTierConfigs = PREMIUM_FEATURES,
 ): { targetTier: PremiumTier; message: string } | null {
   if (hasFeatureAccess(currentTier, desiredFeature, configs)) {
@@ -177,7 +181,7 @@ export function getUpgradeSuggestion(
 
 export function hasFeatureAccess(
   userTier: PremiumTier,
-  feature: keyof PremiumFeatures,
+  feature: PremiumBooleanFeature,
   configs: AllTierConfigs = PREMIUM_FEATURES,
 ): boolean {
   const features = configs[userTier];

@@ -49,7 +49,7 @@ export const usePremiumStore = create<PremiumStoreState>((set, get) => ({
     try {
       const response = await api.get<AllTierConfigs>('/config/tier-plans');
       if (!response.success || !response.data) {
-        throw new Error('Khong the tai cau hinh goi VIP');
+        throw new Error('Failed to load premium tier config');
       }
 
       set({
@@ -61,7 +61,7 @@ export const usePremiumStore = create<PremiumStoreState>((set, get) => ({
 
       return response.data;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Khong the tai cau hinh goi VIP';
+      const message = error instanceof Error ? error.message : 'Failed to load premium tier config';
       set({
         isLoading: false,
         error: message,

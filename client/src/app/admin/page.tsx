@@ -8,7 +8,7 @@ import {
   TrendingUp, Crown, Sparkles, LayoutDashboard, Settings,
   Target, Image, Gift, Brain, Bell, Database, BarChart3,
   Plus, X, Check, AlertTriangle, Megaphone, Server, HardDrive,
-  Zap, Clock, Activity,
+  Zap, Clock, Activity, Languages,
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -25,6 +25,7 @@ import {
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import { TierConfigTab } from './tier-config-tab';
+import { useLanguageStore } from '@/store/language-store';
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement,
@@ -135,6 +136,57 @@ const chartDefaults = {
   borderColor: 'rgba(255,255,255,0.06)',
 };
 
+const ADMIN_I18N = {
+  vi: {
+    loginTitle: 'Trang Quan Tri',
+    loginSubtitle: 'He thong quan ly Amoura',
+    username: 'Ten dang nhap',
+    password: 'Mat khau',
+    loginButton: 'Dang nhap',
+    loggingIn: 'Dang dang nhap...',
+    tabs: {
+      dashboard: 'Tong quan',
+      users: 'Nguoi dung',
+      characters: 'Nhan vat',
+      messages: 'Tin nhan',
+      quests: 'Nhiem vu',
+      templates: 'Mau nhan vat',
+      analytics: 'Phan tich',
+      system: 'He thong',
+      tierConfigs: 'Cau hinh VIP',
+    },
+    broadcast: 'Thong bao',
+    giveCoinsAll: 'Tang xu (tat ca)',
+    giveGemsAll: 'Tang ngoc (tat ca)',
+    logout: 'Dang xuat',
+    languageTitle: 'Ngon ngu',
+  },
+  en: {
+    loginTitle: 'Admin Panel',
+    loginSubtitle: 'Amoura Management System',
+    username: 'Username',
+    password: 'Password',
+    loginButton: 'Login',
+    loggingIn: 'Logging in...',
+    tabs: {
+      dashboard: 'Dashboard',
+      users: 'Users',
+      characters: 'Characters',
+      messages: 'Messages',
+      quests: 'Quests',
+      templates: 'Templates',
+      analytics: 'Analytics',
+      system: 'System',
+      tierConfigs: 'VIP Config',
+    },
+    broadcast: 'Broadcast',
+    giveCoinsAll: 'Give Coins (All)',
+    giveGemsAll: 'Give Gems (All)',
+    logout: 'Logout',
+    languageTitle: 'Language',
+  },
+} as const;
+
 // Pagination Controls Component
 function PaginationControls({ 
   pagination, 
@@ -210,6 +262,9 @@ function Modal({
 }
 
 export default function AdminPage() {
+  const { language, toggleLanguage } = useLanguageStore();
+  const t = ADMIN_I18N[language];
+
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = checking
   const [token, setToken] = useState('');
   const [username, setUsername] = useState('');
@@ -676,30 +731,30 @@ export default function AdminPage() {
               <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Shield className="w-8 h-8 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
-              <p className="text-gray-400 mt-2">Amoura Management System</p>
+              <h1 className="text-2xl font-bold text-white">{t.loginTitle}</h1>
+              <p className="text-gray-400 mt-2">{t.loginSubtitle}</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Username</label>
+                <label className="block text-sm text-gray-400 mb-2">{t.username}</label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-                  placeholder="admin"
+                  placeholder={language === 'vi' ? 'tai khoan admin' : 'admin account'}
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Password</label>
+                <label className="block text-sm text-gray-400 mb-2">{t.password}</label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-                  placeholder="••••••••"
+                  placeholder={language === 'vi' ? 'nhap mat khau' : 'enter password'}
                   required
                 />
               </div>
@@ -709,7 +764,7 @@ export default function AdminPage() {
                 disabled={loading}
                 className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50"
               >
-                {loading ? 'Logging in...' : 'Login'}
+                {loading ? t.loggingIn : t.loginButton}
               </button>
             </form>
           </div>
@@ -719,15 +774,15 @@ export default function AdminPage() {
   }
 
   const tabs: { id: TabType; icon: typeof Users; label: string }[] = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'users', icon: Users, label: 'Users' },
-    { id: 'characters', icon: Heart, label: 'Characters' },
-    { id: 'messages', icon: MessageSquare, label: 'Messages' },
-    { id: 'quests', icon: Target, label: 'Quests' },
-    { id: 'templates', icon: Image, label: 'Templates' },
-    { id: 'analytics', icon: BarChart3, label: 'Analytics' },
-    { id: 'system', icon: Server, label: 'System' },
-    { id: 'tier-configs', icon: Settings, label: 'Cau hinh VIP' },
+    { id: 'dashboard', icon: LayoutDashboard, label: t.tabs.dashboard },
+    { id: 'users', icon: Users, label: t.tabs.users },
+    { id: 'characters', icon: Heart, label: t.tabs.characters },
+    { id: 'messages', icon: MessageSquare, label: t.tabs.messages },
+    { id: 'quests', icon: Target, label: t.tabs.quests },
+    { id: 'templates', icon: Image, label: t.tabs.templates },
+    { id: 'analytics', icon: BarChart3, label: t.tabs.analytics },
+    { id: 'system', icon: Server, label: t.tabs.system },
+    { id: 'tier-configs', icon: Settings, label: t.tabs.tierConfigs },
   ];
 
   return (
@@ -750,63 +805,81 @@ export default function AdminPage() {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-gray-800/50 backdrop-blur-xl border-r border-gray-700/50 p-4 overflow-y-auto">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-            <Shield className="w-5 h-5 text-white" />
+      <aside className="fixed left-0 top-0 h-full w-64 bg-gray-800/50 backdrop-blur-xl border-r border-gray-700/50 p-4">
+        <div className="h-full flex flex-col min-h-0">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+              <Shield className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="font-bold text-white">{t.loginTitle}</h1>
+              <p className="text-xs text-gray-400">Amoura</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-white">Admin Panel</h1>
-            <p className="text-xs text-gray-400">Amoura</p>
-          </div>
-        </div>
 
-        <nav className="space-y-1">
-          {tabs.map((item) => (
+          <div className="mb-4 flex items-center justify-between px-1">
+            <span className="text-xs uppercase tracking-wide text-gray-400">{t.languageTitle}</span>
             <button
-              key={item.id}
-              onClick={() => { setActiveTab(item.id); setPagination(p => ({ ...p, page: 1 })); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                activeTab === item.id ? 'bg-purple-500/20 text-purple-400' : 'text-gray-400 hover:bg-gray-700/50'
-              }`}
+              onClick={toggleLanguage}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-700/60 border border-gray-600 text-gray-200 hover:text-white hover:border-purple-400"
+              title={language === 'vi' ? 'Switch to English' : 'Chuyen sang tieng Viet'}
             >
-              <item.icon className="w-5 h-5" />
-              {item.label}
+              <Languages className="w-3.5 h-3.5" />
+              <span className="text-xs font-semibold uppercase">{language}</span>
             </button>
-          ))}
-        </nav>
+          </div>
 
-        <div className="mt-8 pt-8 border-t border-gray-700/50 space-y-2">
-          <button
-            onClick={handleBroadcast}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-700/50"
-          >
-            <Megaphone className="w-5 h-5" />
-            Broadcast
-          </button>
-          <button
-            onClick={() => handleBulkGive('coins')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-700/50"
-          >
-            <Coins className="w-5 h-5" />
-            Give Coins (All)
-          </button>
-          <button
-            onClick={() => handleBulkGive('gems')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-700/50"
-          >
-            <Sparkles className="w-5 h-5" />
-            Give Gems (All)
-          </button>
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-4">
+            <nav className="space-y-1">
+              {tabs.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => { setActiveTab(item.id); setPagination(p => ({ ...p, page: 1 })); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === item.id ? 'bg-purple-500/20 text-purple-400' : 'text-gray-400 hover:bg-gray-700/50'
+                  }`}
+                >
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="pt-4 border-t border-gray-700/50 space-y-2">
+              <button
+                onClick={handleBroadcast}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-700/50"
+              >
+                <Megaphone className="w-5 h-5" />
+                {t.broadcast}
+              </button>
+              <button
+                onClick={() => handleBulkGive('coins')}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-700/50"
+              >
+                <Coins className="w-5 h-5" />
+                {t.giveCoinsAll}
+              </button>
+              <button
+                onClick={() => handleBulkGive('gems')}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-700/50"
+              >
+                <Sparkles className="w-5 h-5" />
+                {t.giveGemsAll}
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-3 mt-3 border-t border-gray-700/50">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 text-red-400 rounded-xl hover:bg-red-500/20"
+            >
+              <LogOut className="w-5 h-5" />
+              {t.logout}
+            </button>
+          </div>
         </div>
-
-        <button
-          onClick={handleLogout}
-          className="absolute bottom-4 left-4 right-4 flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 text-red-400 rounded-xl hover:bg-red-500/20"
-        >
-          <LogOut className="w-5 h-5" />
-          Logout
-        </button>
       </aside>
 
       {/* Main Content */}
