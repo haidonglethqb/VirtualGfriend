@@ -7,7 +7,8 @@ import { characterService } from '../character/character.service';
 import { gameEventService } from '../game/game-event.service';
 import { MessageType } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
-import { MESSAGE_LIMITS, PREMIUM_FEATURES } from '../../lib/constants';
+import { MESSAGE_LIMITS } from '../../lib/constants';
+import { getTierConfig } from '../admin/tier-config.service';
 import type { PremiumTier } from '../../lib/prisma';
 
 const log = createModuleLogger('Chat');
@@ -401,8 +402,8 @@ export const chatService = {
     limit: number;
     remaining: number;
   }> {
-    const features = PREMIUM_FEATURES[tier];
-    const maxMessages = features.maxMessagesPerDay;
+    const config = await getTierConfig(tier);
+    const maxMessages = config.maxMessagesPerDay;
 
     // Unlimited (-1) means no limit
     if (maxMessages === -1) {

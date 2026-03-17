@@ -38,6 +38,7 @@ import {
   cleanupDuplicateTemplates,
   fixMissingAvatars,
 } from './admin.controller';
+import { getTierConfigs, updateTierConfigHandler } from './admin-tier-config.controller';
 
 const router = Router();
 
@@ -103,5 +104,9 @@ router.delete('/memories/:id', deleteMemory);
 // Cleanup utilities
 router.post('/cleanup/duplicate-templates', cleanupDuplicateTemplates);
 router.get('/cleanup/check-avatars', fixMissingAvatars);
+
+// Tier config management
+router.get('/tier-configs', getTierConfigs);
+router.put('/tier-configs/:tier', updateTierConfigHandler);
 
 export { router as adminRouter };
