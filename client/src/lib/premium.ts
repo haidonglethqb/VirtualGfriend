@@ -1,68 +1,86 @@
 // Premium tier definitions and utilities for frontend
+// Synced with backend: server/src/lib/constants.ts
 
 export type PremiumTier = 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE';
 
 export interface PremiumFeatures {
   dailyMessages: number;
+  maxCharacters: number;
   voiceMessages: boolean;
+  sendImages: boolean;
+  sendVideos: boolean;
+  sendStickers: boolean;
   imageGeneration: boolean;
   advancedPersonality: boolean;
   exclusiveScenes: boolean;
   noAds: boolean;
   prioritySupport: boolean;
   customBackgrounds: boolean;
-  unlimitedCharacters: boolean;
   earlyAccess: boolean;
 }
 
 // Feature definitions by tier
+// Current system: FREE vs VIP (BASIC/PRO/ULTIMATE all treated as VIP)
 export const PREMIUM_FEATURES: Record<PremiumTier, PremiumFeatures> = {
   FREE: {
-    dailyMessages: 20,
+    dailyMessages: -1, // Unlimited for all users
+    maxCharacters: 1,
     voiceMessages: false,
+    sendImages: false,
+    sendVideos: false,
+    sendStickers: false,
     imageGeneration: false,
     advancedPersonality: false,
     exclusiveScenes: false,
     noAds: false,
     prioritySupport: false,
     customBackgrounds: false,
-    unlimitedCharacters: false,
     earlyAccess: false,
   },
+  // VIP tiers - all have same core benefits
   BASIC: {
-    dailyMessages: 100,
+    dailyMessages: -1, // Unlimited
+    maxCharacters: 5,
     voiceMessages: true,
+    sendImages: true,
+    sendVideos: true,
+    sendStickers: true,
     imageGeneration: false,
     advancedPersonality: false,
-    exclusiveScenes: false,
-    noAds: true,
-    prioritySupport: false,
-    customBackgrounds: true,
-    unlimitedCharacters: false,
-    earlyAccess: false,
-  },
-  PRO: {
-    dailyMessages: 500,
-    voiceMessages: true,
-    imageGeneration: true,
-    advancedPersonality: true,
     exclusiveScenes: true,
     noAds: true,
     prioritySupport: false,
     customBackgrounds: true,
-    unlimitedCharacters: true,
     earlyAccess: false,
   },
-  ULTIMATE: {
-    dailyMessages: -1, // Unlimited
+  PRO: {
+    dailyMessages: -1,
+    maxCharacters: 5,
     voiceMessages: true,
+    sendImages: true,
+    sendVideos: true,
+    sendStickers: true,
     imageGeneration: true,
     advancedPersonality: true,
     exclusiveScenes: true,
     noAds: true,
     prioritySupport: true,
     customBackgrounds: true,
-    unlimitedCharacters: true,
+    earlyAccess: true,
+  },
+  ULTIMATE: {
+    dailyMessages: -1, // Unlimited
+    maxCharacters: -1, // Unlimited
+    voiceMessages: true,
+    sendImages: true,
+    sendVideos: true,
+    sendStickers: true,
+    imageGeneration: true,
+    advancedPersonality: true,
+    exclusiveScenes: true,
+    noAds: true,
+    prioritySupport: true,
+    customBackgrounds: true,
     earlyAccess: true,
   },
 };
@@ -70,12 +88,19 @@ export const PREMIUM_FEATURES: Record<PremiumTier, PremiumFeatures> = {
 // Tier hierarchy for comparison
 const TIER_HIERARCHY: PremiumTier[] = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
 
+/**
+ * Check if tier is VIP (any paid tier)
+ */
+export function isVipTier(tier: PremiumTier): boolean {
+  return tier !== 'FREE';
+}
+
 // Premium tier display info
-export const TIER_INFO: Record<PremiumTier, { name: string; color: string; icon: string }> = {
-  FREE: { name: 'Miễn phí', color: 'text-gray-400', icon: '🆓' },
-  BASIC: { name: 'Basic', color: 'text-blue-400', icon: '⭐' },
-  PRO: { name: 'Pro', color: 'text-purple-400', icon: '💎' },
-  ULTIMATE: { name: 'Ultimate', color: 'text-yellow-400', icon: '👑' },
+export const TIER_INFO: Record<PremiumTier, { name: string; displayName: string; color: string; icon: string }> = {
+  FREE: { name: 'FREE', displayName: 'Miễn phí', color: 'text-gray-400', icon: '🆓' },
+  BASIC: { name: 'VIP', displayName: 'VIP Premium', color: 'text-love', icon: '👑' },
+  PRO: { name: 'VIP', displayName: 'VIP Premium', color: 'text-love', icon: '👑' },
+  ULTIMATE: { name: 'VIP', displayName: 'VIP Premium', color: 'text-love', icon: '👑' },
 };
 
 /**
@@ -140,7 +165,7 @@ export function formatMessageLimit(limit: number): string {
  * Get upgrade suggestion based on desired feature
  */
 export function getUpgradeSuggestion(
-  currentTier: PremiumTier, 
+  currentTier: PremiumTier,
   desiredFeature: keyof PremiumFeatures
 ): { targetTier: PremiumTier; message: string } | null {
   if (hasFeatureAccess(currentTier, desiredFeature)) {
@@ -152,6 +177,6 @@ export function getUpgradeSuggestion(
 
   return {
     targetTier,
-    message: `Nâng cấp lên gói ${tierInfo.name} để mở khóa tính năng này`,
+    message: `Nâng cấp lên gói ${tierInfo.displayName} để mở khóa tính năng này`,
   };
 }

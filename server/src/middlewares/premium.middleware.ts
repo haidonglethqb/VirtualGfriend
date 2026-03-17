@@ -1,17 +1,51 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma, PremiumTier } from '../lib/prisma';
 import { AppError } from './error.middleware';
-import { PREMIUM_FEATURES } from '../lib/constants';
+import { PREMIUM_FEATURES, isVipTier } from '../lib/constants';
+import { logger } from '../lib/logger';
 
 // Premium tier hierarchy (higher index = more features)
 const TIER_HIERARCHY: PremiumTier[] = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
+
+/**
+ * Check if premium subscription has expired
+ * Returns true if expired (should downgrade to FREE)
+ */
+function isPremiumExpired(expiresAt: Date | null): boolean {
+  if (!expiresAt) return false; // No expiration = lifetime
+  return new Date() > expiresAt;
+}
+
+/**
+ * Auto-downgrade user to FREE tier if premium expired
+ * Called silently during request processing
+ */
+async function autoDowngradeIfExpired(userId: string, expiresAt: Date | null): Promise<boolean> {
+  if (!isPremiumExpired(expiresAt)) return false;
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isPremium: false,
+        premiumTier: 'FREE',
+        // Keep premiumExpiresAt for record
+      },
+    });
+    logger.info(`User ${userId} premium expired - auto-downgraded to FREE`);
+    return true;
+  } catch (error) {
+    logger.error(`Failed to auto-downgrade user ${userId}:`, error);
+    return false;
+  }
+}
 
 /**
  * Check if user has premium subscription (any paid tier)
  */
 export function requirePremium(req: Request, res: Response, next: NextFunction) {
   const user = req.user;
-  
+
   if (!user) {
     return next(new AppError('Authentication required', 401, 'UNAUTHORIZED'));
   }
@@ -106,30 +140,39 @@ export function requireFeature(feature: keyof typeof PREMIUM_FEATURES.FREE) {
 
 /**
  * Add user premium info to request for conditional logic in handlers
+ * Also auto-downgrades expired premium users to FREE tier
  */
 export async function attachPremiumInfo(req: Request, res: Response, next: NextFunction) {
   const userId = req.user?.id;
-  
+
   if (!userId) {
     return next();
   }
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { 
-      premiumTier: true, 
-      isPremium: true, 
-      premiumExpiresAt: true 
+    select: {
+      premiumTier: true,
+      isPremium: true,
+      premiumExpiresAt: true,
     },
   });
 
   if (user) {
-    const tier = user.premiumTier || 'FREE';
+    // Check and auto-downgrade if expired
+    const expired = await autoDowngradeIfExpired(userId, user.premiumExpiresAt);
+
+    // Use downgraded values if expired
+    const tier = expired ? 'FREE' : (user.premiumTier || 'FREE');
+    const isPremium = expired ? false : (user.isPremium || tier !== 'FREE');
+
     req.premiumInfo = {
       tier,
-      isPremium: user.isPremium || tier !== 'FREE',
+      isPremium,
+      isVip: isVipTier(tier),
       features: PREMIUM_FEATURES[tier],
       expiresAt: user.premiumExpiresAt,
+      expired,
     };
   }
 
@@ -143,8 +186,10 @@ declare global {
       premiumInfo?: {
         tier: PremiumTier;
         isPremium: boolean;
+        isVip: boolean;
         features: typeof PREMIUM_FEATURES[PremiumTier];
         expiresAt: Date | null;
+        expired: boolean;
       };
     }
   }

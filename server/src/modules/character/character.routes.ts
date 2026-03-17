@@ -4,6 +4,7 @@ import { templateController } from './template.controller';
 import { factsController } from './facts.controller';
 import { relationshipController } from './relationship.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
+import { attachPremiumInfo } from '../../middlewares/premium.middleware';
 
 export const characterRouter = Router();
 
@@ -11,6 +12,7 @@ export const characterRouter = Router();
 characterRouter.get('/templates', templateController.getTemplates);
 
 characterRouter.use(authenticate);
+characterRouter.use(attachPremiumInfo);
 
 // Primary routes
 characterRouter.get('/', characterController.getMyCharacter);

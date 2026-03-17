@@ -3,15 +3,17 @@
 import { ReactNode, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  Heart, MessageCircle, Gift, Target, ImageIcon, 
-  Settings, Star, LogOut, Users, Trophy
+import {
+  Heart, MessageCircle, Gift, Target, ImageIcon,
+  Settings, Star, LogOut, Users, Trophy, Crown
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
 import { formatNumber } from '@/lib/utils';
 import api from '@/services/api';
 import { socketService } from '@/services/socket';
+import { PremiumBadge } from '@/components/PremiumGate';
+import { PremiumTier } from '@/lib/premium';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -152,15 +154,20 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
           <aside className="hidden lg:flex flex-col w-64 sticky top-20 h-[calc(100vh-5rem)] p-6 overflow-y-auto border-r border-[#392830]/30">
             <div className="flex flex-col gap-6">
               {/* User Profile in Sidebar */}
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-[#271b21] border border-[#392830]">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl border-2 border-love/30">
-                  {character?.gender === 'FEMALE' ? '👩' : '👨'}
+              <Link href="/subscription">
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-[#271b21] border border-[#392830] hover:border-love/30 transition-colors cursor-pointer">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl border-2 border-love/30">
+                    {character?.gender === 'FEMALE' ? '👩' : '👨'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm truncate">{character?.name || 'Người yêu'}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-[#ba9cab]">Level {Math.floor((character?.affection || 0) / 100) + 1}</p>
+                      <PremiumBadge tier={user?.premiumTier as PremiumTier} />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm truncate">{character?.name || 'Người yêu'}</p>
-                  <p className="text-xs text-[#ba9cab]">Level {Math.floor((character?.affection || 0) / 100) + 1}</p>
-                </div>
-              </div>
+              </Link>
 
               <div>
                 <h1 className="text-white text-lg font-bold mb-1">Điều hướng</h1>
@@ -195,11 +202,23 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
 
               {/* Settings & Logout */}
               <div className="mt-4 pt-4 border-t border-[#392830]">
-                <Link href="/settings">
-                  <button 
+                <Link href="/subscription">
+                  <button
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group ${
-                      pathname === '/settings' 
-                        ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]' 
+                      pathname === '/subscription'
+                        ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]'
+                        : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
+                    }`}
+                  >
+                    <Crown className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="text-sm font-medium">Gói đăng ký</span>
+                  </button>
+                </Link>
+                <Link href="/settings">
+                  <button
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group ${
+                      pathname === '/settings'
+                        ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]'
                         : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
                     }`}
                   >

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { userController } from './users.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
+import { attachPremiumInfo } from '../../middlewares/premium.middleware';
 
 export const userRouter = Router();
 
@@ -16,3 +17,6 @@ userRouter.patch('/privacy', userController.updatePrivacySettings);
 userRouter.get('/stats', userController.getStats);
 userRouter.get('/notifications', userController.getNotifications);
 userRouter.post('/notifications/read', userController.markNotificationsRead);
+
+// Premium status endpoint
+userRouter.get('/premium-status', attachPremiumInfo, userController.getPremiumStatus);
