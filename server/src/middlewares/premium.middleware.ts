@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma, PremiumTier } from '../lib/prisma';
 import { AppError } from './error.middleware';
-import { PREMIUM_FEATURES, isVipTier } from '../lib/constants';
+import { isVipTier } from '../lib/constants';
+import { getTierConfig, TierConfig } from '../modules/admin/tier-config.service';
 import { logger } from '../lib/logger';
 
 // Premium tier hierarchy (higher index = more features)
@@ -96,12 +97,12 @@ export function requireTier(minTier: PremiumTier) {
 }
 
 /**
- * Check feature access based on premium tier
+ * Check feature access based on dynamic tier config
  */
-export function requireFeature(feature: keyof typeof PREMIUM_FEATURES.FREE) {
+export function requireFeature(feature: keyof TierConfig) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.user?.id;
-    
+
     if (!userId) {
       return next(new AppError('Authentication required', 401, 'UNAUTHORIZED'));
     }
@@ -115,23 +116,15 @@ export function requireFeature(feature: keyof typeof PREMIUM_FEATURES.FREE) {
       return next(new AppError('User not found', 404, 'USER_NOT_FOUND'));
     }
 
-    const tier = user.premiumTier || 'FREE';
-    const features = PREMIUM_FEATURES[tier];
+    const tier = (user.premiumTier || 'FREE') as PremiumTier;
+    const config = await getTierConfig(tier);
+    const value = config[feature];
 
-    // For boolean features
-    if (typeof features[feature] === 'boolean') {
-      if (!features[feature]) {
-        return next(new AppError(`Feature "${feature}" requires a premium subscription`, 403, 'FEATURE_LOCKED'));
-      }
-      return next();
+    if (typeof value === 'boolean' && !value) {
+      return next(new AppError(`Feature "${feature}" requires a premium subscription`, 403, 'FEATURE_LOCKED'));
     }
-
-    // For numeric features (we just check if > 0 or unlimited)
-    if (typeof features[feature] === 'number') {
-      if ((features[feature] as number) <= 0) {
-        return next(new AppError(`Feature "${feature}" requires a premium subscription`, 403, 'FEATURE_LOCKED'));
-      }
-      return next();
+    if (typeof value === 'number' && value === 0) {
+      return next(new AppError(`Feature "${feature}" requires a premium subscription`, 403, 'FEATURE_LOCKED'));
     }
 
     return next();
@@ -163,14 +156,15 @@ export async function attachPremiumInfo(req: Request, res: Response, next: NextF
     const expired = await autoDowngradeIfExpired(userId, user.premiumExpiresAt);
 
     // Use downgraded values if expired
-    const tier = expired ? 'FREE' : (user.premiumTier || 'FREE');
+    const tier = (expired ? 'FREE' : (user.premiumTier || 'FREE')) as PremiumTier;
     const isPremium = expired ? false : (user.isPremium || tier !== 'FREE');
+    const features = await getTierConfig(tier);
 
     req.premiumInfo = {
       tier,
       isPremium,
       isVip: isVipTier(tier),
-      features: PREMIUM_FEATURES[tier],
+      features,
       expiresAt: user.premiumExpiresAt,
       expired,
     };
@@ -187,7 +181,7 @@ declare global {
         tier: PremiumTier;
         isPremium: boolean;
         isVip: boolean;
-        features: typeof PREMIUM_FEATURES[PremiumTier];
+        features: TierConfig;
         expiresAt: Date | null;
         expired: boolean;
       };
