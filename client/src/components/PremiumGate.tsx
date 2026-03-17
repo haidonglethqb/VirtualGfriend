@@ -3,11 +3,13 @@
 import { ReactNode, useEffect } from 'react';
 import { Lock, Crown, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
+import { useLanguageStore } from '@/store/language-store';
 import { usePremiumStore } from '@/store/premium-store';
 import {
   AllTierConfigs,
   PremiumTier,
   PremiumFeatures,
+  PremiumBooleanFeature,
   PREMIUM_FEATURES,
   hasTierAccess,
   hasFeatureAccess,
@@ -17,11 +19,33 @@ import {
 } from '@/lib/premium';
 import Link from 'next/link';
 
+function getTierDisplayName(tier: PremiumTier, isVi: boolean): string {
+  const labels = {
+    vi: {
+      FREE: 'Mien phi',
+      BASIC: 'VIP Co ban',
+      PRO: 'VIP Pro',
+      ULTIMATE: 'VIP Ultimate',
+    },
+    en: {
+      FREE: 'Free',
+      BASIC: 'VIP Basic',
+      PRO: 'VIP Pro',
+      ULTIMATE: 'VIP Ultimate',
+    },
+  } as const;
+
+  if (isVi) {
+    return labels.vi[tier];
+  }
+  return labels.en[tier];
+}
+
 interface PremiumGateProps {
   /** Required tier to access this content */
   requiredTier?: PremiumTier;
   /** Required feature to access this content */
-  requiredFeature?: keyof PremiumFeatures;
+  requiredFeature?: PremiumBooleanFeature;
   /** Content to show if user has access */
   children: ReactNode;
   /** Optional fallback content when locked */
@@ -43,6 +67,8 @@ export function PremiumGate({
   showUpgradePrompt = true,
   lockedMessage,
 }: PremiumGateProps) {
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
   const { allTierConfigs, fetchTierConfigs, lastFetchedAt } = usePremiumStore();
   const { user } = useAuthStore();
   const userTier = (user?.premiumTier as PremiumTier) || 'FREE';
@@ -83,6 +109,7 @@ export function PremiumGate({
   }
 
   const tierInfo = TIER_INFO[targetTier];
+  const tierDisplayName = getTierDisplayName(targetTier, isVi);
 
   return (
     <div className="relative">
@@ -99,11 +126,13 @@ export function PremiumGate({
           </div>
           
           <h3 className="text-lg font-bold mb-2">
-            {lockedMessage || 'Nội dung Premium'}
+            {lockedMessage || (isVi ? 'Noi dung Premium' : 'Premium Content')}
           </h3>
           
           <p className="text-[#ba9cab] text-sm mb-4">
-            Nâng cấp lên gói <span className={tierInfo.color}>{tierInfo.icon} {tierInfo.displayName}</span> để mở khóa
+            {isVi ? 'Nang cap len goi ' : 'Upgrade to '}
+            <span className={tierInfo.color}>{tierInfo.icon} {tierDisplayName}</span>
+            {isVi ? ' de mo khoa' : ' to unlock this feature'}
           </p>
           
           <Link
@@ -111,7 +140,7 @@ export function PremiumGate({
             className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-love hover:bg-love/90 transition-colors font-medium text-white"
           >
             <Crown className="w-4 h-4" />
-            Nâng cấp ngay
+            {isVi ? 'Nang cap ngay' : 'Upgrade now'}
           </Link>
         </div>
       </div>
@@ -123,8 +152,11 @@ export function PremiumGate({
  * Premium badge component - shows user's current tier
  */
 export function PremiumBadge({ tier, showFree = false }: { tier?: PremiumTier; showFree?: boolean }) {
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
   const effectiveTier = tier || 'FREE';
   const info = TIER_INFO[effectiveTier];
+  const displayName = getTierDisplayName(effectiveTier, isVi);
 
   if (effectiveTier === 'FREE' && !showFree) {
     return null;
@@ -135,7 +167,7 @@ export function PremiumBadge({ tier, showFree = false }: { tier?: PremiumTier; s
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${info.color} ${bgColor}`}>
       <span>{info.icon}</span>
-      <span>{info.displayName}</span>
+      <span>{displayName}</span>
     </span>
   );
 }
@@ -147,9 +179,11 @@ export function FeatureLock({
   feature, 
   size = 'sm' 
 }: { 
-  feature: keyof PremiumFeatures; 
+  feature: PremiumBooleanFeature;
   size?: 'sm' | 'md' | 'lg';
 }) {
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
   const { allTierConfigs, fetchTierConfigs, lastFetchedAt } = usePremiumStore();
   const { user } = useAuthStore();
   const userTier = (user?.premiumTier as PremiumTier) || 'FREE';
@@ -168,6 +202,7 @@ export function FeatureLock({
 
   const requiredTier = getMinimumTierForFeature(feature, configs);
   const tierInfo = TIER_INFO[requiredTier];
+  const requiredTierDisplayName = getTierDisplayName(requiredTier, isVi);
   
   const sizeClasses = {
     sm: 'w-4 h-4',
@@ -176,7 +211,10 @@ export function FeatureLock({
   };
 
   return (
-    <span className={`${tierInfo.color} inline-flex items-center`} title={`Yêu cầu gói ${tierInfo.displayName}`}>
+    <span
+      className={`${tierInfo.color} inline-flex items-center`}
+      title={isVi ? `Yeu cau goi ${requiredTierDisplayName}` : `Requires ${requiredTierDisplayName} plan`}
+    >
       <Sparkles className={sizeClasses[size]} />
     </span>
   );
@@ -202,6 +240,6 @@ export function usePremiumAccess() {
     isPremium: userTier !== 'FREE',
     isVip: isVipTier(userTier),
     hasTierAccess: (tier: PremiumTier) => hasTierAccess(userTier, tier),
-    hasFeatureAccess: (feature: keyof PremiumFeatures) => hasFeatureAccess(userTier, feature, configs),
+    hasFeatureAccess: (feature: PremiumBooleanFeature) => hasFeatureAccess(userTier, feature, configs),
   };
 }

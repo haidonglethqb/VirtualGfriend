@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Crown, Sparkles } from 'lucide-react';
 import { usePremiumAccess } from '@/components/PremiumGate';
+import { useLanguageStore } from '@/store/language-store';
 
 interface AdBannerProps {
   /** Placement identifier for tracking */
@@ -19,10 +20,12 @@ interface AdBannerProps {
  * Will be replaced with real ad SDK integration later
  */
 export function AdBanner({ placement, size = 'medium', className = '' }: AdBannerProps) {
-  const { isVip, hasFeatureAccess } = usePremiumAccess();
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
+  const { hasFeatureAccess } = usePremiumAccess();
 
-  // VIP users with adFree feature don't see ads
-  if (isVip || hasFeatureAccess('adFree')) {
+  // Respect dynamic per-tier feature config from backend
+  if (hasFeatureAccess('adFree')) {
     return null;
   }
 
@@ -46,8 +49,8 @@ export function AdBanner({ placement, size = 'medium', className = '' }: AdBanne
             <Sparkles className="w-4 h-4 text-[#ba9cab]" />
           </div>
           <div>
-            <p className="text-xs text-[#ba9cab]">Quảng cáo</p>
-            <p className="text-[10px] text-[#ba9cab]/60">Nội dung quảng cáo sẽ hiển thị ở đây</p>
+            <p className="text-xs text-[#ba9cab]">{isVi ? 'Quang cao' : 'Advertisement'}</p>
+            <p className="text-[10px] text-[#ba9cab]/60">{isVi ? 'Noi dung quang cao se hien thi o day' : 'Your ad content appears here'}</p>
           </div>
         </div>
 
@@ -56,7 +59,7 @@ export function AdBanner({ placement, size = 'medium', className = '' }: AdBanne
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-love/20 hover:bg-love/30 text-love text-xs font-medium transition-colors"
         >
           <Crown className="w-3 h-3" />
-          <span>Ẩn QC</span>
+          <span>{isVi ? 'An QC' : 'Hide ads'}</span>
         </Link>
       </div>
     </div>
@@ -67,18 +70,20 @@ export function AdBanner({ placement, size = 'medium', className = '' }: AdBanne
  * Inline ad placeholder - smaller version for between content
  */
 export function InlineAd({ className = '' }: { className?: string }) {
-  const { isVip, hasFeatureAccess } = usePremiumAccess();
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
+  const { hasFeatureAccess } = usePremiumAccess();
 
-  if (isVip || hasFeatureAccess('adFree')) {
+  if (hasFeatureAccess('adFree')) {
     return null;
   }
 
   return (
     <div className={`text-center py-3 ${className}`}>
       <p className="text-xs text-[#ba9cab]/50">
-        Quảng cáo •{' '}
+        {isVi ? 'Quang cao' : 'Ads'} •{' '}
         <Link href="/subscription" className="text-love hover:underline">
-          Nâng cấp VIP để ẩn
+          {isVi ? 'Nang cap VIP de an' : 'Upgrade VIP to hide'}
         </Link>
       </p>
     </div>

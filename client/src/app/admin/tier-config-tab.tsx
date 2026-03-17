@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Save } from 'lucide-react';
 import { PremiumTier, PremiumFeatures } from '@/lib/premium';
+import { useLanguageStore } from '@/store/language-store';
 import { usePremiumStore } from '@/store/premium-store';
 
 interface TierConfigTabProps {
@@ -43,6 +44,21 @@ const FIELD_LABELS: Record<keyof PremiumFeatures, string> = {
   canAccessPremiumQuests: 'Nhiem vu premium',
   prioritySupport: 'Ho tro uu tien',
   earlyAccess: 'Truy cap som',
+};
+
+const FIELD_LABELS_EN: Record<keyof PremiumFeatures, string> = {
+  maxCharacters: 'Max characters',
+  maxMessagesPerDay: 'Messages per day',
+  adFree: 'Ad free',
+  voiceMessages: 'Voice messages',
+  sendImages: 'Send images',
+  sendVideos: 'Send videos',
+  sendStickers: 'Send stickers',
+  canAccessPremiumScenes: 'Premium scenes',
+  canAccessPremiumGifts: 'Premium gifts',
+  canAccessPremiumQuests: 'Premium quests',
+  prioritySupport: 'Priority support',
+  earlyAccess: 'Early access',
 };
 
 function getDefaultTierConfig(): TierConfigs {
@@ -107,6 +123,10 @@ function getDefaultTierConfig(): TierConfigs {
 }
 
 export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
+  const labels = isVi ? FIELD_LABELS : FIELD_LABELS_EN;
+
   const { invalidateTierConfigs } = usePremiumStore();
   const [configs, setConfigs] = useState<TierConfigs>(getDefaultTierConfig());
   const [isLoading, setIsLoading] = useState(true);
@@ -125,12 +145,12 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
       const payload = await response.json();
 
       if (!response.ok || !payload?.success || !payload?.data) {
-        throw new Error(payload?.error || 'Khong the tai cau hinh tier');
+        throw new Error(payload?.error || (isVi ? 'Khong the tai cau hinh tier' : 'Unable to load tier configuration'));
       }
 
       setConfigs(payload.data as TierConfigs);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Khong the tai cau hinh tier';
+      const message = error instanceof Error ? error.message : (isVi ? 'Khong the tai cau hinh tier' : 'Unable to load tier configuration');
       showToast(message, 'error');
     } finally {
       setIsLoading(false);
@@ -172,14 +192,14 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
 
       const payload = await response.json();
       if (!response.ok || !payload?.success || !payload?.data) {
-        throw new Error(payload?.error || `Khong the luu tier ${tier}`);
+        throw new Error(payload?.error || (isVi ? `Khong the luu tier ${tier}` : `Unable to save ${tier} tier`));
       }
 
       setConfigs(payload.data as TierConfigs);
       invalidateTierConfigs();
-      showToast(`Da luu cau hinh ${tier}`);
+      showToast(isVi ? `Da luu cau hinh ${tier}` : `${tier} configuration saved`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : `Khong the luu tier ${tier}`;
+      const message = error instanceof Error ? error.message : (isVi ? `Khong the luu tier ${tier}` : `Unable to save ${tier} tier`);
       showToast(message, 'error');
     } finally {
       setSavingTier(null);
@@ -190,7 +210,7 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
     return (
       <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50 flex items-center justify-center gap-2 text-gray-300">
         <RefreshCw className="w-5 h-5 animate-spin" />
-        Dang tai cau hinh VIP...
+        {isVi ? 'Dang tai cau hinh VIP...' : 'Loading VIP configuration...'}
       </div>
     );
   }
@@ -198,7 +218,7 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Cau hinh VIP</h2>
+        <h2 className="text-2xl font-bold text-white">{isVi ? 'Cau hinh VIP' : 'VIP Configuration'}</h2>
         <button
           onClick={() => void fetchTierConfigs()}
           disabled={isSavingAny}
@@ -210,7 +230,7 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {TIERS.map((tier) => (
-          <div key={tier} className="bg-[#271b21] rounded-2xl p-4 border border-[#392830] text-white">
+          <div key={tier} className="bg-[#271b21] rounded-2xl p-4 border border-[#392830] text-white shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">{tier}</h3>
               <button
@@ -219,14 +239,18 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-love/80 hover:bg-love disabled:opacity-50 text-sm"
               >
                 <Save className="w-3.5 h-3.5" />
-                {savingTier === tier ? 'Dang luu...' : 'Luu'}
+                {savingTier === tier ? (isVi ? 'Dang luu...' : 'Saving...') : (isVi ? 'Luu' : 'Save')}
               </button>
             </div>
+
+            <p className="text-[11px] text-[#ba9cab] mb-3">
+              {isVi ? '-1 nghia la khong gioi han' : '-1 means unlimited'}
+            </p>
 
             <div className="space-y-3">
               {NUMBER_FIELDS.map((field) => (
                 <div key={field}>
-                  <label className="block text-xs text-[#ba9cab] mb-1">{FIELD_LABELS[field]}</label>
+                  <label className="block text-xs text-[#ba9cab] mb-1">{labels[field]}</label>
                   <input
                     type="number"
                     min={-1}
@@ -239,7 +263,7 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
 
               {BOOLEAN_FIELDS.map((field) => (
                 <label key={field} className="flex items-center justify-between gap-2 py-1.5 text-sm">
-                  <span className="text-[#f4e7ee]">{FIELD_LABELS[field]}</span>
+                  <span className="text-[#f4e7ee]">{labels[field]}</span>
                   <input
                     type="checkbox"
                     checked={configs[tier][field]}
