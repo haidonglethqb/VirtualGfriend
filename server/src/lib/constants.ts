@@ -56,10 +56,11 @@ export function validatePassword(password: string): { valid: boolean; errors: st
 }
 
 // Premium Tier Features
+// Current system: FREE vs VIP (BASIC/PRO/ULTIMATE all treated as VIP)
 export const PREMIUM_FEATURES = {
   FREE: {
     maxCharacters: 1,
-    maxMessagesPerDay: 50,
+    maxMessagesPerDay: -1, // Unlimited for all users
     maxScenes: 3,
     canAccessPremiumScenes: false,
     canAccessPremiumGifts: false,
@@ -70,11 +71,12 @@ export const PREMIUM_FEATURES = {
     earlyAccess: false,
     exclusiveContent: false,
   },
+  // VIP tiers - all have same core benefits
   BASIC: {
-    maxCharacters: 2,
-    maxMessagesPerDay: 200,
-    maxScenes: 10,
-    canAccessPremiumScenes: false,
+    maxCharacters: 5,
+    maxMessagesPerDay: -1, // Unlimited
+    maxScenes: -1, // Unlimited
+    canAccessPremiumScenes: true,
     canAccessPremiumGifts: true,
     canAccessPremiumQuests: true,
     aiResponseQuality: 'enhanced',
@@ -110,6 +112,11 @@ export const PREMIUM_FEATURES = {
     exclusiveContent: true,
   },
 } as const;
+
+// Helper to check if user is VIP (any paid tier)
+export function isVipTier(tier: keyof typeof PREMIUM_FEATURES): boolean {
+  return tier !== 'FREE';
+}
 
 // Relationship Stage Thresholds
 export const RELATIONSHIP_THRESHOLDS = {

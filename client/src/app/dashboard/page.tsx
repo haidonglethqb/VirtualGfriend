@@ -10,6 +10,7 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 import AppLayout from '@/components/layout/app-layout';
+import { AdBanner } from '@/components/ads/ad-banner';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
 import { formatNumber, getRelationshipLabel, getMoodEmoji } from '@/lib/utils';
@@ -299,6 +300,9 @@ export default function DashboardPage() {
                 />
               </div>
             </motion.div>
+
+            {/* Ad Banner for free users */}
+            <AdBanner placement="dashboard-bottom" />
 
             {/* Daily Quests */}
             <motion.div

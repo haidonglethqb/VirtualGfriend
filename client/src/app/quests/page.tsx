@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/app-layout';
+import { AdBanner } from '@/components/ads/ad-banner';
 import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
@@ -275,6 +276,9 @@ export default function QuestsPage() {
               </TabsContent>
             </Tabs>
           </motion.div>
+
+          {/* Ad Banner for free users */}
+          <AdBanner placement="quests-bottom" />
             </>
           )}
       </div>

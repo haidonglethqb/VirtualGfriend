@@ -3,13 +3,14 @@
 import { ReactNode } from 'react';
 import { Lock, Crown, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
-import { 
-  PremiumTier, 
+import {
+  PremiumTier,
   PremiumFeatures,
-  hasTierAccess, 
-  hasFeatureAccess, 
+  hasTierAccess,
+  hasFeatureAccess,
   getMinimumTierForFeature,
-  TIER_INFO 
+  isVipTier,
+  TIER_INFO
 } from '@/lib/premium';
 import Link from 'next/link';
 
@@ -91,7 +92,7 @@ export function PremiumGate({
           </h3>
           
           <p className="text-[#ba9cab] text-sm mb-4">
-            Nâng cấp lên gói <span className={tierInfo.color}>{tierInfo.icon} {tierInfo.name}</span> để mở khóa
+            Nâng cấp lên gói <span className={tierInfo.color}>{tierInfo.icon} {tierInfo.displayName}</span> để mở khóa
           </p>
           
           <Link
@@ -110,18 +111,20 @@ export function PremiumGate({
 /**
  * Premium badge component - shows user's current tier
  */
-export function PremiumBadge({ tier }: { tier?: PremiumTier }) {
+export function PremiumBadge({ tier, showFree = false }: { tier?: PremiumTier; showFree?: boolean }) {
   const effectiveTier = tier || 'FREE';
   const info = TIER_INFO[effectiveTier];
 
-  if (effectiveTier === 'FREE') {
+  if (effectiveTier === 'FREE' && !showFree) {
     return null;
   }
 
+  const bgColor = effectiveTier === 'FREE' ? 'bg-gray-500/10' : 'bg-love/20';
+
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${info.color} bg-${info.color.split('-')[1]}-500/10`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${info.color} ${bgColor}`}>
       <span>{info.icon}</span>
-      <span>{info.name}</span>
+      <span>{info.displayName}</span>
     </span>
   );
 }
@@ -154,7 +157,7 @@ export function FeatureLock({
   };
 
   return (
-    <span className={`${tierInfo.color} inline-flex items-center`} title={`Yêu cầu gói ${tierInfo.name}`}>
+    <span className={`${tierInfo.color} inline-flex items-center`} title={`Yêu cầu gói ${tierInfo.displayName}`}>
       <Sparkles className={sizeClasses[size]} />
     </span>
   );
@@ -170,6 +173,7 @@ export function usePremiumAccess() {
   return {
     tier: userTier,
     isPremium: userTier !== 'FREE',
+    isVip: isVipTier(userTier),
     hasTierAccess: (tier: PremiumTier) => hasTierAccess(userTier, tier),
     hasFeatureAccess: (feature: keyof PremiumFeatures) => hasFeatureAccess(userTier, feature),
   };

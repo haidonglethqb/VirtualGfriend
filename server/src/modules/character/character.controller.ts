@@ -3,6 +3,8 @@ import { characterService } from './character.service';
 import { z } from 'zod';
 import { AppError } from '../../middlewares/error.middleware';
 import { createModuleLogger } from '../../lib/logger';
+import { PREMIUM_FEATURES } from '../../lib/constants';
+import { prisma } from '../../lib/prisma';
 
 const log = createModuleLogger('CharacterController');
 
@@ -62,6 +64,27 @@ export const characterController = {
       log.debug('Received request body:', req.body);
       const data = createCharacterSchema.parse(req.body);
       log.debug('Validated data:', data);
+
+      // Check character limit based on premium tier
+      const tier = req.premiumInfo?.tier || 'FREE';
+      const maxCharacters = PREMIUM_FEATURES[tier].maxCharacters;
+
+      // Count existing characters (including inactive ones)
+      const existingCount = await prisma.character.count({
+        where: { userId: req.user!.id },
+      });
+
+      if (maxCharacters !== -1 && existingCount >= maxCharacters) {
+        log.warn(`User ${req.user!.id} exceeded character limit: ${existingCount}/${maxCharacters}`);
+        return next(
+          new AppError(
+            `Bạn đã đạt giới hạn số nhân vật (${maxCharacters}). Nâng cấp VIP để tạo thêm!`,
+            403,
+            'CHARACTER_LIMIT_REACHED'
+          )
+        );
+      }
+
       const character = await characterService.createCharacter(req.user!.id, data);
       log.debug('Character created:', character.id);
       res.status(201).json({ success: true, data: character });
