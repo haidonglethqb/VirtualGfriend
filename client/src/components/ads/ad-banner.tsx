@@ -21,8 +21,8 @@ interface AdBannerProps {
 export function AdBanner({ placement, size = 'medium', className = '' }: AdBannerProps) {
   const { isVip, hasFeatureAccess } = usePremiumAccess();
 
-  // VIP users with noAds feature don't see ads
-  if (isVip || hasFeatureAccess('noAds')) {
+  // VIP users with adFree feature don't see ads
+  if (isVip || hasFeatureAccess('adFree')) {
     return null;
   }
 
@@ -69,7 +69,7 @@ export function AdBanner({ placement, size = 'medium', className = '' }: AdBanne
 export function InlineAd({ className = '' }: { className?: string }) {
   const { isVip, hasFeatureAccess } = usePremiumAccess();
 
-  if (isVip || hasFeatureAccess('noAds')) {
+  if (isVip || hasFeatureAccess('adFree')) {
     return null;
   }
 

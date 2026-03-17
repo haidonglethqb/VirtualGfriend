@@ -1,11 +1,14 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Lock, Crown, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
+import { usePremiumStore } from '@/store/premium-store';
 import {
+  AllTierConfigs,
   PremiumTier,
   PremiumFeatures,
+  PREMIUM_FEATURES,
   hasTierAccess,
   hasFeatureAccess,
   getMinimumTierForFeature,
@@ -40,8 +43,16 @@ export function PremiumGate({
   showUpgradePrompt = true,
   lockedMessage,
 }: PremiumGateProps) {
+  const { allTierConfigs, fetchTierConfigs, lastFetchedAt } = usePremiumStore();
   const { user } = useAuthStore();
   const userTier = (user?.premiumTier as PremiumTier) || 'FREE';
+  const configs: AllTierConfigs = allTierConfigs || PREMIUM_FEATURES;
+
+  useEffect(() => {
+    if (!lastFetchedAt) {
+      void fetchTierConfigs();
+    }
+  }, [fetchTierConfigs, lastFetchedAt]);
 
   // Check access
   let hasAccess = true;
@@ -53,8 +64,8 @@ export function PremiumGate({
   }
 
   if (requiredFeature && hasAccess) {
-    hasAccess = hasFeatureAccess(userTier, requiredFeature);
-    targetTier = getMinimumTierForFeature(requiredFeature);
+    hasAccess = hasFeatureAccess(userTier, requiredFeature, configs);
+    targetTier = getMinimumTierForFeature(requiredFeature, configs);
   }
 
   // User has access - render children
@@ -139,15 +150,23 @@ export function FeatureLock({
   feature: keyof PremiumFeatures; 
   size?: 'sm' | 'md' | 'lg';
 }) {
+  const { allTierConfigs, fetchTierConfigs, lastFetchedAt } = usePremiumStore();
   const { user } = useAuthStore();
   const userTier = (user?.premiumTier as PremiumTier) || 'FREE';
-  const hasAccess = hasFeatureAccess(userTier, feature);
+  const configs: AllTierConfigs = allTierConfigs || PREMIUM_FEATURES;
+  const hasAccess = hasFeatureAccess(userTier, feature, configs);
+
+  useEffect(() => {
+    if (!lastFetchedAt) {
+      void fetchTierConfigs();
+    }
+  }, [fetchTierConfigs, lastFetchedAt]);
 
   if (hasAccess) {
     return null;
   }
 
-  const requiredTier = getMinimumTierForFeature(feature);
+  const requiredTier = getMinimumTierForFeature(feature, configs);
   const tierInfo = TIER_INFO[requiredTier];
   
   const sizeClasses = {
@@ -167,14 +186,22 @@ export function FeatureLock({
  * Hook to check premium access
  */
 export function usePremiumAccess() {
+  const { allTierConfigs, fetchTierConfigs, lastFetchedAt } = usePremiumStore();
   const { user } = useAuthStore();
   const userTier = (user?.premiumTier as PremiumTier) || 'FREE';
+  const configs: AllTierConfigs = allTierConfigs || PREMIUM_FEATURES;
+
+  useEffect(() => {
+    if (!lastFetchedAt) {
+      void fetchTierConfigs();
+    }
+  }, [fetchTierConfigs, lastFetchedAt]);
 
   return {
     tier: userTier,
     isPremium: userTier !== 'FREE',
     isVip: isVipTier(userTier),
     hasTierAccess: (tier: PremiumTier) => hasTierAccess(userTier, tier),
-    hasFeatureAccess: (feature: keyof PremiumFeatures) => hasFeatureAccess(userTier, feature),
+    hasFeatureAccess: (feature: keyof PremiumFeatures) => hasFeatureAccess(userTier, feature, configs),
   };
 }

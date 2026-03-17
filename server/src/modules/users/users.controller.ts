@@ -4,8 +4,7 @@ import { z } from 'zod';
 import { AppError } from '../../middlewares/error.middleware';
 import { chatService } from '../chat/chat.service';
 import { prisma } from '../../lib/prisma';
-import { PREMIUM_FEATURES, isVipTier } from '../../lib/constants';
-
+import { isVipTier } from '../../lib/constants';
 const updateProfileSchema = z.object({
   username: z.string().min(3).optional(),
   displayName: z.string().optional(),
@@ -135,7 +134,8 @@ export const userController = {
   async getPremiumStatus(req: Request, res: Response, next: NextFunction) {
     try {
       const tier = req.premiumInfo?.tier || 'FREE';
-      const features = PREMIUM_FEATURES[tier];
+      // Use features already resolved by premium middleware (reads from dynamic tier config)
+      const features = req.premiumInfo?.features;
 
       // Get daily message usage
       const messageUsage = await chatService.checkDailyLimit(req.user!.id, tier);
@@ -165,13 +165,20 @@ export const userController = {
           daysRemaining,
           expired: req.premiumInfo?.expired || false,
 
-          // Features
+          // Full dynamic feature config for this tier
           features: {
-            maxCharacters: features.maxCharacters,
-            maxMessagesPerDay: features.maxMessagesPerDay,
-            adFree: features.adFree,
-            canAccessPremiumGifts: features.canAccessPremiumGifts,
-            canAccessPremiumScenes: features.canAccessPremiumScenes,
+            maxCharacters: features?.maxCharacters ?? 1,
+            maxMessagesPerDay: features?.maxMessagesPerDay ?? -1,
+            adFree: features?.adFree ?? false,
+            voiceMessages: features?.voiceMessages ?? false,
+            sendImages: features?.sendImages ?? false,
+            sendVideos: features?.sendVideos ?? false,
+            sendStickers: features?.sendStickers ?? false,
+            canAccessPremiumGifts: features?.canAccessPremiumGifts ?? false,
+            canAccessPremiumScenes: features?.canAccessPremiumScenes ?? false,
+            canAccessPremiumQuests: features?.canAccessPremiumQuests ?? false,
+            prioritySupport: features?.prioritySupport ?? false,
+            earlyAccess: features?.earlyAccess ?? false,
           },
 
           // Current usage
@@ -181,8 +188,8 @@ export const userController = {
             messagesRemaining: messageUsage.remaining,
             isUnlimitedMessages: messageUsage.limit === -1,
             charactersUsed: characterCount,
-            charactersLimit: features.maxCharacters,
-            charactersRemaining: features.maxCharacters === -1 ? -1 : Math.max(0, features.maxCharacters - characterCount),
+            charactersLimit: features?.maxCharacters ?? 1,
+            charactersRemaining: (features?.maxCharacters ?? 1) === -1 ? -1 : Math.max(0, (features?.maxCharacters ?? 1) - characterCount),
           },
         },
       });

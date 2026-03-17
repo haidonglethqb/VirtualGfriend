@@ -4,83 +4,80 @@
 export type PremiumTier = 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE';
 
 export interface PremiumFeatures {
-  dailyMessages: number;
+  maxMessagesPerDay: number;
   maxCharacters: number;
+  adFree: boolean;
   voiceMessages: boolean;
   sendImages: boolean;
   sendVideos: boolean;
   sendStickers: boolean;
-  imageGeneration: boolean;
-  advancedPersonality: boolean;
-  exclusiveScenes: boolean;
-  noAds: boolean;
+  canAccessPremiumScenes: boolean;
+  canAccessPremiumGifts: boolean;
+  canAccessPremiumQuests: boolean;
   prioritySupport: boolean;
-  customBackgrounds: boolean;
   earlyAccess: boolean;
 }
 
+export type AllTierConfigs = Record<PremiumTier, PremiumFeatures>;
+
 // Feature definitions by tier
 // Current system: FREE vs VIP (BASIC/PRO/ULTIMATE all treated as VIP)
-export const PREMIUM_FEATURES: Record<PremiumTier, PremiumFeatures> = {
+export const PREMIUM_FEATURES: AllTierConfigs = {
   FREE: {
-    dailyMessages: -1, // Unlimited for all users
+    maxMessagesPerDay: -1,
     maxCharacters: 1,
+    adFree: false,
     voiceMessages: false,
     sendImages: false,
     sendVideos: false,
     sendStickers: false,
-    imageGeneration: false,
-    advancedPersonality: false,
-    exclusiveScenes: false,
-    noAds: false,
+    canAccessPremiumScenes: false,
+    canAccessPremiumGifts: false,
+    canAccessPremiumQuests: false,
     prioritySupport: false,
-    customBackgrounds: false,
     earlyAccess: false,
   },
   // VIP tiers - all have same core benefits
   BASIC: {
-    dailyMessages: -1, // Unlimited
+    maxMessagesPerDay: -1,
     maxCharacters: 5,
+    adFree: true,
     voiceMessages: true,
     sendImages: true,
     sendVideos: true,
     sendStickers: true,
-    imageGeneration: false,
-    advancedPersonality: false,
-    exclusiveScenes: true,
-    noAds: true,
+    canAccessPremiumScenes: true,
+    canAccessPremiumGifts: true,
+    canAccessPremiumQuests: true,
     prioritySupport: false,
-    customBackgrounds: true,
     earlyAccess: false,
   },
   PRO: {
-    dailyMessages: -1,
+    maxMessagesPerDay: -1,
     maxCharacters: 5,
+    adFree: true,
     voiceMessages: true,
     sendImages: true,
     sendVideos: true,
     sendStickers: true,
-    imageGeneration: true,
-    advancedPersonality: true,
-    exclusiveScenes: true,
-    noAds: true,
+    canAccessPremiumScenes: true,
+    canAccessPremiumGifts: true,
+    canAccessPremiumQuests: true,
     prioritySupport: true,
-    customBackgrounds: true,
     earlyAccess: true,
   },
   ULTIMATE: {
-    dailyMessages: -1, // Unlimited
-    maxCharacters: -1, // Unlimited
+    maxMessagesPerDay: -1,
+    maxCharacters: -1,
+    adFree: true,
     voiceMessages: true,
     sendImages: true,
     sendVideos: true,
     sendStickers: true,
-    imageGeneration: true,
-    advancedPersonality: true,
-    exclusiveScenes: true,
-    noAds: true,
+    canAccessPremiumScenes: true,
+    canAccessPremiumGifts: true,
+    canAccessPremiumQuests: true,
     prioritySupport: true,
-    customBackgrounds: true,
     earlyAccess: true,
   },
 };
@@ -113,33 +110,25 @@ export function hasTierAccess(userTier: PremiumTier, requiredTier: PremiumTier):
 }
 
 /**
- * Check if user has access to a specific feature
- */
-export function hasFeatureAccess(userTier: PremiumTier, feature: keyof PremiumFeatures): boolean {
-  const features = PREMIUM_FEATURES[userTier];
-  const value = features[feature];
-  
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value !== 0;
-  return false;
-}
-
-/**
  * Get feature value for user tier
  */
 export function getFeatureValue<K extends keyof PremiumFeatures>(
   userTier: PremiumTier, 
-  feature: K
+  feature: K,
+  configs: AllTierConfigs = PREMIUM_FEATURES,
 ): PremiumFeatures[K] {
-  return PREMIUM_FEATURES[userTier][feature];
+  return configs[userTier][feature];
 }
 
 /**
  * Get minimum tier required for a feature
  */
-export function getMinimumTierForFeature(feature: keyof PremiumFeatures): PremiumTier {
+export function getMinimumTierForFeature(
+  feature: keyof PremiumFeatures,
+  configs: AllTierConfigs = PREMIUM_FEATURES,
+): PremiumTier {
   for (const tier of TIER_HIERARCHY) {
-    if (hasFeatureAccess(tier, feature)) {
+    if (hasFeatureAccess(tier, feature, configs)) {
       return tier;
     }
   }
@@ -149,8 +138,12 @@ export function getMinimumTierForFeature(feature: keyof PremiumFeatures): Premiu
 /**
  * Check if user should see premium upsell
  */
-export function shouldShowUpsell(userTier: PremiumTier, feature: keyof PremiumFeatures): boolean {
-  return !hasFeatureAccess(userTier, feature);
+export function shouldShowUpsell(
+  userTier: PremiumTier,
+  feature: keyof PremiumFeatures,
+  configs: AllTierConfigs = PREMIUM_FEATURES,
+): boolean {
+  return !hasFeatureAccess(userTier, feature, configs);
 }
 
 /**
@@ -166,17 +159,31 @@ export function formatMessageLimit(limit: number): string {
  */
 export function getUpgradeSuggestion(
   currentTier: PremiumTier,
-  desiredFeature: keyof PremiumFeatures
+  desiredFeature: keyof PremiumFeatures,
+  configs: AllTierConfigs = PREMIUM_FEATURES,
 ): { targetTier: PremiumTier; message: string } | null {
-  if (hasFeatureAccess(currentTier, desiredFeature)) {
+  if (hasFeatureAccess(currentTier, desiredFeature, configs)) {
     return null;
   }
 
-  const targetTier = getMinimumTierForFeature(desiredFeature);
+  const targetTier = getMinimumTierForFeature(desiredFeature, configs);
   const tierInfo = TIER_INFO[targetTier];
 
   return {
     targetTier,
     message: `Nâng cấp lên gói ${tierInfo.displayName} để mở khóa tính năng này`,
   };
+}
+
+export function hasFeatureAccess(
+  userTier: PremiumTier,
+  feature: keyof PremiumFeatures,
+  configs: AllTierConfigs = PREMIUM_FEATURES,
+): boolean {
+  const features = configs[userTier];
+  const value = features[feature];
+
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  return false;
 }
