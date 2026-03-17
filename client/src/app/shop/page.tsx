@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/app-layout';
+import { AdBanner } from '@/components/ads/ad-banner';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
 import { useToast } from '@/hooks/use-toast';
@@ -199,6 +200,7 @@ export default function ShopPage() {
             </TabsList>
 
             <TabsContent value={activeTab} className="mt-6">
+              <AdBanner placement="shop-between" className="mb-4" />
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredItems.map((item, index) => (
                   <motion.div

@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import { userService } from './users.service';
 import { z } from 'zod';
 import { AppError } from '../../middlewares/error.middleware';
+import { chatService } from '../chat/chat.service';
+import { prisma } from '../../lib/prisma';
+import { PREMIUM_FEATURES, isVipTier } from '../../lib/constants';
 
 const updateProfileSchema = z.object({
   username: z.string().min(3).optional(),
@@ -121,6 +124,68 @@ export const userController = {
       const { ids } = req.body;
       await userService.markNotificationsRead(req.user!.id, ids);
       res.json({ success: true, message: 'Notifications marked as read' });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Get premium subscription status with usage information
+   */
+  async getPremiumStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const tier = req.premiumInfo?.tier || 'FREE';
+      const features = PREMIUM_FEATURES[tier];
+
+      // Get daily message usage
+      const messageUsage = await chatService.checkDailyLimit(req.user!.id, tier);
+
+      // Count user's characters
+      const characterCount = await prisma.character.count({
+        where: { userId: req.user!.id },
+      });
+
+      // Calculate days remaining if premium
+      let daysRemaining: number | null = null;
+      if (req.premiumInfo?.expiresAt) {
+        const now = new Date();
+        const expires = new Date(req.premiumInfo.expiresAt);
+        daysRemaining = Math.max(0, Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+
+      res.json({
+        success: true,
+        data: {
+          // Subscription info
+          tier,
+          tierDisplay: tier === 'FREE' ? 'Miễn phí' : 'VIP Premium',
+          isPremium: req.premiumInfo?.isPremium || false,
+          isVip: isVipTier(tier),
+          expiresAt: req.premiumInfo?.expiresAt || null,
+          daysRemaining,
+          expired: req.premiumInfo?.expired || false,
+
+          // Features
+          features: {
+            maxCharacters: features.maxCharacters,
+            maxMessagesPerDay: features.maxMessagesPerDay,
+            adFree: features.adFree,
+            canAccessPremiumGifts: features.canAccessPremiumGifts,
+            canAccessPremiumScenes: features.canAccessPremiumScenes,
+          },
+
+          // Current usage
+          usage: {
+            messagesUsedToday: messageUsage.used,
+            messagesLimit: messageUsage.limit,
+            messagesRemaining: messageUsage.remaining,
+            isUnlimitedMessages: messageUsage.limit === -1,
+            charactersUsed: characterCount,
+            charactersLimit: features.maxCharacters,
+            charactersRemaining: features.maxCharacters === -1 ? -1 : Math.max(0, features.maxCharacters - characterCount),
+          },
+        },
+      });
     } catch (error) {
       next(error);
     }

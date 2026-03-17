@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Heart, Send, Mic, Smile,
+import {
+  Heart, Send, Mic, Smile, Paperclip,
   Gift, Phone, Video, Sparkles, X, Check, Loader2, ImageIcon
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/app-layout'
@@ -20,6 +20,7 @@ import Image from 'next/image'
 import api from '@/services/api'
 import { AffectionPopup, LevelUpModal, RelationshipUpgradeModal, ProactiveNotification } from '@/components/ui/notifications'
 import { SceneSelector } from '@/components/ui/scene-selector'
+import { usePremiumAccess } from '@/components/PremiumGate'
 import { useSceneStore } from '@/store/scene-store'
 
 interface InventoryItem {
@@ -67,6 +68,7 @@ export default function ChatPage() {
 
   // Scene store
   const { activeSceneId, getActiveScene, fetchScenes } = useSceneStore();
+  const { hasFeatureAccess } = usePremiumAccess();
 
   const [inputMessage, setInputMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -169,7 +171,7 @@ export default function ChatPage() {
     // Show typing indicator immediately after user message
     useChatStore.getState().setTyping(true);
 
-    socketService.emit('message:send', { 
+    socketService.emit('message:send', {
       content,
       characterId: character.id,
       clientId,
@@ -534,13 +536,13 @@ export default function ChatPage() {
           </div>
           
           <div className="relative group">
-            <input 
+            <input
               ref={inputRef}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyPress}
               disabled={isSending}
-              className="w-full bg-[#392830]/40 hover:bg-[#392830]/60 focus:bg-[#392830]/60 border border-[#4a3640] focus:border-love/50 text-white placeholder-white/40 rounded-full py-4 pl-6 pr-32 outline-none transition-all shadow-lg backdrop-blur-md" 
+              className="w-full bg-[#392830]/40 hover:bg-[#392830]/60 focus:bg-[#392830]/60 border border-[#4a3640] focus:border-love/50 text-white placeholder-white/40 rounded-full py-4 pl-6 pr-40 outline-none transition-all shadow-lg backdrop-blur-md"
               placeholder={`Nhắn tin cho ${character?.name || 'người yêu'}...`}
               type="text"
             />
@@ -549,10 +551,27 @@ export default function ChatPage() {
               <button onClick={() => toast({ title: 'Sắp ra mắt', description: 'Bộ chọn emoji sẽ có trong bản cập nhật tới!' })} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors" title="Emoji (Sắp ra mắt)">
                 <Smile className="w-5 h-5" />
               </button>
-              <button onClick={() => toast({ title: 'Sắp ra mắt', description: 'Tính năng ghi âm sẽ có trong bản cập nhật tới!' })} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors" title="Ghi âm (Sắp ra mắt)">
+              <button
+                onClick={() => hasFeatureAccess('sendImages')
+                  ? toast({ title: 'Sắp ra mắt', description: 'Tính năng gửi ảnh sẽ có trong bản cập nhật tới!' })
+                  : toast({ title: '👑 Tính năng VIP', description: 'Nâng cấp VIP để gửi ảnh & video' })
+                }
+                className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                title="Gửi ảnh (VIP)"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => hasFeatureAccess('voiceMessages')
+                  ? toast({ title: 'Sắp ra mắt', description: 'Tính năng ghi âm sẽ có trong bản cập nhật tới!' })
+                  : toast({ title: '👑 Tính năng VIP', description: 'Nâng cấp VIP để ghi âm giọng nói' })
+                }
+                className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                title="Ghi âm (VIP)"
+              >
                 <Mic className="w-5 h-5" />
               </button>
-              <button 
+              <button
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isSending}
                 className="w-10 h-10 flex items-center justify-center rounded-full bg-love text-white shadow-[0_0_15px_rgba(244,37,140,0.4)] hover:bg-love/90 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"

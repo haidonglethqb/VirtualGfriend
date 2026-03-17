@@ -15,6 +15,30 @@ const sendMessageSchema = z.object({
 });
 
 export const chatController = {
+  /**
+   * Get daily message usage for current user
+   */
+  async getDailyUsage(req: Request, res: Response, next: NextFunction) {
+    try {
+      const tier = req.premiumInfo?.tier || 'FREE';
+      const usage = await chatService.checkDailyLimit(req.user!.id, tier);
+
+      res.json({
+        success: true,
+        data: {
+          tier,
+          isVip: req.premiumInfo?.isVip || false,
+          messagesUsed: usage.used,
+          messagesLimit: usage.limit,
+          messagesRemaining: usage.remaining,
+          isUnlimited: usage.limit === -1,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async getHistory(req: Request, res: Response, next: NextFunction) {
     try {
       const page = parseInt(req.query.page as string) || 1;
@@ -58,10 +82,25 @@ export const chatController = {
       log.debug('=== SEND MESSAGE REQUEST ===');
       log.debug('User ID:', req.user!.id);
       log.debug('Request body:', req.body);
-      
+
       const data = sendMessageSchema.parse(req.body);
       log.debug('Validated data:', data);
-      
+
+      // Check daily message limit based on premium tier
+      const tier = req.premiumInfo?.tier || 'FREE';
+      const limitCheck = await chatService.checkDailyLimit(req.user!.id, tier);
+
+      if (!limitCheck.canSend) {
+        log.warn(`User ${req.user!.id} exceeded daily limit: ${limitCheck.used}/${limitCheck.limit}`);
+        return next(
+          new AppError(
+            `Bạn đã hết lượt tin nhắn hôm nay (${limitCheck.limit} tin). Nâng cấp VIP để nhắn không giới hạn!`,
+            403,
+            'DAILY_LIMIT_REACHED'
+          )
+        );
+      }
+
       // If no characterId provided, get user's active character
       let characterId = data.characterId;
       if (!characterId) {
@@ -75,15 +114,33 @@ export const chatController = {
         characterId = character.id;
         log.debug('Using active character:', characterId);
       }
-      
+
       log.debug('Calling chatService.sendMessage...');
       const result = await chatService.sendMessage(req.user!.id, {
         ...data,
         characterId,
       });
+
+      // Increment daily count in cache after successful send
+      await chatService.incrementDailyCount(req.user!.id);
+
+      // Include remaining messages in response for frontend
+      const newUsage = await chatService.checkDailyLimit(req.user!.id, tier);
+
       log.debug('=== SEND MESSAGE SUCCESS ===');
       log.debug('AI Response:', result.aiMessage?.content?.substring(0, 100));
-      res.json({ success: true, data: result });
+      res.json({
+        success: true,
+        data: {
+          ...result,
+          dailyUsage: {
+            used: newUsage.used,
+            limit: newUsage.limit,
+            remaining: newUsage.remaining,
+            isUnlimited: newUsage.limit === -1,
+          },
+        },
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));
