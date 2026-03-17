@@ -34,8 +34,13 @@ router.use('/admin', adminRouter);
 
 // Public config endpoint for frontend dynamic premium plans
 router.get('/config/tier-plans', async (_: Request, res: Response) => {
-  const configs = await getAllTierConfigs();
-  res.json({ success: true, data: configs });
+  try {
+    const configs = await getAllTierConfigs();
+    res.json({ success: true, data: configs });
+  } catch (error) {
+    console.error('Failed to load tier plans:', error);
+    res.status(500).json({ success: false, error: 'Failed to load tier plans' });
+  }
 });
 
 // API info
