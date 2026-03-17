@@ -7,9 +7,16 @@ import { characterService } from '../character/character.service';
 import { gameEventService } from '../game/game-event.service';
 import { MessageType } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
-import { MESSAGE_LIMITS } from '../../lib/constants';
+import { MESSAGE_LIMITS, PREMIUM_FEATURES } from '../../lib/constants';
+import type { PremiumTier } from '../../lib/prisma';
 
 const log = createModuleLogger('Chat');
+
+// Get start of today in UTC
+function getStartOfToday(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
 
 interface SendMessageData {
   characterId: string;
@@ -355,5 +362,74 @@ export const chatService = {
         },
       },
     });
+  },
+
+  /**
+   * Get count of messages sent by user today (USER role only)
+   */
+  async getDailyMessageCount(userId: string): Promise<number> {
+    const startOfToday = getStartOfToday();
+
+    // Try cache first
+    const cacheKey = `daily_msg_count:${userId}:${startOfToday.toISOString().split('T')[0]}`;
+    const cached = await cache.get<number>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
+    // Count from database
+    const count = await prisma.message.count({
+      where: {
+        userId,
+        role: 'USER',
+        createdAt: { gte: startOfToday },
+      },
+    });
+
+    // Cache for 5 minutes
+    await cache.set(cacheKey, count, 300);
+    return count;
+  },
+
+  /**
+   * Check if user can send more messages today based on premium tier
+   * Returns { canSend, used, limit, remaining }
+   */
+  async checkDailyLimit(userId: string, tier: PremiumTier): Promise<{
+    canSend: boolean;
+    used: number;
+    limit: number;
+    remaining: number;
+  }> {
+    const features = PREMIUM_FEATURES[tier];
+    const maxMessages = features.maxMessagesPerDay;
+
+    // Unlimited (-1) means no limit
+    if (maxMessages === -1) {
+      return { canSend: true, used: 0, limit: -1, remaining: -1 };
+    }
+
+    const used = await this.getDailyMessageCount(userId);
+    const remaining = Math.max(0, maxMessages - used);
+
+    return {
+      canSend: used < maxMessages,
+      used,
+      limit: maxMessages,
+      remaining,
+    };
+  },
+
+  /**
+   * Increment daily message count in cache
+   */
+  async incrementDailyCount(userId: string): Promise<void> {
+    const startOfToday = getStartOfToday();
+    const cacheKey = `daily_msg_count:${userId}:${startOfToday.toISOString().split('T')[0]}`;
+
+    const current = await cache.get<number>(cacheKey);
+    if (current !== null) {
+      await cache.set(cacheKey, current + 1, 300);
+    }
   },
 };
