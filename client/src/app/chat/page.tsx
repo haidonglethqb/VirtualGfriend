@@ -22,6 +22,7 @@ import { AffectionPopup, LevelUpModal, RelationshipUpgradeModal, ProactiveNotifi
 import { SceneSelector } from '@/components/ui/scene-selector'
 import { usePremiumAccess } from '@/components/PremiumGate'
 import { useSceneStore } from '@/store/scene-store'
+import { useLanguageStore } from '@/store/language-store'
 
 interface InventoryItem {
   id: string;
@@ -35,9 +36,86 @@ interface InventoryItem {
   };
 }
 
+const CHAT_I18N = {
+  vi: {
+    lover: 'Người yêu',
+    online: 'Đang online',
+    happy: 'Đang vui',
+    affection: 'Độ thân mật',
+    level: 'Level',
+    voiceCall: 'Gọi thoại (Sắp ra mắt)',
+    videoCall: 'Gọi video (Sắp ra mắt)',
+    changeBackground: 'Đổi background',
+    giveGift: 'Tặng quà',
+    comingSoon: 'Sắp ra mắt',
+    voiceFeature: 'Tính năng gọi thoại sẽ có trong bản cập nhật tới!',
+    videoFeature: 'Tính năng gọi video sẽ có trong bản cập nhật tới!',
+    emojiFeature: 'Bộ chọn emoji sẽ có trong bản cập nhật tới!',
+    imageFeature: 'Tính năng gửi ảnh sẽ có trong bản cập nhật tới!',
+    voiceMessageFeature: 'Tính năng ghi âm sẽ có trong bản cập nhật tới!',
+    loadingMessages: 'Đang tải tin nhắn...',
+    startConversation: 'Bắt đầu cuộc trò chuyện!',
+    startConversationDesc: 'Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện với {name} của bạn 💕',
+    sendImage: 'Gửi ảnh (VIP)',
+    emoji: 'Emoji (Sắp ra mắt)',
+    voiceMessage: 'Ghi âm giọng nói (VIP)',
+    typeMessage: 'Nhắn tin cho {name}...',
+    typing: 'Đang nhắn...',
+    giftModalTitle: 'Tặng quà cho {name}',
+    giftSuccess: 'Tặng quà thành công!',
+    giftSuccessDesc: '{name} rất vui khi nhận được quà! 💕',
+    noGifts: 'Bạn chưa có quà nào trong túi đồ',
+    goShopping: 'Đi mua quà',
+    affectionBonus: '+{amount} độ thân mật',
+    giftTo: 'Tặng cho {name}',
+    gifting: 'Đang tặng...',
+    error: 'Lỗi',
+    cannotLoadInventory: 'Không thể tải túi đồ',
+    cannotSendGift: 'Không thể tặng quà',
+  },
+  en: {
+    lover: 'Lover',
+    online: 'Online',
+    happy: 'Happy',
+    affection: 'Affection',
+    level: 'Level',
+    voiceCall: 'Voice Call (Coming Soon)',
+    videoCall: 'Video Call (Coming Soon)',
+    changeBackground: 'Change Background',
+    giveGift: 'Give Gift',
+    comingSoon: 'Coming Soon',
+    voiceFeature: 'Voice call feature will be available in the next update!',
+    videoFeature: 'Video call feature will be available in the next update!',
+    emojiFeature: 'Emoji picker will be available in the next update!',
+    imageFeature: 'Image sending feature will be available in the next update!',
+    voiceMessageFeature: 'Voice recording feature will be available in the next update!',
+    loadingMessages: 'Loading messages...',
+    startConversation: 'Start a conversation!',
+    startConversationDesc: 'Send your first message to start chatting with your {name} 💕',
+    sendImage: 'Send Image (VIP)',
+    emoji: 'Emoji (Coming Soon)',
+    voiceMessage: 'Voice Message (VIP)',
+    typeMessage: 'Message {name}...',
+    typing: 'Typing...',
+    giftModalTitle: 'Give Gift to {name}',
+    giftSuccess: 'Gift Sent Successfully!',
+    giftSuccessDesc: '{name} is so happy to receive your gift! 💕',
+    noGifts: 'You have no gifts in your inventory',
+    goShopping: 'Go Shopping',
+    affectionBonus: '+{amount} affection',
+    giftTo: 'Give to {name}',
+    gifting: 'Sending...',
+    error: 'Error',
+    cannotLoadInventory: 'Cannot load inventory',
+    cannotSendGift: 'Cannot send gift',
+  },
+} as const;
+
 export default function ChatPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { language } = useLanguageStore();
+  const t = CHAT_I18N[language];
   const { isAuthenticated, accessToken } = useAuthStore();
   const { character, fetchCharacter, updateAffection, isLoading: characterLoading, needsCreation } = useCharacterStore();
   const { 
@@ -202,8 +280,8 @@ export default function ChatPage() {
       }
     } catch {
       toast({
-        title: 'Lỗi',
-        description: 'Không thể tải túi đồ',
+        title: t.error,
+        description: t.cannotLoadInventory,
         variant: 'destructive',
       });
     } finally {
@@ -240,8 +318,8 @@ export default function ChatPage() {
       }
     } catch {
       toast({
-        title: 'Lỗi',
-        description: 'Không thể tặng quà',
+        title: t.error,
+        description: t.cannotSendGift,
         variant: 'destructive',
       });
     } finally {
@@ -280,18 +358,18 @@ export default function ChatPage() {
               </div>
               <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 border-3 border-[#271b21] rounded-full" />
             </div>
-            
-            <h2 className="text-xl font-bold mb-1">{character?.name || 'Người yêu'}</h2>
+
+            <h2 className="text-xl font-bold mb-1">{character?.name || t.lover}</h2>
             <p className="text-sm text-green-400 flex items-center gap-1 mb-4">
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              Online • {getMoodEmoji(character?.mood || 'neutral')} Đang vui
+              {t.online} • {getMoodEmoji(character?.mood || 'neutral')} {t.happy}
             </p>
 
             {/* Affection Level */}
             <div className="w-full p-4 rounded-xl bg-[#181114] border border-[#392830]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-[#ba9cab]">Độ thân mật</span>
-                <span className="text-xs font-bold text-love">Level {affectionLevel}</span>
+                <span className="text-xs text-[#ba9cab]">{t.affection}</span>
+                <span className="text-xs font-bold text-love">{t.level} {affectionLevel}</span>
               </div>
               <div className="h-2 bg-[#392830] rounded-full overflow-hidden">
                 <div 
@@ -303,23 +381,23 @@ export default function ChatPage() {
 
             {/* Quick Actions */}
             <div className="flex items-center gap-3 mt-4">
-              <button onClick={() => toast({ title: 'Sắp ra mắt', description: 'Tính năng gọi thoại sẽ có trong bản cập nhật tới!' })} className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title="Gọi thoại (Sắp ra mắt)">
+              <button onClick={() => toast({ title: t.comingSoon, description: t.voiceFeature })} className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title={t.voiceCall}>
                 <Phone className="w-5 h-5 text-[#ba9cab]" />
               </button>
-              <button onClick={() => toast({ title: 'Sắp ra mắt', description: 'Tính năng gọi video sẽ có trong bản cập nhật tới!' })} className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title="Gọi video (Sắp ra mắt)">
+              <button onClick={() => toast({ title: t.comingSoon, description: t.videoFeature })} className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title={t.videoCall}>
                 <Video className="w-5 h-5 text-[#ba9cab]" />
               </button>
-              <button 
+              <button
                 onClick={() => setShowSceneSelector(true)}
-                className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center hover:bg-purple-500 hover:text-white text-purple-400 transition-all" 
-                title="Đổi background"
+                className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center hover:bg-purple-500 hover:text-white text-purple-400 transition-all"
+                title={t.changeBackground}
               >
                 <ImageIcon className="w-5 h-5" />
               </button>
-              <button 
+              <button
                 onClick={openGiftModal}
-                className="w-12 h-12 rounded-full bg-love/20 border border-love/30 flex items-center justify-center hover:bg-love hover:text-white text-love transition-all" 
-                title="Tặng quà"
+                className="w-12 h-12 rounded-full bg-love/20 border border-love/30 flex items-center justify-center hover:bg-love hover:text-white text-love transition-all"
+                title={t.giveGift}
               >
                 <Gift className="w-5 h-5" />
               </button>
@@ -349,10 +427,10 @@ export default function ChatPage() {
                 <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#271b21] rounded-full animate-pulse" />
               </div>
               <div>
-                <h3 className="font-bold text-base">{character?.name || 'Người yêu'}</h3>
+                <h3 className="font-bold text-base">{character?.name || t.lover}</h3>
                 <p className="text-xs text-green-400 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                  Đang online
+                  {t.online}
                 </p>
               </div>
             </div>
@@ -361,14 +439,14 @@ export default function ChatPage() {
                 <Heart className="w-4 h-4 text-love fill-love" />
                 <span className="text-sm font-bold text-love">Lv.{affectionLevel}</span>
               </div>
-              <button 
+              <button
                 onClick={() => setShowSceneSelector(true)}
                 className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 hover:bg-purple-500 hover:text-white transition-all"
-                title="Đổi background"
+                title={t.changeBackground}
               >
                 <ImageIcon className="w-4 h-4" />
               </button>
-              <button 
+              <button
                 onClick={openGiftModal}
                 className="w-10 h-10 rounded-full bg-love/20 border border-love/30 flex items-center justify-center text-love hover:bg-love hover:text-white transition-all"
               >
@@ -399,7 +477,7 @@ export default function ChatPage() {
                 <span className="w-3 h-3 bg-love rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-3 h-3 bg-love rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-              <p className="text-white/50 mt-4">Đang tải tin nhắn...</p>
+              <p className="text-white/50 mt-4">{t.loadingMessages}</p>
             </div>
           )}
 
@@ -409,9 +487,9 @@ export default function ChatPage() {
               <div className="w-24 h-24 rounded-full gradient-love flex items-center justify-center mb-6 shadow-love-strong">
                 <Sparkles className="w-12 h-12 text-white" />
               </div>
-              <h2 className="text-xl font-semibold mb-2">Bắt đầu cuộc trò chuyện!</h2>
+              <h2 className="text-xl font-semibold mb-2">{t.startConversation}</h2>
               <p className="text-white/50 max-w-sm">
-                Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện với {character?.name || 'người yêu'} của bạn 💕
+                {t.startConversationDesc.replace('{name}', character?.name || t.lover.toLowerCase())}
               </p>
             </div>
           )}
@@ -543,31 +621,31 @@ export default function ChatPage() {
               onKeyDown={handleKeyPress}
               disabled={isSending}
               className="w-full bg-[#392830]/40 hover:bg-[#392830]/60 focus:bg-[#392830]/60 border border-[#4a3640] focus:border-love/50 text-white placeholder-white/40 rounded-full py-4 pl-6 pr-40 outline-none transition-all shadow-lg backdrop-blur-md"
-              placeholder={`Nhắn tin cho ${character?.name || 'người yêu'}...`}
+              placeholder={t.typeMessage.replace('{name}', character?.name || t.lover.toLowerCase())}
               type="text"
             />
             {/* Input Actions */}
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <button onClick={() => toast({ title: 'Sắp ra mắt', description: 'Bộ chọn emoji sẽ có trong bản cập nhật tới!' })} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors" title="Emoji (Sắp ra mắt)">
+              <button onClick={() => toast({ title: t.comingSoon, description: t.emojiFeature })} className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors" title={t.emoji}>
                 <Smile className="w-5 h-5" />
               </button>
               <button
                 onClick={() => hasFeatureAccess('sendImages')
-                  ? toast({ title: 'Sắp ra mắt', description: 'Tính năng gửi ảnh sẽ có trong bản cập nhật tới!' })
-                  : toast({ title: '👑 Tính năng VIP', description: 'Nâng cấp VIP để gửi ảnh & video' })
+                  ? toast({ title: t.comingSoon, description: t.imageFeature })
+                  : toast({ title: '👑 VIP Feature', description: language === 'vi' ? 'Nâng cấp VIP để gửi ảnh & video' : 'Upgrade to VIP to send images & videos' })
                 }
                 className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-                title="Gửi ảnh (VIP)"
+                title={t.sendImage}
               >
                 <Paperclip className="w-5 h-5" />
               </button>
               <button
                 onClick={() => hasFeatureAccess('voiceMessages')
-                  ? toast({ title: 'Sắp ra mắt', description: 'Tính năng ghi âm sẽ có trong bản cập nhật tới!' })
-                  : toast({ title: '👑 Tính năng VIP', description: 'Nâng cấp VIP để ghi âm giọng nói' })
+                  ? toast({ title: t.comingSoon, description: t.voiceMessageFeature })
+                  : toast({ title: '👑 VIP Feature', description: language === 'vi' ? 'Nâng cấp VIP để ghi âm giọng nói' : 'Upgrade to VIP for voice messages' })
                 }
                 className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-                title="Ghi âm (VIP)"
+                title={t.voiceMessage}
               >
                 <Mic className="w-5 h-5" />
               </button>
@@ -613,9 +691,9 @@ export default function ChatPage() {
                   >
                     <Check className="w-8 h-8 text-white" />
                   </motion.div>
-                  <h3 className="text-lg font-bold mb-2">Tặng quà thành công!</h3>
+                  <h3 className="text-lg font-bold mb-2">{t.giftSuccess}</h3>
                   <p className="text-[#ba9cab]">
-                    {character?.name} rất vui khi nhận được quà! 💕
+                    {t.giftSuccessDesc.replace('{name}', character?.name || t.lover)}
                   </p>
                 </div>
               ) : (
@@ -623,7 +701,7 @@ export default function ChatPage() {
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold flex items-center gap-2">
                       <Gift className="w-5 h-5 text-love" />
-                      Tặng quà cho {character?.name}
+                      {t.giftModalTitle.replace('{name}', character?.name || t.lover)}
                     </h3>
                     <button 
                       onClick={() => setShowGiftModal(false)}
@@ -640,12 +718,12 @@ export default function ChatPage() {
                   ) : inventory.length === 0 ? (
                     <div className="text-center py-8">
                       <Gift className="w-12 h-12 mx-auto mb-3 text-[#ba9cab] opacity-50" />
-                      <p className="text-[#ba9cab] mb-4">Bạn chưa có quà nào trong túi đồ</p>
-                      <button 
+                      <p className="text-[#ba9cab] mb-4">{t.noGifts}</p>
+                      <button
                         onClick={() => { setShowGiftModal(false); router.push('/shop'); }}
                         className="px-6 py-3 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all"
                       >
-                        Đi mua quà
+                        {t.goShopping}
                       </button>
                     </div>
                   ) : (
@@ -676,11 +754,11 @@ export default function ChatPage() {
                               <p className="font-semibold">{selectedGift.gift.name}</p>
                               <p className="text-xs text-love flex items-center gap-1">
                                 <Heart className="w-3 h-3 fill-love" />
-                                +{selectedGift.gift.affectionBonus} độ thân mật
+                                {t.affectionBonus.replace('{amount}', String(selectedGift.gift.affectionBonus))}
                               </p>
                             </div>
                           </div>
-                          <button 
+                          <button
                             onClick={handleSendGift}
                             disabled={isSendingGift}
                             className="w-full h-12 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
@@ -688,12 +766,12 @@ export default function ChatPage() {
                             {isSendingGift ? (
                               <>
                                 <Loader2 className="w-4 h-4 animate-spin" />
-                                Đang tặng...
+                                {t.gifting}
                               </>
                             ) : (
                               <>
                                 <Gift className="w-4 h-4" />
-                                Tặng cho {character?.name}
+                                {t.giftTo.replace('{name}', character?.name || t.lover)}
                               </>
                             )}
                           </button>
