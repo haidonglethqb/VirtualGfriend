@@ -8,7 +8,47 @@ import {
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/app-layout'
 import { useAuthStore } from '@/store/auth-store'
+import { useLanguageStore } from '@/store/language-store'
 import api from '@/services/api'
+
+const LEADERBOARD_I18N = {
+  vi: {
+    title: 'Bảng Xếp Hạng',
+    subtitle: 'Xem ai đang dẫn đầu trong cộng đồng Amoura.',
+    categories: {
+      level: 'Cấp độ',
+      affection: 'Độ thân mật',
+      streak: 'Chuỗi ngày',
+      achievements: 'Thành tích',
+    },
+    units: {
+      level: 'Level',
+      affection: 'điểm',
+      streak: 'ngày',
+      achievements: 'huy hiệu',
+    },
+    myRank: 'Thứ hạng của bạn',
+    noData: 'Chưa có dữ liệu xếp hạng',
+  },
+  en: {
+    title: 'Leaderboard',
+    subtitle: 'See who\'s leading in the Amoura community.',
+    categories: {
+      level: 'Level',
+      affection: 'Affection',
+      streak: 'Streak',
+      achievements: 'Achievements',
+    },
+    units: {
+      level: 'Level',
+      affection: 'points',
+      streak: 'days',
+      achievements: 'badges',
+    },
+    myRank: 'Your Rank',
+    noData: 'No ranking data yet',
+  },
+} as const;
 
 interface LeaderboardEntry {
   rank: number
@@ -26,31 +66,21 @@ interface LeaderboardData {
   myRank: { rank: number; value: number } | null
 }
 
-const categories = [
-  { key: 'level', label: 'Cấp độ', icon: Star, color: 'text-yellow-400', unit: 'Level' },
-  { key: 'affection', label: 'Độ thân mật', icon: Heart, color: 'text-pink-400', unit: 'điểm' },
-  { key: 'streak', label: 'Chuỗi ngày', icon: Flame, color: 'text-orange-400', unit: 'ngày' },
-  { key: 'achievements', label: 'Thành tích', icon: Award, color: 'text-purple-400', unit: 'huy hiệu' },
-]
-
-const rankColors: Record<number, string> = {
-  1: 'from-yellow-500/20 to-yellow-600/5 border-yellow-500/30',
-  2: 'from-gray-400/20 to-gray-500/5 border-gray-400/30',
-  3: 'from-amber-700/20 to-amber-800/5 border-amber-700/30',
-}
-
-const rankIcons: Record<number, typeof Trophy> = {
-  1: Crown,
-  2: Medal,
-  3: Medal,
-}
-
 export default function LeaderboardPage() {
   const router = useRouter()
   const { isAuthenticated, user } = useAuthStore()
+  const { language } = useLanguageStore()
+  const t = LEADERBOARD_I18N[language]
   const [activeCategory, setActiveCategory] = useState('level')
   const [data, setData] = useState<LeaderboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  const categories = [
+    { key: 'level', label: t.categories.level, icon: Star, color: 'text-yellow-400', unit: t.units.level },
+    { key: 'affection', label: t.categories.affection, icon: Heart, color: 'text-pink-400', unit: t.units.affection },
+    { key: 'streak', label: t.categories.streak, icon: Flame, color: 'text-orange-400', unit: t.units.streak },
+    { key: 'achievements', label: t.categories.achievements, icon: Award, color: 'text-purple-400', unit: t.units.achievements },
+  ]
 
   const fetchLeaderboard = useCallback(async (category: string) => {
     setIsLoading(true)
@@ -74,6 +104,18 @@ export default function LeaderboardPage() {
     fetchLeaderboard(activeCategory)
   }, [isAuthenticated, router, activeCategory, fetchLeaderboard])
 
+  const rankColors: Record<number, string> = {
+    1: 'from-yellow-500/20 to-yellow-600/5 border-yellow-500/30',
+    2: 'from-gray-400/20 to-gray-500/5 border-gray-400/30',
+    3: 'from-amber-700/20 to-amber-800/5 border-amber-700/30',
+  }
+
+  const rankIcons: Record<number, typeof Trophy> = {
+    1: Crown,
+    2: Medal,
+    3: Medal,
+  }
+
   const activeCat = categories.find(c => c.key === activeCategory)!
 
   if (!isAuthenticated) return null
@@ -85,9 +127,9 @@ export default function LeaderboardPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold flex items-center gap-3 mb-2">
             <Trophy className="w-8 h-8 text-yellow-500" />
-            Bảng Xếp Hạng
+            {t.title}
           </h1>
-          <p className="text-[#ba9cab]">Xem ai đang dẫn đầu trong cộng đồng Amoura.</p>
+          <p className="text-[#ba9cab]">{t.subtitle}</p>
         </div>
 
         {/* Category Tabs */}
@@ -123,7 +165,7 @@ export default function LeaderboardPage() {
                 #{data.myRank.rank}
               </div>
               <div>
-                <p className="font-bold text-sm">Thứ hạng của bạn</p>
+                <p className="font-bold text-sm">{t.myRank}</p>
                 <p className="text-xs text-[#ba9cab]">{data.myRank.value} {activeCat.unit}</p>
               </div>
             </div>
@@ -143,7 +185,7 @@ export default function LeaderboardPage() {
           ) : data?.entries.length === 0 ? (
             <div className="text-center py-16">
               <Trophy className="w-12 h-12 text-gray-700 mx-auto mb-4" />
-              <p className="text-gray-500">Chưa có dữ liệu xếp hạng</p>
+              <p className="text-gray-500">{t.noData}</p>
             </div>
           ) : (
             data?.entries.map((entry, i) => {
