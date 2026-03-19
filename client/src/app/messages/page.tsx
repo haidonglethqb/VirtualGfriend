@@ -11,6 +11,7 @@ import { useAuthStore } from '@/store/auth-store'
 import { socketService } from '@/services/socket'
 import { useToast } from '@/hooks/use-toast'
 import api from '@/services/api'
+import { useLanguageStore } from '@/store/language-store'
 
 interface UserPreview {
   id: string
@@ -44,6 +45,55 @@ interface DM {
   createdAt: string
   sender: UserPreview
 }
+
+const MESSAGES_I18N = {
+  vi: {
+    messages: 'Tin nhắn',
+    newChat: 'Trò chuyện mới',
+    search: 'Tìm kiếm người dùng...',
+    searchResults: 'Kết quả tìm kiếm',
+    startChat: 'Bắt đầu trò chuyện',
+    noResults: 'Không tìm thấy người dùng',
+    noConversations: 'Chưa có cuộc trò chuyện nào',
+    noConversationsDesc: 'Nhấn vào nút + để bắt đầu cuộc trò chuyện mới',
+    selectConversation: 'Chọn cuộc trò chuyện',
+    selectConversationDesc: 'Chọn một cuộc trò chuyện từ danh sách bên trái',
+    typing: 'Đang nhập...',
+    typeMessage: 'Nhập tin nhắn...',
+    online: 'Trực tuyến',
+    offline: 'Ngoại tuyến',
+    you: 'Bạn',
+    error: 'Lỗi',
+    connectionError: 'Lỗi kết nối',
+    cannotLoadMessages: 'Không thể tải tin nhắn',
+    cannotSendMessage: 'Không thể gửi tin nhắn. Vui lòng thử lại.',
+    cannotConnect: 'Không thể kết nối server. Vui lòng thử lại.',
+    cannotStartConversation: 'Không thể bắt đầu cuộc trò chuyện',
+  },
+  en: {
+    messages: 'Messages',
+    newChat: 'New Chat',
+    search: 'Search users...',
+    searchResults: 'Search Results',
+    startChat: 'Start Chat',
+    noResults: 'No users found',
+    noConversations: 'No conversations yet',
+    noConversationsDesc: 'Click the + button to start a new conversation',
+    selectConversation: 'Select a conversation',
+    selectConversationDesc: 'Choose a conversation from the list on the left',
+    typing: 'Typing...',
+    typeMessage: 'Type a message...',
+    online: 'Online',
+    offline: 'Offline',
+    you: 'You',
+    error: 'Error',
+    connectionError: 'Connection Error',
+    cannotLoadMessages: 'Cannot load messages',
+    cannotSendMessage: 'Cannot send message. Please try again.',
+    cannotConnect: 'Cannot connect to server. Please try again.',
+    cannotStartConversation: 'Cannot start conversation',
+  },
+} as const;
 
 export default function MessagesPage() {
   const router = useRouter()
