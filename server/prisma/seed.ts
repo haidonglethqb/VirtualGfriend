@@ -1314,13 +1314,37 @@ async function main() {
   console.log('[Seed] Database seeding completed!');
 
   // Flush Redis cache to prevent stale data after re-seed
+  // Use timeout to avoid hanging if Redis is not available
   try {
-    const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    const redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
+    console.log(`[Seed] Attempting to connect to Redis at ${redisUrl}...`);
+
+    const redis = new Redis(redisUrl, {
+      connectTimeout: 5000,        // 5 second connection timeout
+      maxRetriesPerRequest: 1,     // Don't retry, fail fast
+      retryStrategy: () => null,   // Disable auto-retry
+      lazyConnect: true,           // Don't connect immediately
+    });
+
+    // Set up error handler to prevent unhandled rejection
+    redis.on('error', () => {
+      // Silently ignore connection errors
+    });
+
+    // Try to connect with timeout
+    const connectPromise = redis.connect();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
+    );
+
+    await Promise.race([connectPromise, timeoutPromise]);
+
+    // If connected, flush the database
     await redis.flushdb();
     console.log('[Seed] Redis cache flushed');
-    redis.disconnect();
-  } catch {
-    console.log('[Seed] Redis not available, skipping cache flush');
+    await redis.quit();
+  } catch (err) {
+    console.log(`[Seed] Redis not available, skipping cache flush: ${(err as Error).message}`);
   }
 }
 
