@@ -171,8 +171,8 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          # Tăng timeout để tránh SSH timeout khi pull image lớn
-          command_timeout: 15m
+          # Timeout 10 phút là đủ khi các services ready đúng cách
+          command_timeout: 10m
           script: |
             set -e
             cd ${{ secrets.VPS_DEPLOY_PATH }}
@@ -181,28 +181,26 @@ jobs:
             mkdir -p nginx/ssl nginx/logs
 
             # ── Bước 1: Ghi .env ───────────────────────────────────
-            # GITHUB_REPOSITORY phải lowercase để khớp với image name trên GHCR
-            # (docker/metadata-action tự lowercase khi push)
             cat > .env << 'ENVEOF'
-            POSTGRES_USER=vgfriend
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_DB=vgfriend
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-            GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
-            CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
-            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
-            NEXT_PUBLIC_WS_URL=${{ secrets.NEXT_PUBLIC_WS_URL }}
-            SMTP_HOST=${{ secrets.SMTP_HOST }}
-            SMTP_PORT=${{ secrets.SMTP_PORT }}
-            SMTP_SECURE=${{ secrets.SMTP_SECURE }}
-            SMTP_USER=${{ secrets.SMTP_USER }}
-            SMTP_PASS="${{ secrets.SMTP_PASS }}"
-            SMTP_FROM_NAME=${{ secrets.SMTP_FROM_NAME }}
-            GITHUB_REPOSITORY=${{ needs.type-check.outputs.image_name_lower }}
-            ENVEOF
-            # Xóa leading whitespace do YAML indentation
-            sed -i 's/^[[:space:]]*//' .env
+POSTGRES_USER=vgfriend
+POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+POSTGRES_DB=vgfriend
+JWT_SECRET=${{ secrets.JWT_SECRET }}
+JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
+NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+NEXT_PUBLIC_WS_URL=${{ secrets.NEXT_PUBLIC_WS_URL }}
+SMTP_HOST=${{ secrets.SMTP_HOST }}
+SMTP_PORT=${{ secrets.SMTP_PORT }}
+SMTP_SECURE=${{ secrets.SMTP_SECURE }}
+SMTP_USER=${{ secrets.SMTP_USER }}
+SMTP_PASS=${{ secrets.SMTP_PASS }}
+SMTP_FROM_NAME=${{ secrets.SMTP_FROM_NAME }}
+GITHUB_REPOSITORY=${{ needs.type-check.outputs.image_name_lower }}
+ENVEOF
+            # Escape $ trong các giá trị để tránh docker-compose hiểu nhầm là variable
+            sed -i 's/\([^=]\)\$/\1$$/g' .env
 
             # ── Bước 2: Login GHCR ─────────────────────────────────
             echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
@@ -226,18 +224,32 @@ jobs:
               sleep 2
             done
 
-            # ── Bước 5: Chạy migration TRƯỚC khi start server ──────
-            # Dùng docker compose run để tạo container tạm từ image mới
-            # --no-deps: không start lại postgres (đã chạy ở trên)
-            # --rm: tự xóa container sau khi xong
+            echo "Waiting for Redis to be ready..."
+            for i in $(seq 1 15); do
+              if docker compose exec -T redis redis-cli ping > /dev/null 2>&1; then
+                echo "Redis is ready."
+                break
+              fi
+              if [ "$i" -eq 15 ]; then
+                echo "WARNING: Redis not ready, continuing anyway (cache is optional)..."
+                break
+              fi
+              sleep 2
+            done
+
+            # ── Bước 5: Chạy migration ─────────────────────────────
             echo "Running database migrations..."
-            docker compose run --rm --no-deps server npx prisma migrate deploy
+            docker compose run --rm --no-deps \
+              -e DATABASE_URL="postgresql://vgfriend:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/vgfriend?schema=public" \
+              server npx prisma migrate deploy
             echo "Migrations completed."
 
-            # ── Bước 5.5: Seed database (idempotent - safe to run multiple times)
-            # This uses upsert so it won't duplicate or delete user data
+            # ── Bước 5.5: Seed database ────────────────────────────
             echo "Seeding database..."
-            docker compose run --rm --no-deps server npx prisma db seed
+            docker compose run --rm --no-deps \
+              -e DATABASE_URL="postgresql://vgfriend:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/vgfriend?schema=public" \
+              -e REDIS_URL="redis://redis:6379" \
+              server npx prisma db seed
             echo "Seeding completed."
 
             # ── Bước 6: Start tất cả services ─────────────────────
@@ -260,42 +272,21 @@ jobs:
               sleep 5
             done
 
-            # ── Bước 8: Cleanup để tránh tràn bộ nhớ ──────────────
-            echo "Starting cleanup..."
-            
-            # 8.1: Xóa containers đã stopped (không ảnh hưởng running containers)
-            docker container prune -f
-            
-            # 8.2: Xóa dangling images (images không có tag)
-            docker image prune -f
-            
-            # 8.3: Xóa images cũ của project (giữ lại 3 versions gần nhất để rollback)
-            # Lấy list tất cả images của project, sort theo thời gian, xóa từ image thứ 4 trở đi
-            echo "Cleaning old server images..."
-            docker images "ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/server" --format "{{.ID}} {{.CreatedAt}}" | \
-              sort -k2 -r | tail -n +4 | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
-            
-            echo "Cleaning old client images..."
-            docker images "ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/client" --format "{{.ID}} {{.CreatedAt}}" | \
-              sort -k2 -r | tail -n +4 | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
-            
-            # 8.4: Xóa build cache (giữ lại 500MB để tăng tốc build sau)
-            docker builder prune -f --keep-storage 500MB 2>/dev/null || true
-            
-            # 8.5: Xóa networks không sử dụng
-            docker network prune -f
-            
-            # 8.6: Dọn nginx logs cũ hơn 7 ngày (giữ logs gần đây để debug)
-            find ./nginx/logs -name "*.log" -type f -mtime +7 -exec truncate -s 0 {} \; 2>/dev/null || true
-            
-            # 8.7: Hiển thị disk usage sau cleanup
-            echo "Disk usage after cleanup:"
+            # ── Bước 8: Background cleanup ─────────────────────────
+            echo "Starting background cleanup..."
+            nohup bash -c '
+              sleep 5
+              docker container prune -f
+              docker image prune -f
+              docker images "ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/server" --format "{{.ID}} {{.CreatedAt}}" | sort -k2 -r | tail -n +4 | awk "{print \$1}" | xargs -r docker rmi -f 2>/dev/null || true
+              docker images "ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/client" --format "{{.ID}} {{.CreatedAt}}" | sort -k2 -r | tail -n +4 | awk "{print \$1}" | xargs -r docker rmi -f 2>/dev/null || true
+              docker builder prune -f --keep-storage 500MB 2>/dev/null || true
+              docker network prune -f
+            ' > /tmp/docker-cleanup.log 2>&1 &
+
+            echo "Disk usage:"
             df -h / | tail -1
-            echo "Docker disk usage:"
-            docker system df
-            
-            # ⚠️  KHÔNG dùng 'docker volume prune' - sẽ xóa postgres_data và redis_data!
-            
+
             echo "Deployment completed successfully!"
 
       - name: Notify deployment status
