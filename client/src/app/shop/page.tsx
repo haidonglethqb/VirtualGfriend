@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Gift, Star, Heart, ShoppingBag, 
+import {
+  Gift, Star, Heart, ShoppingBag,
   Sparkles, Clock, Check, X, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
@@ -14,9 +14,87 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { AdBanner } from '@/components/ads/ad-banner';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
+import { useLanguageStore } from '@/store/language-store';
 import { useToast } from '@/hooks/use-toast';
 import { formatNumber } from '@/lib/utils';
 import api from '@/services/api';
+
+const SHOP_I18N = {
+  vi: {
+    title: 'Cửa hàng quà tặng',
+    subtitle: 'Mua quà và tặng trong Chat',
+    inventory: 'Túi đồ',
+    all: 'Tất cả',
+    categories: {
+      flower: '🌸 Hoa',
+      food: '🍰 Đồ ăn',
+      jewelry: '💎 Trang sức',
+      toy: '🧸 Đồ chơi',
+      special: '✨ Đặc biệt',
+    },
+    rarity: {
+      COMMON: 'Thường',
+      UNCOMMON: 'Không phổ biến',
+      RARE: 'Hiếm',
+      EPIC: 'Sử thi',
+      LEGENDARY: 'Huyền thoại',
+    },
+    affectionWhenGift: 'Thân mật khi tặng',
+    coins: 'xu',
+    gems: 'sao',
+    buyToInventory: 'Mua vào túi đồ',
+    purchasing: 'Đang mua...',
+    purchaseSuccess: 'Mua thành công!',
+    addedToInventory: 'đã được thêm vào túi đồ của bạn! 🎁',
+    giftInChat: 'Vào Chat để tặng quà cho',
+    insufficientCoins: 'Không đủ xu',
+    insufficientGems: 'Không đủ sao',
+    insufficientFundsDesc: 'Bạn không đủ',
+    insufficientFundsDescEnd: 'để mua món quà này',
+    purchaseError: 'Không thể mua quà',
+    error: 'Lỗi',
+    loadError: 'Không thể tải danh sách quà tặng',
+    noGifts: 'Không có quà tặng nào',
+    companion: 'người yêu',
+  },
+  en: {
+    title: 'Gift Shop',
+    subtitle: 'Buy gifts and give them in Chat',
+    inventory: 'Inventory',
+    all: 'All',
+    categories: {
+      flower: '🌸 Flowers',
+      food: '🍰 Food',
+      jewelry: '💎 Jewelry',
+      toy: '🧸 Toys',
+      special: '✨ Special',
+    },
+    rarity: {
+      COMMON: 'Common',
+      UNCOMMON: 'Uncommon',
+      RARE: 'Rare',
+      EPIC: 'Epic',
+      LEGENDARY: 'Legendary',
+    },
+    affectionWhenGift: 'Affection when gifted',
+    coins: 'coins',
+    gems: 'gems',
+    buyToInventory: 'Buy to Inventory',
+    purchasing: 'Purchasing...',
+    purchaseSuccess: 'Purchase Successful!',
+    addedToInventory: 'has been added to your inventory! 🎁',
+    giftInChat: 'Go to Chat to give gifts to',
+    insufficientCoins: 'Insufficient Coins',
+    insufficientGems: 'Insufficient Gems',
+    insufficientFundsDesc: 'You don\'t have enough',
+    insufficientFundsDescEnd: 'to buy this gift',
+    purchaseError: 'Cannot purchase gift',
+    error: 'Error',
+    loadError: 'Cannot load gift list',
+    noGifts: 'No gifts available',
+    companion: 'companion',
+  },
+} as const;
 
 interface ShopItem {
   id: string;
@@ -38,19 +116,13 @@ const rarityColors = {
   LEGENDARY: 'border-yellow-500',
 };
 
-const rarityLabels = {
-  COMMON: 'Thường',
-  UNCOMMON: 'Không phổ biến',
-  RARE: 'Hiếm',
-  EPIC: 'Sử thi',
-  LEGENDARY: 'Huyền thoại',
-};
-
 export default function ShopPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated, user, setUser } = useAuthStore();
   const { character, fetchCharacter } = useCharacterStore();
+  const { language } = useLanguageStore();
+  const t = SHOP_I18N[language];
   const [items, setItems] = useState<ShopItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
@@ -78,8 +150,8 @@ export default function ShopPage() {
     } catch (error) {
       console.error('Failed to fetch shop items:', error);
       toast({
-        title: 'Lỗi',
-        description: 'Không thể tải danh sách quà tặng',
+        title: t.error,
+        description: t.loadError,
         variant: 'destructive',
       });
     } finally {
@@ -99,8 +171,8 @@ export default function ShopPage() {
     
     if (balance < price) {
       toast({
-        title: paymentMethod === 'coins' ? 'Không đủ xu' : 'Không đủ sao',
-        description: `Bạn không đủ ${paymentMethod === 'coins' ? 'xu' : 'sao'} để mua món quà này`,
+        title: paymentMethod === 'coins' ? t.insufficientCoins : t.insufficientGems,
+        description: `${t.insufficientFundsDesc} ${paymentMethod === 'coins' ? t.coins : t.gems} ${t.insufficientFundsDescEnd}`,
         variant: 'destructive',
       });
       return;
@@ -138,9 +210,9 @@ export default function ShopPage() {
         }, 2000);
       }
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Không thể mua quà';
+      const message = error instanceof Error ? error.message : t.purchaseError;
       toast({
-        title: 'Lỗi',
+        title: t.error,
         description: message,
         variant: 'destructive',
       });
@@ -161,18 +233,18 @@ export default function ShopPage() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <ShoppingBag className="w-6 h-6 text-love" />
-              Cửa hàng quà tặng
+              {t.title}
             </h1>
             <p className="text-sm text-[#ba9cab] mt-1">
-              Mua quà và tặng trong Chat
+              {t.subtitle}
             </p>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <Link href="/shop/inventory">
               <button className="flex items-center gap-2 h-10 px-4 rounded-full bg-[#271b21] border border-[#392830] text-sm font-medium hover:bg-[#392830] transition-colors">
                 <Gift className="w-4 h-4" />
-                Túi đồ
+                {t.inventory}
               </button>
             </Link>
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#271b21] border border-[#392830]">
@@ -191,12 +263,12 @@ export default function ShopPage() {
           {/* Category tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full overflow-x-auto flex justify-start">
-              <TabsTrigger value="all">Tất cả</TabsTrigger>
-              <TabsTrigger value="flower">🌸 Hoa</TabsTrigger>
-              <TabsTrigger value="food">🍰 Đồ ăn</TabsTrigger>
-              <TabsTrigger value="jewelry">💎 Trang sức</TabsTrigger>
-              <TabsTrigger value="toy">🧸 Đồ chơi</TabsTrigger>
-              <TabsTrigger value="special">✨ Đặc biệt</TabsTrigger>
+              <TabsTrigger value="all">{t.all}</TabsTrigger>
+              <TabsTrigger value="flower">{t.categories.flower}</TabsTrigger>
+              <TabsTrigger value="food">{t.categories.food}</TabsTrigger>
+              <TabsTrigger value="jewelry">{t.categories.jewelry}</TabsTrigger>
+              <TabsTrigger value="toy">{t.categories.toy}</TabsTrigger>
+              <TabsTrigger value="special">{t.categories.special}</TabsTrigger>
             </TabsList>
 
             <TabsContent value={activeTab} className="mt-6">
@@ -247,7 +319,7 @@ export default function ShopPage() {
                           item.rarity === 'UNCOMMON' ? 'bg-green-500/20 text-green-500' :
                           'bg-gray-500/20 text-gray-400'
                         }`}>
-                          {rarityLabels[item.rarity]}
+                          {t.rarity[item.rarity]}
                         </div>
                       </CardContent>
                     </Card>
@@ -258,7 +330,7 @@ export default function ShopPage() {
               {filteredItems.length === 0 && (
                 <div className="text-center py-12 text-[#ba9cab]">
                   <Gift className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Không có quà tặng nào</p>
+                  <p>{t.noGifts}</p>
                 </div>
               )}
             </TabsContent>
@@ -292,12 +364,12 @@ export default function ShopPage() {
                     >
                       <Check className="w-10 h-10 text-white" />
                     </motion.div>
-                    <h3 className="text-xl font-bold mb-2">Mua thành công!</h3>
+                    <h3 className="text-xl font-bold mb-2">{t.purchaseSuccess}</h3>
                     <p className="text-[#ba9cab]">
-                      {selectedItem.name} đã được thêm vào túi đồ của bạn! 🎁
+                      {selectedItem.name} {t.addedToInventory}
                     </p>
                     <p className="text-sm text-[#ba9cab] mt-2">
-                      Vào Chat để tặng quà cho {character?.name || 'người yêu'}
+                      {t.giftInChat} {character?.name || t.companion}
                     </p>
                   </div>
                 ) : (
@@ -319,7 +391,7 @@ export default function ShopPage() {
                           <Heart className="w-5 h-5 fill-love" />
                           <span className="text-xl font-bold">+{selectedItem.affectionBonus}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground">Thân mật khi tặng</p>
+                        <p className="text-xs text-muted-foreground">{t.affectionWhenGift}</p>
                       </div>
                     </div>
 
@@ -335,20 +407,20 @@ export default function ShopPage() {
                           onClick={() => setPaymentMethod('coins')}
                         >
                           <Star className="w-4 h-4 fill-current" />
-                          {selectedItem.priceCoins} xu
+                          {selectedItem.priceCoins} {t.coins}
                         </button>
                       )}
                       {selectedItem.priceGems > 0 && (
                         <button
                           className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-full font-bold transition-all ${
-                            paymentMethod === 'gems' 
-                              ? 'bg-purple-500 text-white' 
+                            paymentMethod === 'gems'
+                              ? 'bg-purple-500 text-white'
                               : 'bg-[#392830] text-white border border-[#392830]'
                           }`}
                           onClick={() => setPaymentMethod('gems')}
                         >
                           <Sparkles className="w-4 h-4" />
-                          {selectedItem.priceGems} sao
+                          {selectedItem.priceGems} {t.gems}
                         </button>
                       )}
                     </div>
@@ -362,7 +434,7 @@ export default function ShopPage() {
                         <>
                           {insufficientFunds && (
                             <p className="text-red-400 text-sm mb-4">
-                              Bạn không đủ {paymentMethod === 'coins' ? 'xu' : 'sao'} để mua món quà này
+                              {t.insufficientFundsDesc} {paymentMethod === 'coins' ? t.coins : t.gems} {t.insufficientFundsDescEnd}
                             </p>
                           )}
 
@@ -374,12 +446,12 @@ export default function ShopPage() {
                             {isPurchasing ? (
                               <>
                                 <Loader2 className="w-4 h-4 animate-spin" />
-                                Đang mua...
+                                {t.purchasing}
                               </>
                             ) : (
                               <>
                                 <ShoppingBag className="w-4 h-4" />
-                                Mua vào túi đồ
+                                {t.buyToInventory}
                               </>
                             )}
                           </button>
