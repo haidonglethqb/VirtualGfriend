@@ -13,22 +13,91 @@ import AppLayout from '@/components/layout/app-layout';
 import { AdBanner } from '@/components/ads/ad-banner';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
+import { useLanguageStore } from '@/store/language-store';
 import { formatNumber, getRelationshipLabel, getMoodEmoji } from '@/lib/utils';
 import api from '@/services/api';
 
+const DASHBOARD_I18N = {
+  vi: {
+    occupations: {
+      student: 'Sinh viên',
+      office_worker: 'Nhân viên văn phòng',
+      teacher: 'Giáo viên',
+      nurse: 'Y tá',
+      artist: 'Nghệ sĩ',
+      developer: 'Lập trình viên',
+      sales: 'Nhân viên bán hàng',
+      freelancer: 'Freelancer',
+    },
+    greetings: {
+      morning: 'Chào buổi sáng',
+      afternoon: 'Chào buổi chiều',
+      evening: 'Chào buổi tối',
+    },
+    loading: 'Đang tải...',
+    subtitle: 'Người yêu ảo của bạn đang chờ đợi cuộc trò chuyện tiếp theo 💕',
+    characterName: 'Người yêu của bạn',
+    age: 'tuổi',
+    affection: 'Độ thân mật',
+    chatNow: 'Chat ngay',
+    giveGift: 'Tặng quà',
+    stats: 'Thống kê',
+    viewDetails: 'Xem chi tiết →',
+    messagesToday: 'Tin nhắn hôm nay',
+    streak: 'Ngày liên tiếp',
+    giftsGiven: 'Quà đã tặng',
+    day: 'Ngày',
+    gifts: 'quà',
+    dailyQuests: 'Nhiệm vụ hàng ngày',
+    viewAll: 'Xem tất cả →',
+    noQuests: 'Chưa có nhiệm vụ nào',
+    recentMoments: 'Khoảnh khắc gần đây',
+    viewAlbum: 'Xem album →',
+    createMemories: 'Trò chuyện nhiều hơn để tạo kỷ niệm đẹp!',
+  },
+  en: {
+    occupations: {
+      student: 'Student',
+      office_worker: 'Office Worker',
+      teacher: 'Teacher',
+      nurse: 'Nurse',
+      artist: 'Artist',
+      developer: 'Developer',
+      sales: 'Sales',
+      freelancer: 'Freelancer',
+    },
+    greetings: {
+      morning: 'Good morning',
+      afternoon: 'Good afternoon',
+      evening: 'Good evening',
+    },
+    loading: 'Loading...',
+    subtitle: 'Your virtual companion is waiting for the next conversation 💕',
+    characterName: 'Your Companion',
+    age: 'years old',
+    affection: 'Affection',
+    chatNow: 'Chat Now',
+    giveGift: 'Give Gift',
+    stats: 'Statistics',
+    viewDetails: 'View Details →',
+    messagesToday: 'Messages Today',
+    streak: 'Day Streak',
+    giftsGiven: 'Gifts Given',
+    day: 'Day',
+    gifts: 'gifts',
+    dailyQuests: 'Daily Quests',
+    viewAll: 'View All →',
+    noQuests: 'No quests yet',
+    recentMoments: 'Recent Moments',
+    viewAlbum: 'View Album →',
+    createMemories: 'Chat more to create beautiful memories!',
+  },
+} as const;
+
 // Helper function to format occupation label
-function getOccupationLabel(occupation: string): string {
-  const labels: Record<string, string> = {
-    student: 'Sinh viên',
-    office_worker: 'Nhân viên văn phòng',
-    teacher: 'Giáo viên',
-    nurse: 'Y tá',
-    artist: 'Nghệ sĩ',
-    developer: 'Lập trình viên',
-    sales: 'Nhân viên bán hàng',
-    freelancer: 'Freelancer',
-  };
-  return labels[occupation] || occupation;
+function getOccupationLabel(occupation: string, language: 'vi' | 'en'): string {
+  const labels = DASHBOARD_I18N[language].occupations;
+  return labels[occupation as keyof typeof labels] || occupation;
 }
 
 
@@ -72,6 +141,8 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const { character, fetchCharacter, isLoading: characterLoading, needsCreation } = useCharacterStore();
+  const { language } = useLanguageStore();
+  const t = DASHBOARD_I18N[language];
   const [greeting, setGreeting] = useState('');
   const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([]);
   const [recentMemories, setRecentMemories] = useState<Memory[]>([]);
@@ -121,9 +192,9 @@ export default function DashboardPage() {
     fetchDashboardData();
 
     const hour = new Date().getHours();
-    if (hour < 12) setGreeting('Chào buổi sáng');
-    else if (hour < 18) setGreeting('Chào buổi chiều');
-    else setGreeting('Chào buổi tối');
+    if (hour < 12) setGreeting(t.greetings.morning);
+    else if (hour < 18) setGreeting(t.greetings.afternoon);
+    else setGreeting(t.greetings.evening);
 
     // Update stats from user
     if (user) {
@@ -132,7 +203,7 @@ export default function DashboardPage() {
         streak: user.streak || 1,
       }));
     }
-  }, [isAuthenticated, router, fetchCharacter, fetchDashboardData, user]);
+  }, [isAuthenticated, router, fetchCharacter, fetchDashboardData, user, t.greetings]);
 
   // Redirect to onboarding if no character
   useEffect(() => {
@@ -154,7 +225,7 @@ export default function DashboardPage() {
             <div className="w-20 h-20 rounded-full bg-love shadow-[0_0_30px_rgba(244,37,140,0.5)] mx-auto" />
           </div>
           <p className="text-[#ba9cab]">
-            Đang tải...
+            {t.loading}
           </p>
         </div>
       </div>
@@ -173,10 +244,10 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
         >
           <h1 className="text-3xl font-bold mb-2">
-            {greeting}, <span className="text-love">{user.username || 'bạn'}!</span>
+            {greeting}, <span className="text-love">{user.username || (language === 'vi' ? 'bạn' : 'you')}!</span>
           </h1>
           <p className="text-[#ba9cab]">
-            Người yêu ảo của bạn đang chờ đợi cuộc trò chuyện tiếp theo 💕
+            {t.subtitle}
           </p>
         </motion.div>
 
@@ -216,21 +287,21 @@ export default function DashboardPage() {
 
               <div className="p-6">
                 <div className="text-center mb-6">
-                  <h2 className="text-2xl font-bold text-white">{character?.name || 'Người yêu của bạn'}</h2>
+                  <h2 className="text-2xl font-bold text-white">{character?.name || t.characterName}</h2>
                   <p className="text-love">{getRelationshipLabel(character?.relationshipStage || 'STRANGER')}</p>
 
                   {/* Character Info */}
                   <div className="mt-3 flex items-center justify-center gap-4 text-sm text-[#ba9cab]">
-                    <span>{character?.age || 22} tuổi</span>
+                    <span>{character?.age || 22} {t.age}</span>
                     <span>•</span>
-                    <span className="capitalize">{getOccupationLabel(character?.occupation || 'student')}</span>
+                    <span className="capitalize">{getOccupationLabel(character?.occupation || 'student', language)}</span>
                   </div>
                 </div>
 
                 {/* Affection progress */}
                 <div className="mb-6">
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-[#ba9cab]">Độ thân mật</span>
+                    <span className="text-[#ba9cab]">{t.affection}</span>
                     <span className="font-bold flex items-center gap-1 text-love">
                       <Heart className="w-4 h-4 fill-love" />
                       {character?.affection || 0}
@@ -249,13 +320,13 @@ export default function DashboardPage() {
                   <Link href="/chat" className="w-full">
                     <button className="w-full flex items-center justify-center gap-2 h-12 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all shadow-[0_0_20px_rgba(244,37,140,0.3)]">
                       <MessageCircle className="w-5 h-5" />
-                      Chat ngay
+                      {t.chatNow}
                     </button>
                   </Link>
                   <Link href="/shop" className="w-full">
                     <button className="w-full flex items-center justify-center gap-2 h-12 rounded-full bg-[#392830] hover:bg-[#392830]/80 text-white font-bold transition-all border border-[#392830]">
                       <Gift className="w-5 h-5" />
-                      Tặng quà
+                      {t.giveGift}
                     </button>
                   </Link>
                 </div>
@@ -272,31 +343,31 @@ export default function DashboardPage() {
               transition={{ delay: 0.2 }}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-white/60">Thống kê</h3>
+                <h3 className="text-sm font-medium text-white/60">{t.stats}</h3>
                 <Link href="/analytics">
                   <span className="text-sm text-[#ba9cab] hover:text-love transition-colors">
-                    Xem chi tiết →
+                    {t.viewDetails}
                   </span>
                 </Link>
               </div>
               <div className="grid sm:grid-cols-3 gap-4">
                 <StatCard
                   icon={<MessageCircle className="w-5 h-5" />}
-                  label="Tin nhắn hôm nay"
+                  label={t.messagesToday}
                   value={stats.messagesToday}
                   trend={`~ ${stats.messagesToday}`}
                 />
                 <StatCard
                   icon={<Calendar className="w-5 h-5" />}
-                  label="Ngày liên tiếp"
+                  label={t.streak}
                   value={stats.streak}
-                  trend={`~ Ngày ${stats.streak}`}
+                  trend={`~ ${t.day} ${stats.streak}`}
                 />
                 <StatCard
                   icon={<Gift className="w-5 h-5" />}
-                  label="Quà đã tặng"
+                  label={t.giftsGiven}
                   value={stats.giftsGiven}
-                  trend={`~ ${stats.giftsGiven} quà`}
+                  trend={`~ ${stats.giftsGiven} ${t.gifts}`}
                 />
               </div>
             </motion.div>
@@ -314,11 +385,11 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="flex items-center gap-2 text-lg font-bold">
                     <Target className="w-5 h-5 text-love" />
-                    Nhiệm vụ hàng ngày
+                    {t.dailyQuests}
                   </h3>
                   <Link href="/quests">
                     <button className="text-sm text-[#ba9cab] hover:text-love transition-colors">
-                      Xem tất cả →
+                      {t.viewAll}
                     </button>
                   </Link>
                 </div>
@@ -342,7 +413,7 @@ export default function DashboardPage() {
                     })
                   ) : (
                     <p className="text-center text-[#ba9cab] py-4">
-                      Chưa có nhiệm vụ nào
+                      {t.noQuests}
                     </p>
                   )}
                 </div>
@@ -359,11 +430,11 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="flex items-center gap-2 text-lg font-bold">
                     <Sparkles className="w-5 h-5 text-love" />
-                    Khoảnh khắc gần đây
+                    {t.recentMoments}
                   </h3>
                   <Link href="/memories">
                     <button className="text-sm text-[#ba9cab] hover:text-love transition-colors">
-                      Xem album →
+                      {t.viewAlbum}
                     </button>
                   </Link>
                 </div>
@@ -398,7 +469,7 @@ export default function DashboardPage() {
                       ))}
                     </div>
                     <p className="text-center text-[#ba9cab] text-sm mt-4">
-                      Trò chuyện nhiều hơn để tạo kỷ niệm đẹp!
+                      {t.createMemories}
                     </p>
                   </>
                 )}
