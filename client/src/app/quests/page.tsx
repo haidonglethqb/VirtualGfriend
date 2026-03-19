@@ -3,16 +3,72 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { 
-  Target, Star, Clock, CheckCircle, Gift, 
+import {
+  Target, Star, Clock, CheckCircle, Gift,
   Calendar, TrendingUp, Zap, Loader2
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/app-layout';
 import { AdBanner } from '@/components/ads/ad-banner';
 import { useAuthStore } from '@/store/auth-store';
+import { useLanguageStore } from '@/store/language-store';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
+
+const QUESTS_I18N = {
+  vi: {
+    title: 'Nhiệm vụ',
+    subtitle: 'Hoàn thành nhiệm vụ để nhận thưởng',
+    daily: 'Hàng ngày',
+    weekly: 'Hàng tuần',
+    achievements: 'Thành tích',
+    error: 'Lỗi',
+    loadError: 'Không thể tải danh sách nhiệm vụ',
+    startQuest: '🎯 Bắt đầu nhiệm vụ!',
+    completeQuest: 'Hoàn thành nhiệm vụ để nhận thưởng',
+    startError: 'Không thể bắt đầu nhiệm vụ',
+    claimSuccess: '🎉 Nhận thưởng thành công!',
+    claimError: 'Không thể nhận thưởng',
+    coins: 'xu',
+    gems: 'gem',
+    start: 'Bắt đầu',
+    starting: 'Đang bắt đầu...',
+    completed: 'Hoàn thành',
+    claim: 'Nhận thưởng',
+    claiming: 'Đang nhận...',
+    claimed: 'Đã nhận',
+    inProgress: 'Đang thực hiện',
+    noQuests: 'Không có nhiệm vụ nào',
+    rewards: 'Phần thưởng',
+    progress: 'Tiến độ',
+  },
+  en: {
+    title: 'Quests',
+    subtitle: 'Complete quests to earn rewards',
+    daily: 'Daily',
+    weekly: 'Weekly',
+    achievements: 'Achievements',
+    error: 'Error',
+    loadError: 'Cannot load quest list',
+    startQuest: '🎯 Quest Started!',
+    completeQuest: 'Complete quest to earn rewards',
+    startError: 'Cannot start quest',
+    claimSuccess: '🎉 Reward Claimed!',
+    claimError: 'Cannot claim reward',
+    coins: 'coins',
+    gems: 'gems',
+    start: 'Start',
+    starting: 'Starting...',
+    completed: 'Completed',
+    claim: 'Claim',
+    claiming: 'Claiming...',
+    claimed: 'Claimed',
+    inProgress: 'In Progress',
+    noQuests: 'No quests available',
+    rewards: 'Rewards',
+    progress: 'Progress',
+  },
+} as const;
 
 interface Quest {
   id: string;
@@ -44,6 +100,8 @@ export default function QuestsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated, user, setUser } = useAuthStore();
+  const { language } = useLanguageStore();
+  const t = QUESTS_I18N[language];
   const [quests, setQuests] = useState<Quest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -68,8 +126,8 @@ export default function QuestsPage() {
     } catch (error) {
       console.error('Failed to fetch quests:', error);
       toast({
-        title: 'Lỗi',
-        description: 'Không thể tải danh sách nhiệm vụ',
+        title: t.error,
+        description: t.loadError,
         variant: 'destructive',
       });
     } finally {
@@ -86,15 +144,15 @@ export default function QuestsPage() {
         // Refetch quests to get updated state
         await fetchQuests();
         toast({
-          title: '🎯 Bắt đầu nhiệm vụ!',
-          description: 'Hoàn thành nhiệm vụ để nhận thưởng',
+          title: t.startQuest,
+          description: t.completeQuest,
         });
       }
     } catch (error: unknown) {
       console.error('Failed to start quest:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Không thể bắt đầu nhiệm vụ';
+      const errorMessage = error instanceof Error ? error.message : t.startError;
       toast({
-        title: 'Lỗi',
+        title: t.error,
         description: errorMessage,
         variant: 'destructive',
       });
@@ -124,15 +182,15 @@ export default function QuestsPage() {
         }
         
         toast({
-          title: '🎉 Nhận thưởng thành công!',
-          description: `+${result.rewards?.coins || 0} xu${result.rewards?.gems ? `, +${result.rewards.gems} gem` : ''}`,
+          title: t.claimSuccess,
+          description: `+${result.rewards?.coins || 0} ${t.coins}${result.rewards?.gems ? `, +${result.rewards.gems} ${t.gems}` : ''}`,
         });
       }
     } catch (error: unknown) {
       console.error('Failed to claim reward:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Không thể nhận thưởng';
+      const errorMessage = error instanceof Error ? error.message : t.claimError;
       toast({
-        title: 'Lỗi',
+        title: t.error,
         description: errorMessage,
         variant: 'destructive',
       });
@@ -169,10 +227,10 @@ export default function QuestsPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Target className="w-6 h-6 text-love" />
-            Nhiệm vụ
+            {t.title}
           </h1>
           <p className="text-sm text-[#ba9cab] mt-1">
-            Hoàn thành nhiệm vụ để nhận thưởng
+            {t.subtitle}
           </p>
         </div>
 
@@ -191,9 +249,9 @@ export default function QuestsPage() {
               <div className="bg-gradient-to-br from-love to-pink-600 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-lg font-bold text-white">Tiến độ hôm nay</h2>
+                    <h2 className="text-lg font-bold text-white">{t.progress} {language === 'vi' ? 'hôm nay' : 'today'}</h2>
                     <p className="text-white/80 text-sm">
-                      {completedToday}/{totalDaily} nhiệm vụ hoàn thành
+                      {completedToday}/{totalDaily} {language === 'vi' ? 'nhiệm vụ hoàn thành' : 'quests completed'}
                     </p>
                   </div>
                   <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
@@ -222,17 +280,17 @@ export default function QuestsPage() {
             <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-4 text-center">
               <Calendar className="w-6 h-6 mx-auto mb-2 text-love" />
               <p className="text-lg font-bold">{user?.streak || 1}</p>
-              <p className="text-xs text-[#ba9cab]">Ngày liên tiếp</p>
+              <p className="text-xs text-[#ba9cab]">{t.streak}</p>
             </div>
             <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-4 text-center">
               <Zap className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
               <p className="text-lg font-bold">{totalCompleted}</p>
-              <p className="text-xs text-[#ba9cab]">Hoàn thành</p>
+              <p className="text-xs text-[#ba9cab]">{t.completed}</p>
             </div>
             <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-4 text-center">
               <TrendingUp className="w-6 h-6 mx-auto mb-2 text-green-500" />
               <p className="text-lg font-bold">+{totalCoinsEarned}</p>
-              <p className="text-xs text-[#ba9cab]">Xu đã nhận</p>
+              <p className="text-xs text-[#ba9cab]">{language === 'vi' ? 'Xu đã nhận' : 'Coins Earned'}</p>
             </div>
           </motion.div>
 
@@ -244,9 +302,9 @@ export default function QuestsPage() {
           >
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="w-full grid grid-cols-3">
-                <TabsTrigger value="daily">Hàng ngày</TabsTrigger>
-                <TabsTrigger value="weekly">Hàng tuần</TabsTrigger>
-                <TabsTrigger value="achievement">Thành tích</TabsTrigger>
+                <TabsTrigger value="daily">{t.daily}</TabsTrigger>
+                <TabsTrigger value="weekly">{t.weekly}</TabsTrigger>
+                <TabsTrigger value="achievement">{t.achievements}</TabsTrigger>
               </TabsList>
 
               <TabsContent value={activeTab} className="mt-4 space-y-3">
@@ -257,12 +315,13 @@ export default function QuestsPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
                   >
-                    <QuestCard 
-                      quest={quest} 
+                    <QuestCard
+                      quest={quest}
                       onStart={handleStartQuest}
                       onClaim={handleClaimReward}
                       isClaiming={claimingId === quest.id}
                       isStarting={startingId === quest.id}
+                      t={t}
                     />
                   </motion.div>
                 ))}
@@ -270,7 +329,7 @@ export default function QuestsPage() {
                 {filteredQuests.length === 0 && (
                   <div className="text-center py-12 text-[#ba9cab]">
                     <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Không có nhiệm vụ nào</p>
+                    <p>{t.noQuests}</p>
                   </div>
                 )}
               </TabsContent>
@@ -286,18 +345,20 @@ export default function QuestsPage() {
   );
 }
 
-function QuestCard({ 
-  quest, 
+function QuestCard({
+  quest,
   onStart,
   onClaim,
   isClaiming,
-  isStarting
-}: { 
-  quest: Quest; 
+  isStarting,
+  t
+}: {
+  quest: Quest;
   onStart: (questId: string) => void;
   onClaim: (questId: string) => void;
   isClaiming: boolean;
   isStarting: boolean;
+  t: typeof QUESTS_I18N['vi'];
 }) {
   const progress = quest.userProgress?.progress || 0;
   const target = quest.target || 1;
@@ -345,18 +406,18 @@ function QuestCard({
           {isStarted ? (
             <>
               <div className="flex items-center justify-between text-xs text-[#ba9cab]">
-                <span>Tiến độ</span>
+                <span>{t.progress}</span>
                 <span>{progress}/{target}</span>
               </div>
               <div className="w-full bg-[#392830] rounded-full h-1.5 overflow-hidden">
-                <div 
+                <div
                   className="bg-gradient-to-r from-love to-pink-400 h-full rounded-full transition-all"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
 
               {isCompleted && (
-                <button 
+                <button
                   className="w-full h-10 mt-2 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   onClick={() => onClaim(quest.id)}
                   disabled={isClaiming}
@@ -366,12 +427,12 @@ function QuestCard({
                   ) : (
                     <Gift className="w-4 h-4" />
                   )}
-                  Nhận thưởng
+                  {isClaiming ? t.claiming : t.claim}
                 </button>
               )}
             </>
           ) : (
-            <button 
+            <button
               className="w-full h-10 mt-2 rounded-full bg-[#392830] hover:bg-[#392830]/80 text-white font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 border border-[#392830]"
               onClick={() => onStart(quest.id)}
               disabled={isStarting}
@@ -381,7 +442,7 @@ function QuestCard({
               ) : (
                 <Zap className="w-4 h-4" />
               )}
-              Bắt đầu nhiệm vụ
+              {isStarting ? t.starting : t.start}
             </button>
           )}
         </div>
@@ -389,7 +450,7 @@ function QuestCard({
 
       {isClaimed && (
         <p className="text-center text-sm text-green-400 mt-2">
-          ✓ Đã nhận thưởng
+          ✓ {t.claimed}
         </p>
       )}
     </div>
