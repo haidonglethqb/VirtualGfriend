@@ -8,10 +8,22 @@ interface AdminConfig {
   jwtSecret: string;
 }
 
+function normalizeEnvValue(value: string | undefined): string {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
 function getAdminConfig(): AdminConfig | null {
-  const username = process.env.ADMIN_USERNAME;
-  const passwordHash = process.env.ADMIN_PASSWORD_HASH;
-  const jwtSecret = process.env.ADMIN_JWT_SECRET;
+  const username = normalizeEnvValue(process.env.ADMIN_USERNAME);
+  const passwordHash = normalizeEnvValue(process.env.ADMIN_PASSWORD_HASH);
+  const jwtSecret = normalizeEnvValue(process.env.ADMIN_JWT_SECRET);
 
   if (!username || !passwordHash || !jwtSecret) {
     return null;
@@ -31,7 +43,7 @@ export function isAdminConfigured(): boolean {
 export function isAdminUsername(username: string): boolean {
   const config = getAdminConfig();
   if (!config) return false;
-  return username === config.username;
+  return String(username || '').trim() === config.username;
 }
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {
