@@ -9,6 +9,7 @@ import { useCharacterStore, CharacterTemplate } from '@/store/character-store';
 import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/services/api';
+import { useLanguageStore } from '@/store/language-store';
 
 // User gender options
 const USER_GENDERS = [
@@ -53,6 +54,8 @@ export default function OnboardingPage() {
     const { createCharacter } = useCharacterStore();
     const { isAuthenticated } = useAuthStore();
     const { toast } = useToast();
+    const { language } = useLanguageStore();
+    const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
     const [step, setStep] = useState(1);
     const [isCreating, setIsCreating] = useState(false);
     const [templates, setTemplates] = useState<CharacterTemplate[]>([]);
@@ -74,23 +77,23 @@ export default function OnboardingPage() {
                     setTemplates(response.data);
                     if (response.data.length === 0) {
                         toast({
-                            title: 'Cảnh báo',
-                            description: 'Không tìm thấy mẫu nhân vật. Vui lòng liên hệ hỗ trợ.',
+                            title: tr('Cảnh báo', 'Warning'),
+                            description: tr('Không tìm thấy mẫu nhân vật. Vui lòng liên hệ hỗ trợ.', 'No character templates found. Please contact support.'),
                             variant: 'destructive',
                         });
                     }
                 } else {
                     toast({
-                        title: 'Lỗi tải dữ liệu',
-                        description: 'Không thể tải danh sách mẫu nhân vật.',
+                        title: tr('Lỗi tải dữ liệu', 'Data loading error'),
+                        description: tr('Không thể tải danh sách mẫu nhân vật.', 'Could not load character templates.'),
                         variant: 'destructive',
                     });
                 }
             } catch (error) {
                 console.error('Failed to fetch templates:', error);
                 toast({
-                    title: 'Lỗi kết nối',
-                    description: 'Không thể kết nối đến server. Vui lòng thử lại.',
+                    title: tr('Lỗi kết nối', 'Connection error'),
+                    description: tr('Không thể kết nối đến server. Vui lòng thử lại.', 'Could not connect to server. Please try again.'),
                     variant: 'destructive',
                 });
             } finally {
@@ -150,8 +153,8 @@ export default function OnboardingPage() {
         // Validate template selection
         if (!formData.templateId) {
             toast({
-                title: 'Thiếu thông tin',
-                description: 'Vui lòng chọn mẫu nhân vật trước khi tiếp tục.',
+                title: tr('Thiếu thông tin', 'Missing information'),
+                description: tr('Vui lòng chọn mẫu nhân vật trước khi tiếp tục.', 'Please choose a character template before continuing.'),
                 variant: 'destructive',
             });
             return;
@@ -180,29 +183,29 @@ export default function OnboardingPage() {
             }
 
             toast({
-                title: 'Thành công!',
-                description: 'Đã tạo nhân vật thành công.',
+                title: tr('Thành công!', 'Success!'),
+                description: tr('Đã tạo nhân vật thành công.', 'Character created successfully.'),
             });
 
             router.push('/dashboard');
         } catch (error: any) {
             console.error('Failed to create character:', error);
 
-            let errorMessage = 'Không thể tạo người yêu ảo. Vui lòng thử lại!';
+            let errorMessage = tr('Không thể tạo người yêu ảo. Vui lòng thử lại!', 'Could not create your AI companion. Please try again!');
 
             if (error?.response?.status === 400) {
-                errorMessage = 'Thông tin nhân vật không hợp lệ. Vui lòng kiểm tra lại.';
+                errorMessage = tr('Thông tin nhân vật không hợp lệ. Vui lòng kiểm tra lại.', 'Invalid character data. Please review your inputs.');
             } else if (error?.response?.status === 401) {
-                errorMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+                errorMessage = tr('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'Session expired. Please sign in again.');
                 setTimeout(() => router.push('/auth/login'), 2000);
             } else if (error?.response?.status === 500) {
-                errorMessage = 'Lỗi server. Vui lòng thử lại sau ít phút.';
+                errorMessage = tr('Lỗi server. Vui lòng thử lại sau ít phút.', 'Server error. Please try again in a few minutes.');
             } else if (error?.message) {
                 errorMessage = error.message;
             }
 
             toast({
-                title: 'Lỗi tạo nhân vật',
+                title: tr('Lỗi tạo nhân vật', 'Character creation failed'),
                 description: errorMessage,
                 variant: 'destructive',
             });
@@ -233,10 +236,10 @@ export default function OnboardingPage() {
                         <Heart className="w-10 h-10 text-white fill-white" />
                     </div>
                     <h1 className="text-4xl font-bold mb-2">
-                        Tạo Nhân Vật <span className="text-love">AI</span>
+                        {tr('Tạo Nhân Vật', 'Create Your')} <span className="text-love">AI</span>
                     </h1>
                     <p className="text-[#ba9cab]">
-                        Hãy cho chúng tôi biết về bạn và người bạn đồng hành lý tưởng
+                        {tr('Hãy cho chúng tôi biết về bạn và người bạn đồng hành lý tưởng', 'Tell us about you and your ideal companion')}
                     </p>
                 </motion.div>
 
@@ -266,10 +269,10 @@ export default function OnboardingPage() {
                             <div>
                                 <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
                                     <Users className="w-6 h-6 text-love" />
-                                    Bạn là ai?
+                                    {tr('Bạn là ai?', 'Who are you?')}
                                 </h2>
                                 <p className="text-[#ba9cab] mb-6">
-                                    Cho chúng tôi biết về bản thân bạn (không bắt buộc)
+                                    {tr('Cho chúng tôi biết về bản thân bạn (không bắt buộc)', 'Tell us about yourself (optional)')}
                                 </p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     {USER_GENDERS.map((gender) => (
@@ -295,10 +298,10 @@ export default function OnboardingPage() {
                             <div>
                                 <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
                                     <Heart className="w-6 h-6 text-love" />
-                                    Bạn muốn hẹn hò với ai?
+                                    {tr('Bạn muốn hẹn hò với ai?', 'Who do you want to date?')}
                                 </h2>
                                 <p className="text-[#ba9cab] mb-6">
-                                    Chọn giới tính người bạn muốn đồng hành
+                                    {tr('Chọn giới tính người bạn muốn đồng hành', 'Choose the gender you want to connect with')}
                                 </p>
                                 <div className="space-y-3">
                                     {DATING_PREFERENCES.map((pref) => (
@@ -327,10 +330,10 @@ export default function OnboardingPage() {
                             <div>
                                 <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
                                     <Sparkles className="w-6 h-6 text-love" />
-                                    Chọn nhân vật
+                                    {tr('Chọn nhân vật', 'Choose character')}
                                 </h2>
                                 <p className="text-[#ba9cab] mb-6">
-                                    Chọn một nhân vật phù hợp với sở thích của bạn
+                                    {tr('Chọn một nhân vật phù hợp với sở thích của bạn', 'Choose a character that matches your preference')}
                                 </p>
 
                                 {isLoadingTemplates ? (
@@ -339,7 +342,7 @@ export default function OnboardingPage() {
                                     </div>
                                 ) : filteredTemplates.length === 0 ? (
                                     <div className="text-center py-12 text-[#ba9cab]">
-                                        Không tìm thấy nhân vật phù hợp. Vui lòng quay lại chọn sở thích khác.
+                                        {tr('Không tìm thấy nhân vật phù hợp. Vui lòng quay lại chọn sở thích khác.', 'No matching characters found. Please go back and choose a different preference.')}
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -387,10 +390,10 @@ export default function OnboardingPage() {
                             <div>
                                 <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
                                     <Sparkles className="w-6 h-6 text-love" />
-                                    Đặt tên
+                                    {tr('Đặt tên', 'Set a name')}
                                 </h2>
                                 <p className="text-[#ba9cab] mb-6">
-                                    Bạn có thể giữ tên gốc hoặc đặt tên mới
+                                    {tr('Bạn có thể giữ tên gốc hoặc đặt tên mới', 'You can keep the original name or set a new one')}
                                 </p>
 
                                 {selectedTemplate && (
@@ -411,7 +414,7 @@ export default function OnboardingPage() {
                                             )}
                                         </div>
                                         <div>
-                                            <div className="text-sm text-[#ba9cab]">Nhân vật đã chọn</div>
+                                            <div className="text-sm text-[#ba9cab]">{tr('Nhân vật đã chọn', 'Selected character')}</div>
                                             <div className="font-bold">{selectedTemplate.name}</div>
                                         </div>
                                     </div>
@@ -431,14 +434,14 @@ export default function OnboardingPage() {
                         {/* Step 5: Age */}
                         {step === 5 && (
                             <div>
-                                <h2 className="text-2xl font-bold mb-2">Người ấy bao nhiêu tuổi?</h2>
+                                <h2 className="text-2xl font-bold mb-2">{tr('Người ấy bao nhiêu tuổi?', 'How old is your companion?')}</h2>
                                 <p className="text-[#ba9cab] mb-6">
-                                    Chọn độ tuổi phù hợp (18-30 tuổi)
+                                    {tr('Chọn độ tuổi phù hợp (18-30 tuổi)', 'Choose an age range (18-30)')}
                                 </p>
                                 <div className="space-y-4">
                                     <div className="text-center">
                                         <span className="text-6xl font-bold text-love">{formData.age}</span>
-                                        <span className="text-2xl text-[#ba9cab] ml-2">tuổi</span>
+                                        <span className="text-2xl text-[#ba9cab] ml-2">{tr('tuổi', 'years')}</span>
                                     </div>
                                     <input
                                         type="range"
@@ -459,9 +462,9 @@ export default function OnboardingPage() {
                         {/* Step 6: Occupation */}
                         {step === 6 && (
                             <div>
-                                <h2 className="text-2xl font-bold mb-2">Nghề nghiệp của người ấy?</h2>
+                                <h2 className="text-2xl font-bold mb-2">{tr('Nghề nghiệp của người ấy?', 'Companion occupation?')}</h2>
                                 <p className="text-[#ba9cab] mb-6">
-                                    Chọn nghề nghiệp để AI có thể trò chuyện phù hợp
+                                    {tr('Chọn nghề nghiệp để AI có thể trò chuyện phù hợp', 'Choose an occupation to help AI chat more naturally')}
                                 </p>
                                 <div className="grid grid-cols-2 gap-3">
                                     {OCCUPATIONS.map((occ) => (
@@ -484,9 +487,9 @@ export default function OnboardingPage() {
                         {/* Step 7: Personality */}
                         {step === 7 && (
                             <div>
-                                <h2 className="text-2xl font-bold mb-2">Tính cách?</h2>
+                                <h2 className="text-2xl font-bold mb-2">{tr('Tính cách?', 'Personality?')}</h2>
                                 <p className="text-[#ba9cab] mb-6">
-                                    Chọn tính cách phù hợp với sở thích của bạn
+                                    {tr('Chọn tính cách phù hợp với sở thích của bạn', 'Choose a personality that fits your preference')}
                                 </p>
                                 <div className="space-y-3">
                                     {PERSONALITIES.map((pers) => (
@@ -516,7 +519,7 @@ export default function OnboardingPage() {
                             className="flex items-center gap-2 px-6 py-3 rounded-full bg-[#392830] hover:bg-[#4a3640] transition-colors font-medium"
                         >
                             <ArrowLeft className="w-4 h-4" />
-                            Quay lại
+                            {tr('Quay lại', 'Back')}
                         </button>
                     )}
                     <button
@@ -525,15 +528,15 @@ export default function OnboardingPage() {
                         className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-love hover:bg-love/90 disabled:bg-[#392830] disabled:cursor-not-allowed transition-colors font-bold shadow-[0_0_20px_rgba(244,37,140,0.3)]"
                     >
                         {isCreating ? (
-                            'Đang tạo...'
+                            tr('Đang tạo...', 'Creating...')
                         ) : step === TOTAL_STEPS ? (
                             <>
                                 <Heart className="w-5 h-5" />
-                                Tạo người yêu ảo
+                                {tr('Tạo người yêu ảo', 'Create AI companion')}
                             </>
                         ) : (
                             <>
-                                Tiếp theo
+                                {tr('Tiếp theo', 'Next')}
                                 <ArrowRight className="w-5 h-5" />
                             </>
                         )}

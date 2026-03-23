@@ -162,22 +162,65 @@ export const userService = {
     const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
     const skip = (page - 1) * safeLimit;
 
-    const [notifications, total] = await Promise.all([
-      prisma.notification.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: safeLimit,
-      }),
-      prisma.notification.count({ where: { userId } }),
+    const [notifications, totalRows] = await Promise.all([
+      prisma.$queryRaw<Array<{
+        id: string;
+        userId: string;
+        type: string;
+        title: string;
+        message: string;
+        data: unknown;
+        isRead: boolean;
+        createdAt: Date;
+      }>>`
+        SELECT n.id, n."userId", n.type, n.title, n.message, n.data, n."isRead", n."createdAt"
+        FROM notifications n
+        WHERE n."userId" = ${userId}
+          AND (
+            n.data IS NULL
+            OR (n.data->>'expiresAt') IS NULL
+            OR (n.data->>'expiresAt') = ''
+            OR NOT ((n.data->>'expiresAt') ~ '^\\d{4}-\\d{2}-\\d{2}T')
+            OR ((n.data->>'expiresAt')::timestamptz > NOW())
+          )
+        ORDER BY n."createdAt" DESC
+        OFFSET ${skip}
+        LIMIT ${safeLimit}
+      `,
+      prisma.$queryRaw<Array<{ total: bigint }>>`
+        SELECT COUNT(*)::bigint AS total
+        FROM notifications n
+        WHERE n."userId" = ${userId}
+          AND (
+            n.data IS NULL
+            OR (n.data->>'expiresAt') IS NULL
+            OR (n.data->>'expiresAt') = ''
+            OR NOT ((n.data->>'expiresAt') ~ '^\\d{4}-\\d{2}-\\d{2}T')
+            OR ((n.data->>'expiresAt')::timestamptz > NOW())
+          )
+      `,
     ]);
 
+    const total = Number(totalRows[0]?.total || 0);
+
+    const normalizedNotifications = notifications.map((item) => {
+      const rawData = item.data as Record<string, unknown> | null;
+      const durationMs = Number(rawData?.durationMs);
+      return {
+        ...item,
+        data: {
+          ...(rawData || {}),
+          durationMs: Number.isFinite(durationMs) ? durationMs : 5000,
+        },
+      };
+    });
+
     return {
-      items: notifications,
+      items: normalizedNotifications,
       total,
       page,
       pageSize: safeLimit,
-      hasMore: skip + notifications.length < total,
+      hasMore: skip + normalizedNotifications.length < total,
     };
   },
 

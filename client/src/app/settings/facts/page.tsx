@@ -8,10 +8,13 @@ import Link from 'next/link';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { FactsManager } from '@/components/facts/facts-manager';
+import { useLanguageStore } from '@/store/language-store';
 
 export default function FactsSettingsPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -44,8 +47,8 @@ export default function FactsSettingsPage() {
                 <Brain className="w-5 h-5 text-purple-400" />
               </div>
               <div>
-                <h1 className="text-lg font-semibold text-white">Quản lý Facts</h1>
-                <p className="text-xs text-white/60">Thông tin AI đã học về bạn</p>
+                <h1 className="text-lg font-semibold text-white">{tr('Quản lý Facts', 'Manage Facts')}</h1>
+                <p className="text-xs text-white/60">{tr('Thông tin AI đã học về bạn', 'Information AI has learned about you')}</p>
               </div>
             </div>
           </div>

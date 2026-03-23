@@ -7,6 +7,7 @@ import { Lock, Eye, EyeOff, Loader2, Check, X, Heart, KeyRound, ShieldCheck } fr
 import Link from 'next/link';
 import api from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguageStore } from '@/store/language-store';
 import { 
   validatePassword, 
   getPasswordStrengthColor, 
@@ -14,7 +15,7 @@ import {
   PASSWORD_REQUIREMENTS 
 } from '@/lib/password-validation';
 
-function LoadingOverlay() {
+function LoadingOverlay({ text }: { text: string }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -41,7 +42,7 @@ function LoadingOverlay() {
         </div>
         
         <div className="flex items-center gap-1">
-          <span className="text-white font-medium">Đang đặt lại mật khẩu</span>
+          <span className="text-white font-medium">{text}</span>
           <motion.span
             animate={{ opacity: [0, 1, 0] }}
             transition={{ duration: 1.5, repeat: Infinity }}
@@ -68,6 +69,8 @@ function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   
   const emailFromUrl = searchParams.get('email') || '';
   const tokenFromUrl = searchParams.get('token') || '';
@@ -79,7 +82,7 @@ function ResetPasswordContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const passwordValidation = useMemo(() => validatePassword(newPassword), [newPassword]);
+  const passwordValidation = useMemo(() => validatePassword(newPassword, language), [newPassword, language]);
   const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
 
   useEffect(() => {
@@ -93,7 +96,7 @@ function ResetPasswordContent() {
 
     if (!passwordValidation.valid) {
       toast({
-        title: 'Mật khẩu không hợp lệ',
+        title: tr('Mật khẩu không hợp lệ', 'Invalid password'),
         description: passwordValidation.errors[0],
         variant: 'destructive',
       });
@@ -102,8 +105,8 @@ function ResetPasswordContent() {
 
     if (newPassword !== confirmPassword) {
       toast({
-        title: 'Lỗi',
-        description: 'Mật khẩu xác nhận không khớp',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Mật khẩu xác nhận không khớp', 'Confirmation password does not match'),
         variant: 'destructive',
       });
       return;
@@ -120,8 +123,8 @@ function ResetPasswordContent() {
 
       if (response.success) {
         toast({
-          title: 'Thành công!',
-          description: 'Mật khẩu đã được đặt lại thành công',
+          title: tr('Thành công!', 'Success!'),
+          description: tr('Mật khẩu đã được đặt lại thành công', 'Password has been reset successfully'),
           variant: 'love',
         });
         setTimeout(() => {
@@ -129,9 +132,9 @@ function ResetPasswordContent() {
         }, 2000);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Không thể đặt lại mật khẩu. Vui lòng thử lại.';
+      const message = error instanceof Error ? error.message : tr('Không thể đặt lại mật khẩu. Vui lòng thử lại.', 'Unable to reset password. Please try again.');
       toast({
-        title: 'Lỗi',
+        title: tr('Lỗi', 'Error'),
         description: message,
         variant: 'destructive',
       });
@@ -143,7 +146,7 @@ function ResetPasswordContent() {
   return (
     <>
       <AnimatePresence>
-        {isLoading && <LoadingOverlay />}
+        {isLoading && <LoadingOverlay text={tr('Đang đặt lại mật khẩu', 'Resetting password')} />}
       </AnimatePresence>
 
       <div className="min-h-screen bg-[#030014] flex items-center justify-center p-4 sm:p-6">
@@ -200,8 +203,8 @@ function ResetPasswordContent() {
                 >
                   <KeyRound className="w-8 h-8 text-green-400" />
                 </motion.div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Đặt lại mật khẩu</h1>
-                <p className="text-gray-500">Tạo mật khẩu mới cho tài khoản của bạn</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">{tr('Đặt lại mật khẩu', 'Reset password')}</h1>
+                <p className="text-gray-500">{tr('Tạo mật khẩu mới cho tài khoản của bạn', 'Create a new password for your account')}</p>
               </div>
 
               {/* Form */}
@@ -209,7 +212,7 @@ function ResetPasswordContent() {
                 {/* New Password */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-300">
-                    Mật khẩu mới <span className="text-love">*</span>
+                    {tr('Mật khẩu mới', 'New password')} <span className="text-love">*</span>
                   </label>
                   <div className={`relative rounded-xl transition-all duration-300 ${
                     focusedField === 'password' ? 'ring-2 ring-green-500/50' : ''
@@ -225,7 +228,7 @@ function ResetPasswordContent() {
                       onBlur={() => setFocusedField(null)}
                       disabled={isLoading}
                       className="w-full h-12 pl-12 pr-12 bg-white/[0.03] border border-white/[0.08] rounded-xl text-white placeholder:text-gray-600 outline-none transition-all duration-300 hover:bg-white/[0.05] focus:bg-white/[0.05] focus:border-green-500/30 disabled:opacity-50"
-                      placeholder={`Ít nhất ${PASSWORD_REQUIREMENTS.MIN_LENGTH} ký tự`}
+                      placeholder={tr(`Ít nhất ${PASSWORD_REQUIREMENTS.MIN_LENGTH} ký tự`, `At least ${PASSWORD_REQUIREMENTS.MIN_LENGTH} characters`)}
                       autoComplete="new-password"
                     />
                     <button
@@ -258,17 +261,17 @@ function ResetPasswordContent() {
                           />
                         </div>
                         <span className="text-xs text-gray-500 w-16 text-right">
-                          {getPasswordStrengthLabel(passwordValidation.strength)}
+                          {getPasswordStrengthLabel(passwordValidation.strength, language)}
                         </span>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                         {[
-                          { check: newPassword.length >= PASSWORD_REQUIREMENTS.MIN_LENGTH, label: `${PASSWORD_REQUIREMENTS.MIN_LENGTH}+ ký tự` },
-                          { check: /[A-Z]/.test(newPassword), label: 'Chữ hoa' },
-                          { check: /[a-z]/.test(newPassword), label: 'Chữ thường' },
-                          { check: /[0-9]/.test(newPassword), label: 'Số' },
-                          { check: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword), label: 'Ký tự đặc biệt' },
+                          { check: newPassword.length >= PASSWORD_REQUIREMENTS.MIN_LENGTH, label: tr(`${PASSWORD_REQUIREMENTS.MIN_LENGTH}+ ký tự`, `${PASSWORD_REQUIREMENTS.MIN_LENGTH}+ characters`) },
+                          { check: /[A-Z]/.test(newPassword), label: tr('Chữ hoa', 'Uppercase') },
+                          { check: /[a-z]/.test(newPassword), label: tr('Chữ thường', 'Lowercase') },
+                          { check: /[0-9]/.test(newPassword), label: tr('Số', 'Number') },
+                          { check: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword), label: tr('Ký tự đặc biệt', 'Special character') },
                         ].map((req, i) => (
                           <div 
                             key={i}
@@ -292,7 +295,7 @@ function ResetPasswordContent() {
                 {/* Confirm Password */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-300">
-                    Xác nhận mật khẩu <span className="text-love">*</span>
+                    {tr('Xác nhận mật khẩu', 'Confirm password')} <span className="text-love">*</span>
                   </label>
                   <div className={`relative rounded-xl transition-all duration-300 ${
                     focusedField === 'confirm' ? 'ring-2 ring-green-500/50' : ''
@@ -308,7 +311,7 @@ function ResetPasswordContent() {
                       onBlur={() => setFocusedField(null)}
                       disabled={isLoading}
                       className="w-full h-12 pl-12 pr-12 bg-white/[0.03] border border-white/[0.08] rounded-xl text-white placeholder:text-gray-600 outline-none transition-all duration-300 hover:bg-white/[0.05] focus:bg-white/[0.05] focus:border-green-500/30 disabled:opacity-50"
-                      placeholder="Nhập lại mật khẩu mới"
+                      placeholder={tr('Nhập lại mật khẩu mới', 'Re-enter new password')}
                       autoComplete="new-password"
                     />
                     {confirmPassword ? (
@@ -332,7 +335,7 @@ function ResetPasswordContent() {
                   {confirmPassword && !passwordsMatch && (
                     <p className="text-xs text-red-400 flex items-center gap-1">
                       <X className="w-3 h-3" />
-                      Mật khẩu không khớp
+                      {tr('Mật khẩu không khớp', 'Passwords do not match')}
                     </p>
                   )}
                 </div>
@@ -345,7 +348,7 @@ function ResetPasswordContent() {
                   <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-green-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <span className="relative z-10 flex items-center justify-center gap-2">
                     <Check className="w-5 h-5" />
-                    Đặt lại mật khẩu
+                    {tr('Đặt lại mật khẩu', 'Reset password')}
                   </span>
                 </button>
               </form>
@@ -354,7 +357,7 @@ function ResetPasswordContent() {
               <div className="mt-6 p-4 rounded-xl bg-green-500/5 border border-green-500/10">
                 <p className="text-sm text-green-400/80 text-center flex items-center justify-center gap-2">
                   <ShieldCheck className="w-4 h-4" />
-                  Mật khẩu mạnh giúp bảo vệ tài khoản của bạn
+                  {tr('Mật khẩu mạnh giúp bảo vệ tài khoản của bạn', 'A strong password helps protect your account')}
                 </p>
               </div>
             </div>
@@ -366,11 +369,14 @@ function ResetPasswordContent() {
 }
 
 function LoadingFallback() {
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+
   return (
     <div className="min-h-screen bg-[#030014] flex items-center justify-center">
       <div className="flex items-center gap-2">
         <Loader2 className="w-6 h-6 animate-spin text-green-400" />
-        <span className="text-gray-400">Đang tải...</span>
+        <span className="text-gray-400">{tr('Đang tải...', 'Loading...')}</span>
       </div>
     </div>
   );

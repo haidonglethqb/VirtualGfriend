@@ -94,6 +94,20 @@ interface Template {
   avatarUrl: string;
   gender: string;
   personality: string;
+  style?: string;
+  isDefault?: boolean;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+interface TemplateFormData {
+  name: string;
+  description: string;
+  avatarUrl: string;
+  gender: string;
+  personality: string;
+  style: string;
+  isDefault: boolean;
   isActive: boolean;
   sortOrder: number;
 }
@@ -136,30 +150,42 @@ const chartDefaults = {
   borderColor: 'rgba(255,255,255,0.06)',
 };
 
+const createTemplateFormData = (template?: Template): TemplateFormData => ({
+  name: template?.name || '',
+  description: template?.description || '',
+  avatarUrl: template?.avatarUrl || '',
+  gender: template?.gender || 'FEMALE',
+  personality: template?.personality || 'caring',
+  style: template?.style || 'anime',
+  isDefault: Boolean(template?.isDefault),
+  isActive: template?.isActive ?? true,
+  sortOrder: template?.sortOrder ?? 0,
+});
+
 const ADMIN_I18N = {
   vi: {
-    loginTitle: 'Trang Quan Tri',
-    loginSubtitle: 'He thong quan ly Amoura',
-    username: 'Ten dang nhap',
-    password: 'Mat khau',
-    loginButton: 'Dang nhap',
-    loggingIn: 'Dang dang nhap...',
+    loginTitle: 'Trang Quản Trị',
+    loginSubtitle: 'Hệ thống quản lý Amoura',
+    username: 'Tên đăng nhập',
+    password: 'Mật khẩu',
+    loginButton: 'Đăng nhập',
+    loggingIn: 'Đang đăng nhập...',
     tabs: {
-      dashboard: 'Tong quan',
-      users: 'Nguoi dung',
-      characters: 'Nhan vat',
-      messages: 'Tin nhan',
-      quests: 'Nhiem vu',
-      templates: 'Mau nhan vat',
-      analytics: 'Phan tich',
-      system: 'He thong',
-      tierConfigs: 'Cau hinh VIP',
+      dashboard: 'Tổng quan',
+      users: 'Người dùng',
+      characters: 'Nhân vật',
+      messages: 'Tin nhắn',
+      quests: 'Nhiệm vụ',
+      templates: 'Mẫu nhân vật',
+      analytics: 'Phân tích',
+      system: 'Hệ thống',
+      tierConfigs: 'Cấu hình VIP',
     },
-    broadcast: 'Thong bao',
-    giveCoinsAll: 'Tang xu (tat ca)',
-    giveGemsAll: 'Tang ngoc (tat ca)',
-    logout: 'Dang xuat',
-    languageTitle: 'Ngon ngu',
+    broadcast: 'Thông báo',
+    giveCoinsAll: 'Tặng xu (tất cả)',
+    giveGemsAll: 'Tặng ngọc (tất cả)',
+    logout: 'Đăng xuất',
+    languageTitle: 'Ngôn ngữ',
   },
   en: {
     loginTitle: 'Admin Panel',
@@ -190,16 +216,19 @@ const ADMIN_I18N = {
 // Pagination Controls Component
 function PaginationControls({ 
   pagination, 
-  setPagination 
+  setPagination,
+  language,
 }: { 
   pagination: Pagination; 
-  setPagination: React.Dispatch<React.SetStateAction<Pagination>> 
+  setPagination: React.Dispatch<React.SetStateAction<Pagination>>;
+  language: 'vi' | 'en';
 }) {
+  const isVi = language === 'vi';
   return (
     <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700/50">
       <p className="text-sm text-gray-400">
-        Showing {Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total)} to{' '}
-        {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+        {isVi ? 'Hiển thị' : 'Showing'} {Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total)} {isVi ? 'đến' : 'to'}{' '}
+        {Math.min(pagination.page * pagination.limit, pagination.total)} {isVi ? 'trong tổng số' : 'of'} {pagination.total}
       </p>
       <div className="flex items-center gap-2">
         <button
@@ -264,6 +293,7 @@ function Modal({
 export default function AdminPage() {
   const { language, toggleLanguage } = useLanguageStore();
   const t = ADMIN_I18N[language];
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
 
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = checking
   const [token, setToken] = useState('');
@@ -292,6 +322,7 @@ export default function AdminPage() {
   // Modal states
   const [showModal, setShowModal] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<User | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
 
   // Toast notification
@@ -316,7 +347,7 @@ export default function AdminPage() {
     
     if (res.status === 401) {
       handleLogout();
-      throw new Error('Session expired');
+      throw new Error(tr('Phiên đăng nhập đã hết hạn', 'Session expired'));
     }
     
     return res;
@@ -404,13 +435,13 @@ export default function AdminPage() {
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || 'Login failed');
+      if (!res.ok) throw new Error(data.error || tr('Đăng nhập thất bại', 'Login failed'));
 
       setToken(data.token);
       localStorage.setItem('adminToken', data.token);
       setIsLoggedIn(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : tr('Đăng nhập thất bại', 'Login failed'));
     } finally {
       setLoading(false);
     }
@@ -493,21 +524,21 @@ export default function AdminPage() {
         body: JSON.stringify(formData),
       });
       if (res.ok) {
-        showToast('User updated successfully');
+        showToast(tr('Cập nhật người dùng thành công', 'User updated successfully'));
         setShowModal(null);
         fetchUsers();
       }
     } catch {
-      showToast('Failed to update user', 'error');
+      showToast(tr('Cập nhật người dùng thất bại', 'Failed to update user'), 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleResetPassword = async (userId: string) => {
-    const newPass = prompt('Enter new password (min 8 chars):');
+    const newPass = prompt(tr('Nhập mật khẩu mới (tối thiểu 8 ký tự):', 'Enter new password (min 8 chars):'));
     if (!newPass || newPass.length < 8) {
-      showToast('Password must be at least 8 characters', 'error');
+      showToast(tr('Mật khẩu phải có ít nhất 8 ký tự', 'Password must be at least 8 characters'), 'error');
       return;
     }
     
@@ -517,17 +548,17 @@ export default function AdminPage() {
         method: 'POST',
         body: JSON.stringify({ newPassword: newPass }),
       });
-      if (res.ok) showToast('Password reset successfully');
+      if (res.ok) showToast(tr('Đặt lại mật khẩu thành công', 'Password reset successfully'));
     } catch {
-      showToast('Failed to reset password', 'error');
+      showToast(tr('Đặt lại mật khẩu thất bại', 'Failed to reset password'), 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleGiveRewards = async (userId: string) => {
-    const coins = prompt('Enter coins to give (0 to skip):');
-    const gems = prompt('Enter gems to give (0 to skip):');
+    const coins = prompt(tr('Nhập số xu muốn tặng (0 để bỏ qua):', 'Enter coins to give (0 to skip):'));
+    const gems = prompt(tr('Nhập số ngọc muốn tặng (0 để bỏ qua):', 'Enter gems to give (0 to skip):'));
     
     if (!coins && !gems) return;
     
@@ -541,28 +572,28 @@ export default function AdminPage() {
         }),
       });
       if (res.ok) {
-        showToast('Rewards given successfully');
+        showToast(tr('Tặng thưởng thành công', 'Rewards given successfully'));
         fetchUsers();
       }
     } catch {
-      showToast('Failed to give rewards', 'error');
+      showToast(tr('Tặng thưởng thất bại', 'Failed to give rewards'), 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteCharacter = async (id: string) => {
-    if (!confirm('Delete this character and all related data? This cannot be undone.')) return;
+    if (!confirm(tr('Xóa nhân vật này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.', 'Delete this character and all related data? This cannot be undone.'))) return;
     
     setActionLoading(true);
     try {
       const res = await apiCall(`/characters/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        showToast('Character deleted');
+        showToast(tr('Đã xóa nhân vật', 'Character deleted'));
         fetchCharacters();
       }
     } catch {
-      showToast('Failed to delete character', 'error');
+      showToast(tr('Xóa nhân vật thất bại', 'Failed to delete character'), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -573,11 +604,11 @@ export default function AdminPage() {
     try {
       const res = await apiCall(`/quests/${id}/toggle`, { method: 'POST' });
       if (res.ok) {
-        showToast('Quest status toggled');
+        showToast(tr('Đã đổi trạng thái nhiệm vụ', 'Quest status toggled'));
         fetchQuests();
       }
     } catch {
-      showToast('Failed to toggle quest', 'error');
+      showToast(tr('Đổi trạng thái nhiệm vụ thất bại', 'Failed to toggle quest'), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -591,12 +622,12 @@ export default function AdminPage() {
         body: JSON.stringify(formData),
       });
       if (res.ok) {
-        showToast('Quest created');
+        showToast(tr('Đã tạo nhiệm vụ', 'Quest created'));
         setShowModal(null);
         fetchQuests();
       }
     } catch {
-      showToast('Failed to create quest', 'error');
+      showToast(tr('Tạo nhiệm vụ thất bại', 'Failed to create quest'), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -607,21 +638,124 @@ export default function AdminPage() {
     try {
       const res = await apiCall(`/templates/${id}/toggle`, { method: 'POST' });
       if (res.ok) {
-        showToast('Template status toggled');
+        showToast(tr('Đã đổi trạng thái mẫu', 'Template status toggled'));
         fetchTemplates();
       }
     } catch {
-      showToast('Failed to toggle template', 'error');
+      showToast(tr('Đổi trạng thái mẫu thất bại', 'Failed to toggle template'), 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCreateTemplate = async () => {
+    const source = formData as Record<string, unknown>;
+    const payload = {
+      ...source,
+      name: String(source.name || '').trim(),
+      description: String(source.description || '').trim(),
+      avatarUrl: String(source.avatarUrl || '').trim(),
+      sortOrder: Number(source.sortOrder || 0),
+      isDefault: Boolean(source.isDefault),
+      isActive: source.isActive !== false,
+    };
+
+    if (!payload.name || !payload.description || !payload.avatarUrl) {
+      showToast(tr('Vui lòng nhập đủ tên, mô tả và avatar URL', 'Please fill name, description and avatar URL'), 'error');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const res = await apiCall('/templates', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        showToast(tr('Đã tạo mẫu nhân vật', 'Template created'));
+        setShowModal(null);
+        setSelectedTemplate(null);
+        setFormData({});
+        fetchTemplates();
+      } else {
+        const data = await res.json();
+        showToast(data.error || tr('Tạo mẫu thất bại', 'Failed to create template'), 'error');
+      }
+    } catch {
+      showToast(tr('Tạo mẫu thất bại', 'Failed to create template'), 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpdateTemplate = async () => {
+    if (!selectedTemplate) return;
+
+    const source = formData as Record<string, unknown>;
+    const payload = {
+      ...source,
+      name: String(source.name || '').trim(),
+      description: String(source.description || '').trim(),
+      avatarUrl: String(source.avatarUrl || '').trim(),
+      sortOrder: Number(source.sortOrder || 0),
+      isDefault: Boolean(source.isDefault),
+      isActive: source.isActive !== false,
+    };
+
+    setActionLoading(true);
+    try {
+      const res = await apiCall(`/templates/${selectedTemplate.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        showToast(tr('Đã cập nhật mẫu nhân vật', 'Template updated'));
+        setShowModal(null);
+        setSelectedTemplate(null);
+        setFormData({});
+        fetchTemplates();
+      } else {
+        const data = await res.json();
+        showToast(data.error || tr('Cập nhật mẫu thất bại', 'Failed to update template'), 'error');
+      }
+    } catch {
+      showToast(tr('Cập nhật mẫu thất bại', 'Failed to update template'), 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    if (!confirm(tr('Xóa mẫu nhân vật này?', 'Delete this character template?'))) return;
+
+    setActionLoading(true);
+    try {
+      const res = await apiCall(`/templates/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        showToast(tr('Đã xóa mẫu nhân vật', 'Template deleted'));
+        fetchTemplates();
+      } else {
+        const data = await res.json();
+        showToast(data.error || tr('Xóa mẫu thất bại', 'Failed to delete template'), 'error');
+      }
+    } catch {
+      showToast(tr('Xóa mẫu thất bại', 'Failed to delete template'), 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleBulkGive = async (type: 'coins' | 'gems') => {
-    const amount = prompt(`Enter ${type} amount to give to ALL users:`);
+    const amount = prompt(
+      language === 'vi'
+        ? `Nhập số lượng ${type === 'coins' ? 'xu' : 'ngọc'} tặng cho TẤT CẢ người dùng:`
+        : `Enter ${type} amount to give to ALL users:`,
+    );
     if (!amount || parseInt(amount) <= 0) return;
     
-    if (!confirm(`Give ${amount} ${type} to ALL users?`)) return;
+    if (!confirm(language === 'vi' ? `Tặng ${amount} ${type === 'coins' ? 'xu' : 'ngọc'} cho TẤT CẢ người dùng?` : `Give ${amount} ${type} to ALL users?`)) return;
     
     setActionLoading(true);
     try {
@@ -634,34 +768,48 @@ export default function AdminPage() {
         showToast(data.message);
       }
     } catch {
-      showToast('Failed to give rewards', 'error');
+      showToast(tr('Tặng thưởng thất bại', 'Failed to give rewards'), 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleBroadcast = async () => {
-    const title = prompt('Enter notification title:');
-    const message = prompt('Enter notification message:');
+    const title = prompt(tr('Nhập tiêu đề thông báo:', 'Enter notification title:'));
+    const message = prompt(tr('Nhập nội dung thông báo:', 'Enter notification message:'));
+    const durationRaw = prompt(tr('Thời lượng hiển thị (ms, mặc định 5000):', 'Display duration (ms, default 5000):'), '5000');
+    const targetRaw = prompt(tr('Đối tượng nhận (all/free/premium):', 'Target audience (all/free/premium):'), 'all');
     
     if (!title || !message) return;
+
+    const durationMs = Number(durationRaw || 5000);
+    const targetFilter = ['all', 'free', 'premium'].includes((targetRaw || '').toLowerCase())
+      ? (targetRaw || 'all').toLowerCase()
+      : 'all';
     
     setActionLoading(true);
     try {
       const res = await apiCall('/broadcast', {
         method: 'POST',
-        body: JSON.stringify({ title, message, type: 'info' }),
+        body: JSON.stringify({ title, message, type: 'info', durationMs, targetFilter }),
       });
-      if (res.ok) showToast('Broadcast sent to all connected users');
+      if (res.ok) {
+        const data = await res.json();
+        showToast(
+          language === 'vi'
+            ? `Đã gửi ${data.persisted || 0} thông báo (hiển thị ${data.durationMs || 5000}ms)`
+            : `Sent ${data.persisted || 0} notifications (${data.durationMs || 5000}ms display)`
+        );
+      }
     } catch {
-      showToast('Failed to send broadcast', 'error');
+      showToast(tr('Gửi thông báo thất bại', 'Failed to send broadcast'), 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleCleanup = async (action: string) => {
-    if (!confirm(`Run cleanup: ${action}?`)) return;
+    if (!confirm(language === 'vi' ? `Chạy dọn dẹp: ${action}?` : `Run cleanup: ${action}?`)) return;
     
     setActionLoading(true);
     try {
@@ -674,14 +822,14 @@ export default function AdminPage() {
         showToast(data.message);
       }
     } catch {
-      showToast('Cleanup failed', 'error');
+      showToast(tr('Dọn dẹp thất bại', 'Cleanup failed'), 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleCleanupDuplicates = async () => {
-    if (!confirm('Clean up duplicate templates? This will:\n- Remove duplicate templates with the same name\n- Migrate characters to the kept template\n\nContinue?')) return;
+    if (!confirm(tr('Dọn các mẫu trùng lặp? Thao tác này sẽ:\n- Xóa các mẫu trùng tên\n- Chuyển nhân vật sang mẫu được giữ lại\n\nTiếp tục?', 'Clean up duplicate templates? This will:\n- Remove duplicate templates with the same name\n- Migrate characters to the kept template\n\nContinue?'))) return;
     
     setActionLoading(true);
     try {
@@ -691,17 +839,19 @@ export default function AdminPage() {
       if (res.ok) {
         const data = await res.json();
         const message = data.deleted.length > 0 
-          ? `Deleted ${data.deleted.length} duplicates: ${data.deleted.join(', ')}`
-          : 'No duplicates found';
+          ? language === 'vi'
+            ? `Đã xóa ${data.deleted.length} bản trùng: ${data.deleted.join(', ')}`
+            : `Deleted ${data.deleted.length} duplicates: ${data.deleted.join(', ')}`
+          : tr('Không tìm thấy mẫu trùng lặp', 'No duplicates found');
         showToast(message);
         // Refresh templates list
         fetchTemplates();
       } else {
         const error = await res.json();
-        showToast(error.message || 'Cleanup failed', 'error');
+        showToast(error.message || tr('Dọn dẹp thất bại', 'Cleanup failed'), 'error');
       }
     } catch {
-      showToast('Cleanup failed', 'error');
+      showToast(tr('Dọn dẹp thất bại', 'Cleanup failed'), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -715,7 +865,7 @@ export default function AdminPage() {
           <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
             <Shield className="w-8 h-8 text-white" />
           </div>
-          <p className="text-gray-400">Checking authentication...</p>
+          <p className="text-gray-400">{tr('Đang kiểm tra xác thực...', 'Checking authentication...')}</p>
         </div>
       </div>
     );
@@ -743,7 +893,7 @@ export default function AdminPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-                  placeholder={language === 'vi' ? 'tai khoan admin' : 'admin account'}
+                  placeholder={language === 'vi' ? 'tài khoản admin' : 'admin account'}
                   required
                 />
               </div>
@@ -754,7 +904,7 @@ export default function AdminPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-                  placeholder={language === 'vi' ? 'nhap mat khau' : 'enter password'}
+                  placeholder={language === 'vi' ? 'nhập mật khẩu' : 'enter password'}
                   required
                 />
               </div>
@@ -822,7 +972,7 @@ export default function AdminPage() {
             <button
               onClick={toggleLanguage}
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-700/60 border border-gray-600 text-gray-200 hover:text-white hover:border-purple-400"
-              title={language === 'vi' ? 'Switch to English' : 'Chuyen sang tieng Viet'}
+              title={language === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt'}
             >
               <Languages className="w-3.5 h-3.5" />
               <span className="text-xs font-semibold uppercase">{language}</span>
@@ -888,14 +1038,14 @@ export default function AdminPage() {
           {/* DASHBOARD */}
           {activeTab === 'dashboard' && stats && (
             <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
+              <h2 className="text-2xl font-bold mb-6">{tr('Tổng quan', 'Dashboard')}</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[
-                  { label: 'Total Users', value: stats.totalUsers, icon: Users, color: 'blue' },
-                  { label: 'Premium Users', value: stats.premiumUsers, icon: Crown, color: 'yellow' },
-                  { label: 'Characters', value: stats.totalCharacters, icon: Heart, color: 'pink' },
-                  { label: 'Messages', value: stats.totalMessages, icon: MessageSquare, color: 'green' },
+                  { label: tr('Tổng người dùng', 'Total Users'), value: stats.totalUsers, icon: Users, color: 'blue' },
+                  { label: tr('Người dùng Premium', 'Premium Users'), value: stats.premiumUsers, icon: Crown, color: 'yellow' },
+                  { label: tr('Nhân vật', 'Characters'), value: stats.totalCharacters, icon: Heart, color: 'pink' },
+                  { label: tr('Tin nhắn', 'Messages'), value: stats.totalMessages, icon: MessageSquare, color: 'green' },
                 ].map((stat, i) => (
                   <div key={i} className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                     <div className="flex items-center justify-between mb-4">
@@ -911,21 +1061,21 @@ export default function AdminPage() {
                 <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="w-5 h-5 text-green-400" />
-                    <span className="text-gray-400">Active Today</span>
+                    <span className="text-gray-400">{tr('Hoạt động hôm nay', 'Active Today')}</span>
                   </div>
                   <p className="text-3xl font-bold">{stats.activeUsersToday}</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                   <div className="flex items-center gap-2 mb-2">
                     <Sparkles className="w-5 h-5 text-purple-400" />
-                    <span className="text-gray-400">New Users Today</span>
+                    <span className="text-gray-400">{tr('Người dùng mới hôm nay', 'New Users Today')}</span>
                   </div>
                   <p className="text-3xl font-bold">{stats.newUsersToday}</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                   <div className="flex items-center gap-2 mb-2">
                     <Crown className="w-5 h-5 text-yellow-400" />
-                    <span className="text-gray-400">Premium Rate</span>
+                    <span className="text-gray-400">{tr('Tỷ lệ Premium', 'Premium Rate')}</span>
                   </div>
                   <p className="text-3xl font-bold">{stats.premiumRate}%</p>
                 </div>
@@ -937,7 +1087,7 @@ export default function AdminPage() {
           {activeTab === 'users' && (
             <motion.div key="users" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Users Management</h2>
+                <h2 className="text-2xl font-bold">{tr('Quản lý người dùng', 'Users Management')}</h2>
                 <button onClick={fetchUsers} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
                   <RefreshCw className="w-5 h-5" />
                 </button>
@@ -950,7 +1100,7 @@ export default function AdminPage() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => { setSearchQuery(e.target.value); setPagination(p => ({ ...p, page: 1 })); }}
-                    placeholder="Search by email, username..."
+                    placeholder={tr('Tìm theo email, tên người dùng...', 'Search by email, username...')}
                     className="w-full pl-12 pr-4 py-3 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
                   />
                 </div>
@@ -960,12 +1110,12 @@ export default function AdminPage() {
                 <table className="w-full">
                   <thead className="bg-gray-700/50">
                     <tr>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">User</th>
+                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Người dùng', 'User')}</th>
                       <th className="text-left px-6 py-4 text-gray-400 font-medium">Email</th>
                       <th className="text-center px-6 py-4 text-gray-400 font-medium">Premium</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">Coins</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">Gems</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">Actions</th>
+                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Xu', 'Coins')}</th>
+                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Ngọc', 'Gems')}</th>
+                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Thao tác', 'Actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -990,7 +1140,7 @@ export default function AdminPage() {
                               {user.premiumTier || 'Premium'}
                             </span>
                           ) : (
-                            <span className="text-gray-500">Free</span>
+                            <span className="text-gray-500">{tr('Miễn phí', 'Free')}</span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-center text-yellow-400">{user.coins}</td>
@@ -1004,21 +1154,21 @@ export default function AdminPage() {
                                 setShowModal('editUser');
                               }}
                               className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30"
-                              title="Edit"
+                              title={tr('Sửa', 'Edit')}
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleResetPassword(user.id)}
                               className="p-2 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30"
-                              title="Reset Password"
+                              title={tr('Đặt lại mật khẩu', 'Reset Password')}
                             >
                               <Key className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleGiveRewards(user.id)}
                               className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
-                              title="Give Rewards"
+                              title={tr('Tặng thưởng', 'Give Rewards')}
                             >
                               <Gift className="w-4 h-4" />
                             </button>
@@ -1028,7 +1178,7 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
-                <PaginationControls pagination={pagination} setPagination={setPagination} />
+                <PaginationControls pagination={pagination} setPagination={setPagination} language={language} />
               </div>
             </motion.div>
           )}
@@ -1037,7 +1187,7 @@ export default function AdminPage() {
           {activeTab === 'characters' && (
             <motion.div key="characters" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Characters Management</h2>
+                <h2 className="text-2xl font-bold">{tr('Quản lý nhân vật', 'Characters Management')}</h2>
                 <button onClick={fetchCharacters} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
                   <RefreshCw className="w-5 h-5" />
                 </button>
@@ -1047,12 +1197,12 @@ export default function AdminPage() {
                 <table className="w-full">
                   <thead className="bg-gray-700/50">
                     <tr>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">Character</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">Owner</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">Level</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">Affection</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">Status</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">Actions</th>
+                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Nhân vật', 'Character')}</th>
+                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Chủ sở hữu', 'Owner')}</th>
+                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Cấp độ', 'Level')}</th>
+                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Độ thân mật', 'Affection')}</th>
+                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Trạng thái', 'Status')}</th>
+                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Thao tác', 'Actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1069,14 +1219,14 @@ export default function AdminPage() {
                         <td className="px-6 py-4 text-center text-pink-400">{char.affection}%</td>
                         <td className="px-6 py-4 text-center">
                           <span className={`px-2 py-1 rounded-full text-sm ${char.isActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                            {char.isActive ? 'Active' : 'Inactive'}
+                            {char.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center">
                           <button
                             onClick={() => handleDeleteCharacter(char.id)}
                             className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
-                            title="Delete"
+                            title={tr('Xóa', 'Delete')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1085,7 +1235,7 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
-                <PaginationControls pagination={pagination} setPagination={setPagination} />
+                <PaginationControls pagination={pagination} setPagination={setPagination} language={language} />
               </div>
             </motion.div>
           )}
@@ -1094,7 +1244,7 @@ export default function AdminPage() {
           {activeTab === 'messages' && (
             <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Messages ({pagination.total.toLocaleString()})</h2>
+                <h2 className="text-2xl font-bold">{tr('Tin nhắn', 'Messages')} ({pagination.total.toLocaleString()})</h2>
                 <button onClick={fetchMessages} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
                   <RefreshCw className="w-5 h-5" />
                 </button>
@@ -1104,11 +1254,11 @@ export default function AdminPage() {
                 <table className="w-full">
                   <thead className="bg-gray-700/50">
                     <tr>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">User</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">Character</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">Role</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">Content</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">Date</th>
+                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Người dùng', 'User')}</th>
+                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Nhân vật', 'Character')}</th>
+                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Vai trò', 'Role')}</th>
+                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Nội dung', 'Content')}</th>
+                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Ngày', 'Date')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1127,7 +1277,7 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
-                <PaginationControls pagination={pagination} setPagination={setPagination} />
+                <PaginationControls pagination={pagination} setPagination={setPagination} language={language} />
               </div>
             </motion.div>
           )}
@@ -1136,13 +1286,13 @@ export default function AdminPage() {
           {activeTab === 'quests' && (
             <motion.div key="quests" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Quests Management</h2>
+                <h2 className="text-2xl font-bold">{tr('Quản lý nhiệm vụ', 'Quests Management')}</h2>
                 <div className="flex gap-2">
                   <button
                     onClick={() => { setFormData({}); setShowModal('createQuest'); }}
                     className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center gap-2"
                   >
-                    <Plus className="w-4 h-4" /> Create Quest
+                    <Plus className="w-4 h-4" /> {tr('Tạo nhiệm vụ', 'Create Quest')}
                   </button>
                   <button onClick={fetchQuests} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
                     <RefreshCw className="w-5 h-5" />
@@ -1153,7 +1303,7 @@ export default function AdminPage() {
               <div className="grid gap-4">
                 {['DAILY', 'WEEKLY', 'ACHIEVEMENT'].map((type) => (
                   <div key={type} className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
-                    <h3 className="text-lg font-semibold mb-4 text-purple-400">{type} Quests</h3>
+                    <h3 className="text-lg font-semibold mb-4 text-purple-400">{type} {tr('Nhiệm vụ', 'Quests')}</h3>
                     <div className="grid gap-3">
                       {quests.filter(q => q.type === type).map((quest) => (
                         <div key={quest.id} className="flex items-center justify-between p-4 bg-gray-700/30 rounded-xl">
@@ -1161,14 +1311,14 @@ export default function AdminPage() {
                             <p className="font-medium">{quest.title}</p>
                             <p className="text-sm text-gray-400">{quest.description}</p>
                             <div className="flex gap-2 mt-2">
-                              {quest.rewardCoins > 0 && <span className="text-yellow-400 text-sm">{quest.rewardCoins} coins</span>}
-                              {quest.rewardGems > 0 && <span className="text-purple-400 text-sm">{quest.rewardGems} gems</span>}
+                              {quest.rewardCoins > 0 && <span className="text-yellow-400 text-sm">{quest.rewardCoins} {tr('xu', 'coins')}</span>}
+                              {quest.rewardGems > 0 && <span className="text-purple-400 text-sm">{quest.rewardGems} {tr('ngọc', 'gems')}</span>}
                               {quest.rewardXp > 0 && <span className="text-blue-400 text-sm">{quest.rewardXp} XP</span>}
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className={`px-2 py-1 rounded text-xs ${quest.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                              {quest.isActive ? 'Active' : 'Inactive'}
+                              {quest.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
                             </span>
                             <button
                               onClick={() => handleToggleQuest(quest.id)}
@@ -1190,10 +1340,22 @@ export default function AdminPage() {
           {activeTab === 'templates' && (
             <motion.div key="templates" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Character Templates</h2>
-                <button onClick={fetchTemplates} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
-                  <RefreshCw className="w-5 h-5" />
-                </button>
+                <h2 className="text-2xl font-bold">{tr('Mẫu nhân vật', 'Character Templates')}</h2>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setSelectedTemplate(null);
+                      setFormData({ ...createTemplateFormData() });
+                      setShowModal('createTemplate');
+                    }}
+                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" /> {tr('Thêm mẫu', 'Add Template')}
+                  </button>
+                  <button onClick={fetchTemplates} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
+                    <RefreshCw className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1208,18 +1370,39 @@ export default function AdminPage() {
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold">{template.name}</h3>
                         <span className={`px-2 py-1 rounded text-xs ${template.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {template.isActive ? 'Active' : 'Inactive'}
+                          {template.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
                         </span>
                       </div>
                       <p className="text-sm text-gray-400 mb-3">{template.description}</p>
                       <div className="flex items-center justify-between text-sm text-gray-500">
-                        <span>{template.gender} • {template.personality}</span>
-                        <button
-                          onClick={() => handleToggleTemplate(template.id)}
-                          className="p-2 bg-gray-600/50 rounded-lg hover:bg-gray-600"
-                        >
-                          <Zap className="w-4 h-4" />
-                        </button>
+                        <span>{template.gender} • {template.personality} • #{template.sortOrder}</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedTemplate(template);
+                              setFormData({ ...createTemplateFormData(template) });
+                              setShowModal('editTemplate');
+                            }}
+                            className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30"
+                            title={tr('Sửa', 'Edit')}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTemplate(template.id)}
+                            className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
+                            title={tr('Xóa', 'Delete')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleToggleTemplate(template.id)}
+                            className="p-2 bg-gray-600/50 rounded-lg hover:bg-gray-600"
+                            title={tr('Bật/tắt', 'Toggle')}
+                          >
+                            <Zap className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1232,7 +1415,7 @@ export default function AdminPage() {
           {activeTab === 'analytics' && (
             <motion.div key="analytics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
+                <h2 className="text-2xl font-bold">{tr('Bảng điều khiển phân tích', 'Analytics Dashboard')}</h2>
                 <div className="flex items-center gap-3">
                   <select
                     value={analyticsDays}
@@ -1243,10 +1426,10 @@ export default function AdminPage() {
                     }}
                     className="px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
                   >
-                    <option value={7}>Last 7 days</option>
-                    <option value={14}>Last 14 days</option>
-                    <option value={30}>Last 30 days</option>
-                    <option value={90}>Last 90 days</option>
+                    <option value={7}>{tr('7 ngày gần nhất', 'Last 7 days')}</option>
+                    <option value={14}>{tr('14 ngày gần nhất', 'Last 14 days')}</option>
+                    <option value={30}>{tr('30 ngày gần nhất', 'Last 30 days')}</option>
+                    <option value={90}>{tr('90 ngày gần nhất', 'Last 90 days')}</option>
                   </select>
                   <button onClick={() => fetchAnalytics()} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
                     <RefreshCw className="w-5 h-5" />
@@ -1263,19 +1446,19 @@ export default function AdminPage() {
                   {/* Summary Stats Cards */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-                      <p className="text-sm text-gray-400 mb-1">New Users ({analyticsDays}d)</p>
+                      <p className="text-sm text-gray-400 mb-1">{tr('Người dùng mới', 'New Users')} ({analyticsDays}{tr(' ngày', 'd')})</p>
                       <p className="text-2xl font-bold text-blue-400">
                         {analytics.dailyStats.reduce((acc, d) => acc + d.new_users, 0)}
                       </p>
                     </div>
                     <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-                      <p className="text-sm text-gray-400 mb-1">Messages ({analyticsDays}d)</p>
+                      <p className="text-sm text-gray-400 mb-1">{tr('Tin nhắn', 'Messages')} ({analyticsDays}{tr(' ngày', 'd')})</p>
                       <p className="text-2xl font-bold text-green-400">
                         {analytics.messageStats.reduce((acc, d) => acc + d.count, 0).toLocaleString()}
                       </p>
                     </div>
                     <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-                      <p className="text-sm text-gray-400 mb-1">Avg Messages/Day</p>
+                      <p className="text-sm text-gray-400 mb-1">{tr('TB tin nhắn/ngày', 'Avg Messages/Day')}</p>
                       <p className="text-2xl font-bold text-purple-400">
                         {analytics.messageStats.length > 0
                           ? Math.round(analytics.messageStats.reduce((acc, d) => acc + d.count, 0) / analytics.messageStats.length).toLocaleString()
@@ -1283,7 +1466,7 @@ export default function AdminPage() {
                       </p>
                     </div>
                     <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-                      <p className="text-sm text-gray-400 mb-1">Avg Active Users/Day</p>
+                      <p className="text-sm text-gray-400 mb-1">{tr('TB người dùng hoạt động/ngày', 'Avg Active Users/Day')}</p>
                       <p className="text-2xl font-bold text-amber-400">
                         {analytics.dailyStats.length > 0
                           ? Math.round(analytics.dailyStats.reduce((acc, d) => acc + (d.active_users || 0), 0) / analytics.dailyStats.length)
@@ -1296,7 +1479,7 @@ export default function AdminPage() {
                   <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <TrendingUp className="w-5 h-5 text-blue-400" />
-                      User Registrations & Messages
+                      {tr('Đăng ký người dùng và tin nhắn', 'User Registrations & Messages')}
                     </h3>
                     <div className="h-72">
                       <Line
@@ -1307,7 +1490,7 @@ export default function AdminPage() {
                           }),
                           datasets: [
                             {
-                              label: 'New Users',
+                              label: tr('Người dùng mới', 'New Users'),
                               data: analytics.dailyStats.map(d => d.new_users),
                               borderColor: '#3b82f6',
                               backgroundColor: 'rgba(59,130,246,0.1)',
@@ -1318,7 +1501,7 @@ export default function AdminPage() {
                               yAxisID: 'y',
                             },
                             {
-                              label: 'Messages',
+                              label: tr('Tin nhắn', 'Messages'),
                               data: analytics.dailyStats.map(d => d.messages),
                               borderColor: '#22c55e',
                               backgroundColor: 'rgba(34,197,94,0.1)',
@@ -1349,14 +1532,14 @@ export default function AdminPage() {
                             x: { ticks: { color: chartDefaults.color }, grid: { color: chartDefaults.borderColor } },
                             y: {
                               type: 'linear', position: 'left',
-                              title: { display: true, text: 'New Users', color: '#3b82f6' },
+                              title: { display: true, text: tr('Người dùng mới', 'New Users'), color: '#3b82f6' },
                               ticks: { color: '#3b82f6' },
                               grid: { color: chartDefaults.borderColor },
                               beginAtZero: true,
                             },
                             y1: {
                               type: 'linear', position: 'right',
-                              title: { display: true, text: 'Messages', color: '#22c55e' },
+                              title: { display: true, text: tr('Tin nhắn', 'Messages'), color: '#22c55e' },
                               ticks: { color: '#22c55e' },
                               grid: { drawOnChartArea: false },
                               beginAtZero: true,
@@ -1371,7 +1554,7 @@ export default function AdminPage() {
                   <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <Activity className="w-5 h-5 text-amber-400" />
-                      Daily Active Users
+                      {tr('Người dùng hoạt động theo ngày', 'Daily Active Users')}
                     </h3>
                     <div className="h-64">
                       <Bar
@@ -1381,7 +1564,7 @@ export default function AdminPage() {
                             return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
                           }),
                           datasets: [{
-                            label: 'Active Users',
+                            label: tr('Người dùng hoạt động', 'Active Users'),
                             data: analytics.dailyStats.map(d => d.active_users || 0),
                             backgroundColor: 'rgba(251,191,36,0.6)',
                             borderColor: '#fbbf24',
@@ -1416,7 +1599,7 @@ export default function AdminPage() {
                     <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
                       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-purple-400" />
-                        Premium Distribution
+                        {tr('Phân bố gói Premium', 'Premium Distribution')}
                       </h3>
                       {analytics.premiumDistribution.length > 0 ? (
                         <div className="h-64 flex items-center justify-center">
@@ -1463,7 +1646,9 @@ export default function AdminPage() {
                                     label: (ctx) => {
                                       const total = analytics.premiumDistribution.reduce((acc, t) => acc + t._count, 0);
                                       const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0';
-                                      return ` ${ctx.label}: ${ctx.parsed} users (${pct}%)`;
+                                      return language === 'vi'
+                                        ? ` ${ctx.label}: ${ctx.parsed} người dùng (${pct}%)`
+                                        : ` ${ctx.label}: ${ctx.parsed} users (${pct}%)`;
                                     },
                                   },
                                 },
@@ -1472,7 +1657,7 @@ export default function AdminPage() {
                           />
                         </div>
                       ) : (
-                        <p className="text-gray-500 text-center py-4">No premium users yet</p>
+                        <p className="text-gray-500 text-center py-4">{tr('Chưa có người dùng premium', 'No premium users yet')}</p>
                       )}
                     </div>
 
@@ -1480,7 +1665,7 @@ export default function AdminPage() {
                     <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
                       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Crown className="w-5 h-5 text-yellow-400" />
-                        Top Users by Messages
+                        {tr('Top người dùng theo số tin nhắn', 'Top Users by Messages')}
                       </h3>
                       <div className="space-y-3 max-h-64 overflow-y-auto">
                         {analytics.topUsers.map((user, idx) => (
@@ -1495,18 +1680,18 @@ export default function AdminPage() {
                                 {idx + 1}
                               </span>
                               <div>
-                                <p className="font-medium text-sm">{user.displayName || user.username || 'Anonymous'}</p>
+                                <p className="font-medium text-sm">{user.displayName || user.username || tr('Ẩn danh', 'Anonymous')}</p>
                                 <p className="text-xs text-gray-400">{user.email}</p>
                               </div>
                             </div>
                             <div className="text-right">
                               <p className="font-bold text-purple-400">{user.messageCount.toLocaleString()}</p>
-                              <p className="text-xs text-gray-500">messages</p>
+                              <p className="text-xs text-gray-500">{tr('tin nhắn', 'messages')}</p>
                             </div>
                           </div>
                         ))}
                         {analytics.topUsers.length === 0 && (
-                          <p className="text-gray-500 text-center py-4">No data available</p>
+                          <p className="text-gray-500 text-center py-4">{tr('Không có dữ liệu', 'No data available')}</p>
                         )}
                       </div>
                     </div>
@@ -1520,7 +1705,7 @@ export default function AdminPage() {
           {activeTab === 'system' && systemInfo && (
             <motion.div key="system" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">System Information</h2>
+                <h2 className="text-2xl font-bold">{tr('Thông tin hệ thống', 'System Information')}</h2>
                 <button onClick={fetchSystemInfo} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
                   <RefreshCw className="w-5 h-5" />
                 </button>
@@ -1530,21 +1715,21 @@ export default function AdminPage() {
                 <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                   <div className="flex items-center gap-2 mb-2">
                     <Database className="w-5 h-5 text-blue-400" />
-                    <span className="text-gray-400">Database Size</span>
+                    <span className="text-gray-400">{tr('Dung lượng cơ sở dữ liệu', 'Database Size')}</span>
                   </div>
                   <p className="text-2xl font-bold">{systemInfo.databaseSize}</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                   <div className="flex items-center gap-2 mb-2">
                     <Clock className="w-5 h-5 text-green-400" />
-                    <span className="text-gray-400">Uptime</span>
+                    <span className="text-gray-400">{tr('Thời gian hoạt động', 'Uptime')}</span>
                   </div>
                   <p className="text-2xl font-bold">{Math.floor(systemInfo.uptime / 3600)}h {Math.floor((systemInfo.uptime % 3600) / 60)}m</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
                   <div className="flex items-center gap-2 mb-2">
                     <HardDrive className="w-5 h-5 text-purple-400" />
-                    <span className="text-gray-400">Memory</span>
+                    <span className="text-gray-400">{tr('Bộ nhớ', 'Memory')}</span>
                   </div>
                   <p className="text-2xl font-bold">{Math.round(systemInfo.memoryUsage.heapUsed / 1024 / 1024)} MB</p>
                 </div>
@@ -1552,51 +1737,51 @@ export default function AdminPage() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <h3 className="font-semibold mb-4">Table Statistics</h3>
+                  <h3 className="font-semibold mb-4">{tr('Thống kê bảng dữ liệu', 'Table Statistics')}</h3>
                   <div className="space-y-2 max-h-80 overflow-y-auto">
                     {systemInfo.tables.map((table) => (
                       <div key={table.name} className="flex justify-between p-2 bg-gray-700/30 rounded">
                         <span className="text-gray-300">{table.name}</span>
-                        <span className="text-gray-400">{table.rows.toLocaleString()} rows</span>
+                        <span className="text-gray-400">{table.rows.toLocaleString()} {tr('dòng', 'rows')}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <h3 className="font-semibold mb-4">Cleanup Actions</h3>
+                  <h3 className="font-semibold mb-4">{tr('Tác vụ dọn dẹp', 'Cleanup Actions')}</h3>
                   <div className="space-y-3">
                     <button
                       onClick={() => handleCleanup('expired_tokens')}
                       disabled={actionLoading}
                       className="w-full p-4 bg-gray-700/50 rounded-xl hover:bg-gray-700 text-left"
                     >
-                      <p className="font-medium">Clean Expired Tokens</p>
-                      <p className="text-sm text-gray-400">Remove expired and revoked refresh tokens</p>
+                      <p className="font-medium">{tr('Dọn token hết hạn', 'Clean Expired Tokens')}</p>
+                      <p className="text-sm text-gray-400">{tr('Xóa refresh token đã hết hạn hoặc bị thu hồi', 'Remove expired and revoked refresh tokens')}</p>
                     </button>
                     <button
                       onClick={() => handleCleanup('old_messages')}
                       disabled={actionLoading}
                       className="w-full p-4 bg-gray-700/50 rounded-xl hover:bg-gray-700 text-left"
                     >
-                      <p className="font-medium">Clean Old Messages</p>
-                      <p className="text-sm text-gray-400">Delete messages older than 6 months (free users only)</p>
+                      <p className="font-medium">{tr('Dọn tin nhắn cũ', 'Clean Old Messages')}</p>
+                      <p className="text-sm text-gray-400">{tr('Xóa tin nhắn cũ hơn 6 tháng (chỉ người dùng miễn phí)', 'Delete messages older than 6 months (free users only)')}</p>
                     </button>
                     <button
                       onClick={() => handleCleanup('inactive_users')}
                       disabled={actionLoading}
                       className="w-full p-4 bg-gray-700/50 rounded-xl hover:bg-gray-700 text-left"
                     >
-                      <p className="font-medium">Find Inactive Users</p>
-                      <p className="text-sm text-gray-400">List users inactive for 90+ days</p>
+                      <p className="font-medium">{tr('Tìm người dùng không hoạt động', 'Find Inactive Users')}</p>
+                      <p className="text-sm text-gray-400">{tr('Liệt kê người dùng không hoạt động trên 90 ngày', 'List users inactive for 90+ days')}</p>
                     </button>
                     <button
                       onClick={handleCleanupDuplicates}
                       disabled={actionLoading}
                       className="w-full p-4 bg-red-700/50 rounded-xl hover:bg-red-700 text-left"
                     >
-                      <p className="font-medium">Clean Duplicate Templates</p>
-                      <p className="text-sm text-gray-400">Remove duplicate character templates and migrate characters</p>
+                      <p className="font-medium">{tr('Dọn mẫu trùng lặp', 'Clean Duplicate Templates')}</p>
+                      <p className="text-sm text-gray-400">{tr('Xóa mẫu nhân vật trùng và chuyển nhân vật sang mẫu còn lại', 'Remove duplicate character templates and migrate characters')}</p>
                     </button>
                   </div>
                 </div>
@@ -1616,11 +1801,11 @@ export default function AdminPage() {
       {/* Modals */}
       <AnimatePresence>
         {showModal === 'editUser' && selectedItem && (
-          <Modal title="Edit User" onClose={() => setShowModal(null)}>
+          <Modal title={tr('Chỉnh sửa người dùng', 'Edit User')} onClose={() => setShowModal(null)}>
             <p className="text-gray-400 mb-4">{selectedItem.email}</p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Coins</label>
+                <label className="block text-sm text-gray-400 mb-2">{tr('Xu', 'Coins')}</label>
                 <input
                   type="number"
                   value={formData.coins as number || 0}
@@ -1629,7 +1814,7 @@ export default function AdminPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Gems</label>
+                <label className="block text-sm text-gray-400 mb-2">{tr('Ngọc', 'Gems')}</label>
                 <input
                   type="number"
                   value={formData.gems as number || 0}
@@ -1645,73 +1830,73 @@ export default function AdminPage() {
                   onChange={(e) => setFormData({ ...formData, isPremium: e.target.checked })}
                   className="w-5 h-5 rounded bg-gray-700 border-gray-600"
                 />
-                <label htmlFor="isPremium" className="text-gray-300">Premium Status</label>
+                <label htmlFor="isPremium" className="text-gray-300">{tr('Trạng thái Premium', 'Premium Status')}</label>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowModal(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
-                Cancel
+                {tr('Hủy', 'Cancel')}
               </button>
               <button onClick={handleUpdateUser} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? 'Saving...' : 'Save Changes'}
+                {actionLoading ? tr('Đang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
               </button>
             </div>
           </Modal>
         )}
 
         {showModal === 'createQuest' && (
-          <Modal title="Create Quest" onClose={() => setShowModal(null)}>
+          <Modal title={tr('Tạo nhiệm vụ', 'Create Quest')} onClose={() => setShowModal(null)}>
             <div className="space-y-4 max-h-96 overflow-y-auto">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Title *</label>
+                <label className="block text-sm text-gray-400 mb-2">{tr('Tiêu đề', 'Title')} *</label>
                 <input
                   type="text"
                   value={formData.title as string || ''}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  placeholder="Quest title"
+                  placeholder={tr('Tiêu đề nhiệm vụ', 'Quest title')}
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Description *</label>
+                <label className="block text-sm text-gray-400 mb-2">{tr('Mô tả', 'Description')} *</label>
                 <textarea
                   value={formData.description as string || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
                   rows={2}
-                  placeholder="Quest description"
+                  placeholder={tr('Mô tả nhiệm vụ', 'Quest description')}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Type</label>
+                  <label className="block text-sm text-gray-400 mb-2">{tr('Loại', 'Type')}</label>
                   <select
                     value={formData.type as string || 'DAILY'}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                     className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
                   >
-                    <option value="DAILY">Daily</option>
-                    <option value="WEEKLY">Weekly</option>
-                    <option value="ACHIEVEMENT">Achievement</option>
+                    <option value="DAILY">{tr('Hằng ngày', 'Daily')}</option>
+                    <option value="WEEKLY">{tr('Hằng tuần', 'Weekly')}</option>
+                    <option value="ACHIEVEMENT">{tr('Thành tựu', 'Achievement')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Category</label>
+                  <label className="block text-sm text-gray-400 mb-2">{tr('Danh mục', 'Category')}</label>
                   <select
                     value={formData.category as string || 'chat'}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
                   >
-                    <option value="chat">Chat</option>
-                    <option value="gift">Gift</option>
-                    <option value="social">Social</option>
-                    <option value="explore">Explore</option>
+                    <option value="chat">{tr('Trò chuyện', 'Chat')}</option>
+                    <option value="gift">{tr('Quà tặng', 'Gift')}</option>
+                    <option value="social">{tr('Xã hội', 'Social')}</option>
+                    <option value="explore">{tr('Khám phá', 'Explore')}</option>
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Coins</label>
+                  <label className="block text-sm text-gray-400 mb-2">{tr('Xu', 'Coins')}</label>
                   <input
                     type="number"
                     value={formData.rewardCoins as number || 0}
@@ -1720,7 +1905,7 @@ export default function AdminPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Gems</label>
+                  <label className="block text-sm text-gray-400 mb-2">{tr('Ngọc', 'Gems')}</label>
                   <input
                     type="number"
                     value={formData.rewardGems as number || 0}
@@ -1741,10 +1926,223 @@ export default function AdminPage() {
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowModal(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
-                Cancel
+                {tr('Hủy', 'Cancel')}
               </button>
               <button onClick={handleCreateQuest} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? 'Creating...' : 'Create Quest'}
+                {actionLoading ? tr('Đang tạo...', 'Creating...') : tr('Tạo nhiệm vụ', 'Create Quest')}
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {showModal === 'createTemplate' && (
+          <Modal title={tr('Thêm mẫu nhân vật', 'Create Template')} onClose={() => setShowModal(null)}>
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">{tr('Tên mẫu', 'Name')} *</label>
+                <input
+                  type="text"
+                  value={formData.name as string || ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">{tr('Mô tả', 'Description')} *</label>
+                <textarea
+                  value={formData.description as string || ''}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Avatar URL *</label>
+                <input
+                  type="url"
+                  value={formData.avatarUrl as string || ''}
+                  onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  placeholder="https://..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">{tr('Giới tính', 'Gender')}</label>
+                  <select
+                    value={formData.gender as string || 'FEMALE'}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  >
+                    <option value="FEMALE">FEMALE</option>
+                    <option value="MALE">MALE</option>
+                    <option value="NON_BINARY">NON_BINARY</option>
+                    <option value="OTHER">OTHER</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">{tr('Tính cách', 'Personality')}</label>
+                  <input
+                    type="text"
+                    value={formData.personality as string || ''}
+                    onChange={(e) => setFormData({ ...formData, personality: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Style</label>
+                  <input
+                    type="text"
+                    value={formData.style as string || 'anime'}
+                    onChange={(e) => setFormData({ ...formData, style: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">{tr('Thứ tự', 'Sort order')}</label>
+                  <input
+                    type="number"
+                    value={formData.sortOrder as number || 0}
+                    onChange={(e) => setFormData({ ...formData, sortOrder: Number(e.target.value) })}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.isActive ?? true)}
+                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  {tr('Đang hoạt động', 'Active')}
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.isDefault)}
+                    onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  {tr('Mặc định', 'Default')}
+                </label>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowModal(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
+                {tr('Hủy', 'Cancel')}
+              </button>
+              <button onClick={handleCreateTemplate} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
+                {actionLoading ? tr('Đang tạo...', 'Creating...') : tr('Tạo mẫu', 'Create Template')}
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {showModal === 'editTemplate' && selectedTemplate && (
+          <Modal title={tr('Sửa mẫu nhân vật', 'Edit Template')} onClose={() => setShowModal(null)}>
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">{tr('Tên mẫu', 'Name')} *</label>
+                <input
+                  type="text"
+                  value={formData.name as string || ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">{tr('Mô tả', 'Description')} *</label>
+                <textarea
+                  value={formData.description as string || ''}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Avatar URL *</label>
+                <input
+                  type="url"
+                  value={formData.avatarUrl as string || ''}
+                  onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">{tr('Giới tính', 'Gender')}</label>
+                  <select
+                    value={formData.gender as string || 'FEMALE'}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  >
+                    <option value="FEMALE">FEMALE</option>
+                    <option value="MALE">MALE</option>
+                    <option value="NON_BINARY">NON_BINARY</option>
+                    <option value="OTHER">OTHER</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">{tr('Tính cách', 'Personality')}</label>
+                  <input
+                    type="text"
+                    value={formData.personality as string || ''}
+                    onChange={(e) => setFormData({ ...formData, personality: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Style</label>
+                  <input
+                    type="text"
+                    value={formData.style as string || 'anime'}
+                    onChange={(e) => setFormData({ ...formData, style: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">{tr('Thứ tự', 'Sort order')}</label>
+                  <input
+                    type="number"
+                    value={formData.sortOrder as number || 0}
+                    onChange={(e) => setFormData({ ...formData, sortOrder: Number(e.target.value) })}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.isActive ?? true)}
+                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  {tr('Đang hoạt động', 'Active')}
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.isDefault)}
+                    onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  {tr('Mặc định', 'Default')}
+                </label>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowModal(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
+                {tr('Hủy', 'Cancel')}
+              </button>
+              <button onClick={handleUpdateTemplate} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
+                {actionLoading ? tr('Đang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
               </button>
             </div>
           </Modal>

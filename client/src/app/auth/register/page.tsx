@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Eye, EyeOff, Mail, Lock, User, Check, X, Sparkles, Shield, MessageCircle, Users, Home } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguageStore } from '@/store/language-store';
 import { 
   validatePassword, 
   getPasswordStrengthColor, 
@@ -14,7 +15,7 @@ import {
   PASSWORD_REQUIREMENTS 
 } from '@/lib/password-validation';
 
-function LoadingOverlay() {
+function LoadingOverlay({ text }: { text: string }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -41,7 +42,7 @@ function LoadingOverlay() {
         </div>
         
         <div className="flex items-center gap-1">
-          <span className="text-white font-medium">Đang tạo tài khoản</span>
+          <span className="text-white font-medium">{text}</span>
           <motion.span
             animate={{ opacity: [0, 1, 0] }}
             transition={{ duration: 1.5, repeat: Infinity }}
@@ -68,6 +69,8 @@ export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const register = useAuthStore((state) => state.register);
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
 
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -77,7 +80,7 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const passwordValidation = useMemo(() => validatePassword(password), [password]);
+  const passwordValidation = useMemo(() => validatePassword(password, language), [password, language]);
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,8 +88,8 @@ export default function RegisterPage() {
 
     if (!email || !password) {
       toast({
-        title: 'Lỗi',
-        description: 'Vui lòng điền đầy đủ thông tin',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Vui lòng điền đầy đủ thông tin', 'Please fill in all required fields'),
         variant: 'destructive',
       });
       return;
@@ -94,7 +97,7 @@ export default function RegisterPage() {
 
     if (!passwordValidation.valid) {
       toast({
-        title: 'Mật khẩu không hợp lệ',
+        title: tr('Mật khẩu không hợp lệ', 'Invalid password'),
         description: passwordValidation.errors[0],
         variant: 'destructive',
       });
@@ -103,8 +106,8 @@ export default function RegisterPage() {
 
     if (username && username.trim().length < 5) {
       toast({
-        title: 'Tên người dùng không hợp lệ',
-        description: 'Tên người dùng phải có ít nhất 5 ký tự',
+        title: tr('Tên người dùng không hợp lệ', 'Invalid username'),
+        description: tr('Tên người dùng phải có ít nhất 5 ký tự', 'Username must be at least 5 characters'),
         variant: 'destructive',
       });
       return;
@@ -112,8 +115,8 @@ export default function RegisterPage() {
 
     if (password !== confirmPassword) {
       toast({
-        title: 'Lỗi',
-        description: 'Mật khẩu xác nhận không khớp',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Mật khẩu xác nhận không khớp', 'Confirmation password does not match'),
         variant: 'destructive',
       });
       return;
@@ -124,15 +127,15 @@ export default function RegisterPage() {
     try {
       await register(email, password, username || undefined);
       toast({
-        title: 'Mã OTP đã được gửi!',
-        description: 'Kiểm tra email của bạn để xác nhận đăng ký',
+        title: tr('Mã OTP đã được gửi!', 'OTP code sent!'),
+        description: tr('Kiểm tra email của bạn để xác nhận đăng ký', 'Check your email to verify registration'),
         variant: 'love',
       });
       router.push(`/auth/verify-otp?type=registration&email=${encodeURIComponent(email)}`);
     } catch (error) {
       toast({
-        title: 'Đăng ký thất bại',
-        description: error instanceof Error ? error.message : 'Có lỗi xảy ra',
+        title: tr('Đăng ký thất bại', 'Sign up failed'),
+        description: error instanceof Error ? error.message : tr('Có lỗi xảy ra', 'Something went wrong'),
         variant: 'destructive',
       });
     } finally {
@@ -143,7 +146,7 @@ export default function RegisterPage() {
   return (
     <>
       <AnimatePresence>
-        {isLoading && <LoadingOverlay />}
+        {isLoading && <LoadingOverlay text={tr('Đang tạo tài khoản', 'Creating account')} />}
       </AnimatePresence>
 
       <div className="min-h-screen bg-[#030014] relative">
@@ -153,7 +156,7 @@ export default function RegisterPage() {
           className="fixed top-4 left-4 sm:top-6 sm:left-6 z-40 flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 group backdrop-blur-sm"
         >
           <Home className="w-4 h-4" />
-          <span className="text-sm font-medium hidden sm:inline">Trang chủ</span>
+          <span className="text-sm font-medium hidden sm:inline">{tr('Trang chủ', 'Home')}</span>
         </Link>
 
         <div className="min-h-screen flex flex-col lg:flex-row">
@@ -185,8 +188,8 @@ export default function RegisterPage() {
                 
                 <div className="relative bg-[#0a0518]/80 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-6 sm:p-8">
                   <div className="text-center mb-6">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">Tạo tài khoản</h2>
-                    <p className="text-gray-500 text-sm sm:text-base">Bắt đầu hành trình của bạn</p>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">{tr('Tạo tài khoản', 'Create account')}</h2>
+                    <p className="text-gray-500 text-sm sm:text-base">{tr('Bắt đầu hành trình của bạn', 'Start your journey')}</p>
                   </div>
 
                   <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
@@ -217,7 +220,7 @@ export default function RegisterPage() {
                     {/* Username field */}
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-300">
-                        Tên người dùng <span className="text-gray-600 text-xs">(tuỳ chọn, tối thiểu 5 ký tự)</span>
+                        {tr('Tên người dùng', 'Username')} <span className="text-gray-600 text-xs">{tr('(tuỳ chọn, tối thiểu 5 ký tự)', '(optional, at least 5 characters)')}</span>
                       </label>
                       <div className={`relative rounded-xl transition-all duration-300 ${
                         focusedField === 'username' ? 'ring-2 ring-love/50' : ''
@@ -227,7 +230,7 @@ export default function RegisterPage() {
                         </div>
                         <input
                           type="text"
-                          placeholder="username (tối thiểu 5 ký tự)"
+                          placeholder={tr('username (tối thiểu 5 ký tự)', 'username (at least 5 characters)')}
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
                           onFocus={() => setFocusedField('username')}
@@ -239,7 +242,7 @@ export default function RegisterPage() {
                       {username && username.trim().length < 5 && (
                         <p className="text-xs text-red-400 flex items-center gap-1">
                           <X className="w-3 h-3" />
-                          Tên người dùng phải có ít nhất 5 ký tự ({username.trim().length}/5)
+                          {tr('Tên người dùng phải có ít nhất 5 ký tự', 'Username must be at least 5 characters')} ({username.trim().length}/5)
                         </p>
                       )}
                     </div>
@@ -247,7 +250,7 @@ export default function RegisterPage() {
                     {/* Password field */}
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-300">
-                        Mật khẩu <span className="text-love">*</span>
+                        {tr('Mật khẩu', 'Password')} <span className="text-love">*</span>
                       </label>
                       <div className={`relative rounded-xl transition-all duration-300 ${
                         focusedField === 'password' ? 'ring-2 ring-love/50' : ''
@@ -257,7 +260,7 @@ export default function RegisterPage() {
                         </div>
                         <input
                           type={showPassword ? 'text' : 'password'}
-                          placeholder={`Ít nhất ${PASSWORD_REQUIREMENTS.MIN_LENGTH} ký tự`}
+                          placeholder={tr(`Ít nhất ${PASSWORD_REQUIREMENTS.MIN_LENGTH} ký tự`, `At least ${PASSWORD_REQUIREMENTS.MIN_LENGTH} characters`)}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           onFocus={() => setFocusedField('password')}
@@ -295,17 +298,17 @@ export default function RegisterPage() {
                               />
                             </div>
                             <span className="text-xs text-gray-500 w-14 text-right">
-                              {getPasswordStrengthLabel(passwordValidation.strength)}
+                              {getPasswordStrengthLabel(passwordValidation.strength, language)}
                             </span>
                           </div>
                           
                           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
                             {[
-                              { check: password.length >= PASSWORD_REQUIREMENTS.MIN_LENGTH, label: `${PASSWORD_REQUIREMENTS.MIN_LENGTH}+ ký tự` },
-                              { check: /[A-Z]/.test(password), label: 'Chữ hoa' },
-                              { check: /[a-z]/.test(password), label: 'Chữ thường' },
-                              { check: /[0-9]/.test(password), label: 'Số' },
-                              { check: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password), label: 'Ký tự đặc biệt' },
+                              { check: password.length >= PASSWORD_REQUIREMENTS.MIN_LENGTH, label: tr(`${PASSWORD_REQUIREMENTS.MIN_LENGTH}+ ký tự`, `${PASSWORD_REQUIREMENTS.MIN_LENGTH}+ characters`) },
+                              { check: /[A-Z]/.test(password), label: tr('Chữ hoa', 'Uppercase') },
+                              { check: /[a-z]/.test(password), label: tr('Chữ thường', 'Lowercase') },
+                              { check: /[0-9]/.test(password), label: tr('Số', 'Number') },
+                              { check: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password), label: tr('Ký tự đặc biệt', 'Special character') },
                             ].map((req, i) => (
                               <div 
                                 key={i}
@@ -329,7 +332,7 @@ export default function RegisterPage() {
                     {/* Confirm password field */}
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-300">
-                        Xác nhận mật khẩu <span className="text-love">*</span>
+                        {tr('Xác nhận mật khẩu', 'Confirm password')} <span className="text-love">*</span>
                       </label>
                       <div className={`relative rounded-xl transition-all duration-300 ${
                         focusedField === 'confirm' ? 'ring-2 ring-love/50' : ''
@@ -339,7 +342,7 @@ export default function RegisterPage() {
                         </div>
                         <input
                           type="password"
-                          placeholder="Nhập lại mật khẩu"
+                          placeholder={tr('Nhập lại mật khẩu', 'Re-enter password')}
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           onFocus={() => setFocusedField('confirm')}
@@ -360,7 +363,7 @@ export default function RegisterPage() {
                       {confirmPassword && !passwordsMatch && (
                         <p className="text-xs text-red-400 flex items-center gap-1">
                           <X className="w-3 h-3" />
-                          Mật khẩu không khớp
+                          {tr('Mật khẩu không khớp', 'Passwords do not match')}
                         </p>
                       )}
                     </div>
@@ -373,7 +376,7 @@ export default function RegisterPage() {
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                       <span className="relative z-10 flex items-center justify-center gap-2 text-sm sm:text-base">
-                        Tạo tài khoản
+                        {tr('Tạo tài khoản', 'Create account')}
                         <Sparkles className="w-4 h-4" />
                       </span>
                     </button>
@@ -381,21 +384,21 @@ export default function RegisterPage() {
 
                   {/* Terms */}
                   <p className="mt-4 sm:mt-6 text-center text-xs text-gray-600 leading-relaxed">
-                    Bằng việc đăng ký, bạn đồng ý với{' '}
+                    {tr('Bằng việc đăng ký, bạn đồng ý với', 'By signing up, you agree to')}{' '}
                     <Link href="/terms" className="text-gray-400 hover:text-white underline-offset-4 hover:underline">
-                      Điều khoản sử dụng
+                      {tr('Điều khoản sử dụng', 'Terms of use')}
                     </Link>
-                    {' '}và{' '}
+                    {' '}{tr('và', 'and')}{' '}
                     <Link href="/privacy" className="text-gray-400 hover:text-white underline-offset-4 hover:underline">
-                      Chính sách bảo mật
+                      {tr('Chính sách bảo mật', 'Privacy policy')}
                     </Link>
                   </p>
 
                   {/* Login link */}
                   <p className="mt-4 sm:mt-6 text-center text-sm text-gray-500">
-                    Đã có tài khoản?{' '}
+                    {tr('Đã có tài khoản?', 'Already have an account?')}{' '}
                     <Link href="/auth/login" className="text-love hover:text-love/80 font-medium transition-colors">
-                      Đăng nhập
+                      {tr('Đăng nhập', 'Sign in')}
                     </Link>
                   </p>
                 </div>
@@ -443,16 +446,18 @@ export default function RegisterPage() {
                 </Link>
 
                 <h1 className="text-4xl xl:text-5xl font-black text-white leading-tight mb-5">
-                  Bắt đầu
+                  {tr('Bắt đầu', 'Start')}
                   <br />
                   <span className="bg-gradient-to-r from-love via-pink-400 to-purple-400 bg-clip-text text-transparent">
-                    hành trình mới
+                    {tr('hành trình mới', 'a new journey')}
                   </span>
                 </h1>
                 
                 <p className="text-gray-400 text-base xl:text-lg leading-relaxed max-w-md mb-8">
-                  Tạo tài khoản miễn phí và khám phá người bạn đồng hành AI 
-                  được thiết kế riêng cho bạn. Không cần thẻ tín dụng.
+                  {tr(
+                    'Tạo tài khoản miễn phí và khám phá người bạn đồng hành AI được thiết kế riêng cho bạn. Không cần thẻ tín dụng.',
+                    'Create your free account and discover an AI companion tailored just for you. No credit card required.'
+                  )}
                 </p>
 
                 {/* Benefits with Lucide icons */}
@@ -460,18 +465,18 @@ export default function RegisterPage() {
                   {[
                     { 
                       icon: MessageCircle, 
-                      title: 'Chat không giới hạn',
-                      desc: 'Trò chuyện 24/7 với AI thông minh'
+                      title: tr('Chat không giới hạn', 'Unlimited chat'),
+                      desc: tr('Trò chuyện 24/7 với AI thông minh', 'Chat with smart AI 24/7')
                     },
                     { 
                       icon: Heart, 
-                      title: 'Tùy chỉnh nhân vật',
-                      desc: 'Tạo người yêu ảo theo ý thích'
+                      title: tr('Tùy chỉnh nhân vật', 'Customize character'),
+                      desc: tr('Tạo người yêu ảo theo ý thích', 'Create your ideal virtual partner')
                     },
                     { 
                       icon: Shield, 
-                      title: 'Riêng tư tuyệt đối',
-                      desc: 'Mã hóa End-to-End mọi cuộc trò chuyện'
+                      title: tr('Riêng tư tuyệt đối', 'Total privacy'),
+                      desc: tr('Mã hóa End-to-End mọi cuộc trò chuyện', 'End-to-End encryption for all chats')
                     },
                   ].map((benefit, i) => (
                     <motion.div
@@ -503,7 +508,7 @@ export default function RegisterPage() {
                     <Users className="w-4 h-4 text-love" />
                   </div>
                   <p className="text-sm text-gray-500">
-                    <span className="text-white font-semibold">10,000+</span> người dùng tin tưởng
+                    <span className="text-white font-semibold">10,000+</span> {tr('người dùng tin tưởng', 'trusted users')}
                   </p>
                 </motion.div>
               </motion.div>
