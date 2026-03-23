@@ -13,6 +13,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
+import { useLanguageStore } from '@/store/language-store';
 
 interface InventoryItem {
   id: string;
@@ -39,6 +40,8 @@ export default function InventoryPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -59,8 +62,8 @@ export default function InventoryPage() {
       }
     } catch {
       toast({
-        title: 'Lỗi',
-        description: 'Không thể tải túi đồ',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Không thể tải túi đồ', 'Could not load inventory'),
         variant: 'destructive',
       });
     } finally {
@@ -80,10 +83,10 @@ export default function InventoryPage() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Package className="w-6 h-6 text-love" />
-              Túi đồ của bạn
+              {tr('Túi đồ của bạn', 'Your inventory')}
             </h1>
             <p className="text-sm text-[#ba9cab] mt-1">
-              Vào Chat để tặng quà cho người yêu
+              {tr('Vào Chat để tặng quà cho người yêu', 'Open chat to send gifts to your companion')}
             </p>
           </div>
           
@@ -91,13 +94,13 @@ export default function InventoryPage() {
             <Link href="/shop">
               <button className="flex items-center gap-2 h-10 px-4 rounded-full bg-[#271b21] border border-[#392830] text-sm font-medium hover:bg-[#392830] transition-colors">
                 <ShoppingBag className="w-4 h-4" />
-                Cửa hàng
+                {tr('Cửa hàng', 'Shop')}
               </button>
             </Link>
             <Link href="/chat">
               <button className="flex items-center gap-2 h-10 px-4 rounded-full bg-love hover:bg-love/90 text-white text-sm font-bold transition-colors">
                 <Gift className="w-4 h-4" />
-                Đi tặng quà
+                {tr('Đi tặng quà', 'Send gifts')}
               </button>
             </Link>
           </div>
@@ -110,14 +113,14 @@ export default function InventoryPage() {
         ) : items.length === 0 ? (
           <div className="text-center py-20">
             <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-[#ba9cab] opacity-50" />
-            <h2 className="text-xl font-semibold mb-2">Túi đồ trống</h2>
+            <h2 className="text-xl font-semibold mb-2">{tr('Túi đồ trống', 'Empty inventory')}</h2>
             <p className="text-[#ba9cab] mb-6">
-              Bạn chưa có quà nào. Hãy mua quà ở cửa hàng!
+              {tr('Bạn chưa có quà nào. Hãy mua quà ở cửa hàng!', 'You do not have any gifts yet. Visit the shop!')}
             </p>
             <Link href="/shop">
               <button className="flex items-center gap-2 mx-auto h-11 px-6 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-colors">
                 <ShoppingBag className="w-4 h-4" />
-                Đi mua sắm
+                {tr('Đi mua sắm', 'Go shopping')}
               </button>
             </Link>
           </div>
@@ -143,7 +146,7 @@ export default function InventoryPage() {
                     
                     <div className="flex items-center justify-center gap-1 text-xs text-love">
                       <Heart className="w-3 h-3 fill-love" />
-                      <span>+{item.gift.affectionBonus} khi tặng</span>
+                      <span>{language === 'vi' ? `+${item.gift.affectionBonus} khi tặng` : `+${item.gift.affectionBonus} when sent`}</span>
                     </div>
                   </CardContent>
                 </Card>

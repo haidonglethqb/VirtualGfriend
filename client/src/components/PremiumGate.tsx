@@ -22,8 +22,8 @@ import Link from 'next/link';
 function getTierDisplayName(tier: PremiumTier, isVi: boolean): string {
   const labels = {
     vi: {
-      FREE: 'Mien phi',
-      BASIC: 'VIP Co ban',
+      FREE: 'Miễn phí',
+      BASIC: 'VIP Cơ bản',
       PRO: 'VIP Pro',
       ULTIMATE: 'VIP Ultimate',
     },
@@ -126,13 +126,13 @@ export function PremiumGate({
           </div>
           
           <h3 className="text-lg font-bold mb-2">
-            {lockedMessage || (isVi ? 'Noi dung Premium' : 'Premium Content')}
+            {lockedMessage || (isVi ? 'Nội dung Premium' : 'Premium Content')}
           </h3>
           
           <p className="text-[#ba9cab] text-sm mb-4">
-            {isVi ? 'Nang cap len goi ' : 'Upgrade to '}
+            {isVi ? 'Nâng cấp lên gói ' : 'Upgrade to '}
             <span className={tierInfo.color}>{tierInfo.icon} {tierDisplayName}</span>
-            {isVi ? ' de mo khoa' : ' to unlock this feature'}
+            {isVi ? ' để mở khóa' : ' to unlock this feature'}
           </p>
           
           <Link
@@ -140,7 +140,7 @@ export function PremiumGate({
             className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-love hover:bg-love/90 transition-colors font-medium text-white"
           >
             <Crown className="w-4 h-4" />
-            {isVi ? 'Nang cap ngay' : 'Upgrade now'}
+            {isVi ? 'Nâng cấp ngay' : 'Upgrade now'}
           </Link>
         </div>
       </div>
@@ -213,7 +213,7 @@ export function FeatureLock({
   return (
     <span
       className={`${tierInfo.color} inline-flex items-center`}
-      title={isVi ? `Yeu cau goi ${requiredTierDisplayName}` : `Requires ${requiredTierDisplayName} plan`}
+      title={isVi ? `Yêu cầu gói ${requiredTierDisplayName}` : `Requires ${requiredTierDisplayName} plan`}
     >
       <Sparkles className={sizeClasses[size]} />
     </span>

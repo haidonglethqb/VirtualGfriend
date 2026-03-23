@@ -8,8 +8,9 @@ import Link from 'next/link';
 import api from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/auth-store';
+import { useLanguageStore } from '@/store/language-store';
 
-function LoadingOverlay() {
+function LoadingOverlay({ text }: { text: string }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -36,7 +37,7 @@ function LoadingOverlay() {
         </div>
         
         <div className="flex items-center gap-1">
-          <span className="text-white font-medium">Đang xác thực</span>
+          <span className="text-white font-medium">{text}</span>
           <motion.span
             animate={{ opacity: [0, 1, 0] }}
             transition={{ duration: 1.5, repeat: Infinity }}
@@ -64,6 +65,8 @@ function VerifyOTPContent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const completeRegistration = useAuthStore((state) => state.completeRegistration);
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   
   const emailFromUrl = searchParams.get('email') || '';
   const otpType = searchParams.get('type') || 'password-reset'; // 'registration' or 'password-reset'
@@ -127,8 +130,8 @@ function VerifyOTPContent() {
     const otpString = otp.join('');
     if (otpString.length !== 6) {
       toast({
-        title: 'Lỗi',
-        description: 'Vui lòng nhập đầy đủ 6 số OTP',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Vui lòng nhập đầy đủ 6 số OTP', 'Please enter all 6 OTP digits'),
         variant: 'destructive',
       });
       return;
@@ -141,8 +144,8 @@ function VerifyOTPContent() {
         // Registration flow: verify OTP and complete registration
         await completeRegistration(emailFromUrl, otpString);
         toast({
-          title: 'Đăng ký thành công!',
-          description: 'Chào mừng bạn đến với Amoura',
+          title: tr('Đăng ký thành công!', 'Registration successful!'),
+          description: tr('Chào mừng bạn đến với Amoura', 'Welcome to Amoura'),
           variant: 'love',
         });
         router.push('/onboarding');
@@ -157,25 +160,25 @@ function VerifyOTPContent() {
         
         if (token) {
           toast({
-            title: 'Thành công',
-            description: 'Mã OTP xác thực thành công',
+            title: tr('Thành công', 'Success'),
+            description: tr('Mã OTP xác thực thành công', 'OTP verified successfully'),
           });
           router.push(
             `/auth/reset-password?email=${encodeURIComponent(emailFromUrl)}&token=${token}`
           );
         } else {
           toast({
-            title: 'Lỗi',
-            description: 'Không nhận được token. Vui lòng thử lại.',
+            title: tr('Lỗi', 'Error'),
+            description: tr('Không nhận được token. Vui lòng thử lại.', 'No token received. Please try again.'),
             variant: 'destructive',
           });
         }
       }
     } catch (error) {
       console.error('OTP Verification Error:', error);
-      const message = error instanceof Error ? error.message : 'Mã OTP không hợp lệ hoặc đã hết hạn';
+      const message = error instanceof Error ? error.message : tr('Mã OTP không hợp lệ hoặc đã hết hạn', 'OTP is invalid or expired');
       toast({
-        title: 'Lỗi',
+        title: tr('Lỗi', 'Error'),
         description: message,
         variant: 'destructive',
       });
@@ -195,8 +198,8 @@ function VerifyOTPContent() {
 
       if (response.success) {
         toast({
-          title: 'Thành công',
-          description: 'Mã OTP mới đã được gửi đến email của bạn',
+          title: tr('Thành công', 'Success'),
+          description: tr('Mã OTP mới đã được gửi đến email của bạn', 'A new OTP code has been sent to your email'),
         });
         setCountdown(60);
         setCanResend(false);
@@ -204,9 +207,9 @@ function VerifyOTPContent() {
         document.getElementById('otp-0')?.focus();
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Không thể gửi lại mã OTP';
+      const message = error instanceof Error ? error.message : tr('Không thể gửi lại mã OTP', 'Could not resend OTP code');
       toast({
-        title: 'Lỗi',
+        title: tr('Lỗi', 'Error'),
         description: message,
         variant: 'destructive',
       });
@@ -218,7 +221,7 @@ function VerifyOTPContent() {
   return (
     <>
       <AnimatePresence>
-        {isLoading && <LoadingOverlay />}
+        {isLoading && <LoadingOverlay text={tr('Đang xác thực', 'Verifying')} />}
       </AnimatePresence>
       
       <div className="min-h-screen bg-[#030014] flex items-center justify-center p-4 sm:p-6">
@@ -265,7 +268,7 @@ function VerifyOTPContent() {
           className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-white mb-6 transition-colors group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          Quay lại
+          {tr('Quay lại', 'Back')}
         </Link>
 
         {/* Card */}
@@ -285,10 +288,12 @@ function VerifyOTPContent() {
                 <Shield className="w-8 h-8 text-purple-400" />
               </motion.div>
               <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-                {isRegistration ? 'Xác nhận email' : 'Xác thực OTP'}
+                {isRegistration ? tr('Xác nhận email', 'Verify email') : tr('Xác thực OTP', 'Verify OTP')}
               </h1>
               <p className="text-gray-500">
-                {isRegistration ? 'Nhập mã 6 số được gửi đến email để hoàn tất đăng ký' : 'Nhập mã 6 số được gửi đến'}
+                {isRegistration
+                  ? tr('Nhập mã 6 số được gửi đến email để hoàn tất đăng ký', 'Enter the 6-digit code sent to your email to complete registration')
+                  : tr('Nhập mã 6 số được gửi đến', 'Enter the 6-digit code sent to')}
               </p>
               <p className="text-love font-medium mt-1">{emailFromUrl}</p>
             </div>
@@ -326,12 +331,12 @@ function VerifyOTPContent() {
                   {isLoading ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Đang xác thực...
+                      {tr('Đang xác thực...', 'Verifying...')}
                     </>
                   ) : (
                     <>
                       <Shield className="w-4 h-4" />
-                      Xác thực
+                      {tr('Xác thực', 'Verify')}
                     </>
                   )}
                 </span>
@@ -347,11 +352,11 @@ function VerifyOTPContent() {
                     className="inline-flex items-center gap-2 text-sm text-love hover:text-love/80 disabled:opacity-50 transition-colors"
                   >
                     <RotateCcw className={`w-4 h-4 ${isResending ? 'animate-spin' : ''}`} />
-                    {isResending ? 'Đang gửi...' : 'Gửi lại mã OTP'}
+                    {isResending ? tr('Đang gửi...', 'Sending...') : tr('Gửi lại mã OTP', 'Resend OTP code')}
                   </button>
                 ) : (
                   <p className="text-sm text-gray-600">
-                    Gửi lại mã sau <span className="text-purple-400 font-medium">{countdown}s</span>
+                    {tr('Gửi lại mã sau', 'Resend code in')} <span className="text-purple-400 font-medium">{countdown}s</span>
                   </p>
                 )}
               </div>
@@ -361,7 +366,7 @@ function VerifyOTPContent() {
             <div className="mt-6 p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
               <p className="text-sm text-amber-400/80 text-center flex items-center justify-center gap-2">
                 <Clock className="w-4 h-4" />
-                Mã OTP có hiệu lực trong 10 phút
+                {tr('Mã OTP có hiệu lực trong 10 phút', 'OTP code is valid for 10 minutes')}
               </p>
             </div>
           </div>
@@ -377,7 +382,7 @@ function LoadingFallback() {
     <div className="min-h-screen bg-[#030014] flex items-center justify-center">
       <div className="flex items-center gap-2">
         <Loader2 className="w-6 h-6 animate-spin text-love" />
-        <span className="text-gray-400">Đang tải...</span>
+        <span className="text-gray-400">Loading...</span>
       </div>
     </div>
   );

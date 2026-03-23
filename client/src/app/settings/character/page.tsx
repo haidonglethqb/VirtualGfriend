@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Loader2, Check, Heart, User, RefreshCw, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, Heart, User, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AppLayout } from '@/components/layout/app-layout';
@@ -11,20 +11,16 @@ import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore, CharacterTemplate } from '@/store/character-store';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
-
-const PERSONALITIES = [
-  { value: 'caring', label: 'Quan tâm', description: 'Luôn chăm sóc và lo lắng cho bạn' },
-  { value: 'playful', label: 'Vui vẻ', description: 'Năng động, hay đùa và vui tính' },
-  { value: 'shy', label: 'Nhút nhát', description: 'Dễ thương, ngại ngùng và dễ xấu hổ' },
-  { value: 'passionate', label: 'Nhiệt huyết', description: 'Mạnh mẽ, quyết đoán và đam mê' },
-  { value: 'intellectual', label: 'Trí tuệ', description: 'Thông minh, sâu sắc và triết lý' },
-];
+import { useLanguageStore } from '@/store/language-store';
 
 export default function CharacterSettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
   const { character } = useCharacterStore();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+
   const [isLoading, setIsLoading] = useState(false);
   const [templates, setTemplates] = useState<CharacterTemplate[]>([]);
   const [showTemplateGrid, setShowTemplateGrid] = useState(false);
@@ -36,7 +32,14 @@ export default function CharacterSettingsPage() {
     avatarUrl: '',
   });
 
-  // Fetch templates
+  const personalities = [
+    { value: 'caring', label: tr('Quan tâm', 'Caring'), description: tr('Luôn chăm sóc và lo lắng cho bạn', 'Always caring and attentive') },
+    { value: 'playful', label: tr('Vui vẻ', 'Playful'), description: tr('Năng động, hay đùa và vui tính', 'Energetic, humorous, and fun') },
+    { value: 'shy', label: tr('Nhút nhát', 'Shy'), description: tr('Dễ thương, ngại ngùng và dễ xấu hổ', 'Cute, bashful, and a little shy') },
+    { value: 'passionate', label: tr('Nhiệt huyết', 'Passionate'), description: tr('Mạnh mẽ, quyết đoán và đam mê', 'Strong, decisive, and passionate') },
+    { value: 'intellectual', label: tr('Trí tuệ', 'Intellectual'), description: tr('Thông minh, sâu sắc và triết lý', 'Smart, thoughtful, and philosophical') },
+  ];
+
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
@@ -48,6 +51,7 @@ export default function CharacterSettingsPage() {
         console.error('Failed to fetch templates:', error);
       }
     };
+
     fetchTemplates();
   }, []);
 
@@ -56,7 +60,7 @@ export default function CharacterSettingsPage() {
       router.push('/auth/login');
       return;
     }
-    
+
     if (character) {
       setFormData({
         name: character.name || '',
@@ -69,19 +73,19 @@ export default function CharacterSettingsPage() {
   }, [isAuthenticated, router, character]);
 
   const handleSelectTemplate = (template: CharacterTemplate) => {
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       templateId: template.id,
       avatarUrl: template.avatarUrl,
-    });
+    }));
     setShowTemplateGrid(false);
   };
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
       toast({
-        title: 'Lỗi',
-        description: 'Vui lòng nhập tên nhân vật',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Vui lòng nhập tên nhân vật', 'Please enter a character name'),
         variant: 'destructive',
       });
       return;
@@ -89,11 +93,13 @@ export default function CharacterSettingsPage() {
 
     try {
       setIsLoading(true);
+
       const payload: Record<string, string> = {
         name: formData.name,
         bio: formData.bio,
         personality: formData.personality,
       };
+
       if (formData.templateId) payload.templateId = formData.templateId;
       if (formData.avatarUrl) payload.avatarUrl = formData.avatarUrl;
 
@@ -101,16 +107,18 @@ export default function CharacterSettingsPage() {
       if (response.success) {
         const { fetchCharacter: refetch } = useCharacterStore.getState();
         refetch();
+
         toast({
-          title: 'Thành công',
-          description: 'Thông tin nhân vật đã được cập nhật',
+          title: tr('Thành công', 'Success'),
+          description: tr('Thông tin nhân vật đã được cập nhật', 'Character information updated'),
         });
+
         router.push('/settings');
       }
     } catch {
       toast({
-        title: 'Lỗi',
-        description: 'Không thể cập nhật thông tin nhân vật',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Không thể cập nhật thông tin nhân vật', 'Unable to update character information'),
         variant: 'destructive',
       });
     } finally {
@@ -118,7 +126,7 @@ export default function CharacterSettingsPage() {
     }
   };
 
-  const selectedTemplate = templates.find(t => t.id === formData.templateId);
+  const selectedTemplate = templates.find((item) => item.id === formData.templateId);
   const displayAvatarUrl = formData.avatarUrl || character?.avatarUrl;
 
   if (!isAuthenticated) {
@@ -128,7 +136,6 @@ export default function CharacterSettingsPage() {
   return (
     <AppLayout>
       <div className="max-w-2xl mx-auto pb-8">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -140,10 +147,9 @@ export default function CharacterSettingsPage() {
             </button>
           </Link>
           <Heart className="w-6 h-6 text-love" />
-          <h1 className="text-2xl font-bold">Người yêu ảo của tôi</h1>
+          <h1 className="text-2xl font-bold">{tr('Người yêu ảo của tôi', 'My virtual partner')}</h1>
         </motion.div>
 
-        {/* Character Avatar & Info */}
         {character && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -154,38 +160,37 @@ export default function CharacterSettingsPage() {
             <div className="flex items-center gap-4">
               <div className="relative w-20 h-20 rounded-full overflow-hidden flex-shrink-0 border-2 border-love/30">
                 {displayAvatarUrl ? (
-                  <Image
-                    src={displayAvatarUrl}
-                    alt={character.name}
-                    fill
-                    className="object-cover"
-                    sizes="80px"
-                  />
+                  <Image src={displayAvatarUrl} alt={character.name} fill className="object-cover" sizes="80px" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-3xl font-bold text-white">
                     {character.name?.[0]?.toUpperCase()}
                   </div>
                 )}
               </div>
+
               <div className="flex-1">
                 <h2 className="text-2xl font-bold">{character.name}</h2>
-                <p className="text-[#ba9cab] text-sm">Mức độ yêu thích: {character.affection || 0}</p>
+                <p className="text-[#ba9cab] text-sm">
+                  {tr('Mức độ yêu thích', 'Affection level')}: {character.affection || 0}
+                </p>
                 {selectedTemplate && (
-                  <p className="text-love text-xs mt-1">Nhân vật: {selectedTemplate.name}</p>
+                  <p className="text-love text-xs mt-1">
+                    {tr('Nhân vật', 'Character')}: {selectedTemplate.name}
+                  </p>
                 )}
               </div>
+
               <button
-                onClick={() => setShowTemplateGrid(!showTemplateGrid)}
+                onClick={() => setShowTemplateGrid((prev) => !prev)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#181114] border border-[#392830] hover:border-love/50 transition-colors text-sm"
               >
                 <RefreshCw className="w-4 h-4 text-love" />
-                Đổi nhân vật
+                {tr('Đổi nhân vật', 'Change character')}
               </button>
             </div>
           </motion.div>
         )}
 
-        {/* Template Selector (toggle) */}
         <AnimatePresence>
           {showTemplateGrid && (
             <motion.div
@@ -195,7 +200,7 @@ export default function CharacterSettingsPage() {
               className="overflow-hidden mb-6"
             >
               <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6">
-                <h3 className="text-lg font-bold mb-4">Chọn nhân vật mới</h3>
+                <h3 className="text-lg font-bold mb-4">{tr('Chọn nhân vật mới', 'Choose a new character')}</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {templates.map((template) => (
                     <button
@@ -212,6 +217,7 @@ export default function CharacterSettingsPage() {
                           <Check className="w-3 h-3 text-white" />
                         </div>
                       )}
+
                       <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden bg-[#181114] mb-2">
                         {template.avatarUrl ? (
                           <Image
@@ -227,6 +233,7 @@ export default function CharacterSettingsPage() {
                           </div>
                         )}
                       </div>
+
                       <div className="font-bold text-xs">{template.name}</div>
                       <div className="text-[10px] text-[#ba9cab] mt-0.5 line-clamp-1">{template.description}</div>
                     </button>
@@ -237,7 +244,6 @@ export default function CharacterSettingsPage() {
           )}
         </AnimatePresence>
 
-        {/* Form */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -245,40 +251,34 @@ export default function CharacterSettingsPage() {
           className="rounded-2xl bg-[#271b21] border border-[#392830] p-6 space-y-6"
         >
           <div>
-            <label className="block text-sm font-medium text-[#ba9cab] mb-2">
-              Tên nhân vật
-            </label>
+            <label className="block text-sm font-medium text-[#ba9cab] mb-2">{tr('Tên nhân vật', 'Character name')}</label>
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Nhập tên nhân vật..."
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder={tr('Nhập tên nhân vật...', 'Enter character name...')}
               className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#ba9cab] px-4 py-3 focus:outline-none focus:border-love transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#ba9cab] mb-2">
-              Mô tả
-            </label>
+            <label className="block text-sm font-medium text-[#ba9cab] mb-2">{tr('Mô tả', 'Description')}</label>
             <textarea
               value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-              placeholder="Viết mô tả về nhân vật..."
+              onChange={(e) => setFormData((prev) => ({ ...prev, bio: e.target.value }))}
+              placeholder={tr('Viết mô tả về nhân vật...', 'Write a character description...')}
               className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#ba9cab] px-4 py-3 focus:outline-none focus:border-love transition-colors resize-none h-24"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#ba9cab] mb-2">
-              Tính cách
-            </label>
+            <label className="block text-sm font-medium text-[#ba9cab] mb-2">{tr('Tính cách', 'Personality')}</label>
             <div className="grid grid-cols-1 gap-2">
-              {PERSONALITIES.map((pers) => (
+              {personalities.map((pers) => (
                 <button
                   key={pers.value}
                   type="button"
-                  onClick={() => setFormData({ ...formData, personality: pers.value })}
+                  onClick={() => setFormData((prev) => ({ ...prev, personality: pers.value }))}
                   className={`w-full p-3 rounded-lg border transition-all text-left ${
                     formData.personality === pers.value
                       ? 'border-love bg-love/10'
@@ -295,7 +295,7 @@ export default function CharacterSettingsPage() {
           <div className="flex gap-3">
             <Link href="/settings" className="flex-1">
               <button className="w-full h-12 rounded-lg border border-[#392830] text-[#ba9cab] hover:text-white hover:border-white/30 transition-all">
-                Hủy
+                {tr('Hủy', 'Cancel')}
               </button>
             </Link>
             <button
@@ -306,12 +306,12 @@ export default function CharacterSettingsPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Đang lưu...</span>
+                  <span>{tr('Đang lưu...', 'Saving...')}</span>
                 </>
               ) : (
                 <>
                   <Check className="w-5 h-5" />
-                  <span>Lưu thay đổi</span>
+                  <span>{tr('Lưu thay đổi', 'Save changes')}</span>
                 </>
               )}
             </button>

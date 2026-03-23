@@ -27,4 +27,8 @@ export const templateService = {
 
     return template;
   },
+
+  async invalidateCache() {
+    await cache.del(TEMPLATES_CACHE_KEY);
+  },
 };

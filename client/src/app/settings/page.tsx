@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
+import { useLanguageStore } from '@/store/language-store';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
 
@@ -35,6 +36,8 @@ export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated, user, logout } = useAuthStore();
+  const { language, setLanguage } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -65,6 +68,9 @@ export default function SettingsPage() {
           theme: s.theme || 'dark',
           language: s.language || 'vi',
         });
+        if (s.language === 'vi' || s.language === 'en') {
+          setLanguage(s.language);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch settings:', error);
@@ -76,8 +82,8 @@ export default function SettingsPage() {
   const handleLogout = () => {
     logout();
     toast({
-      title: 'Đã đăng xuất',
-      description: 'Hẹn gặp lại bạn!',
+      title: tr('Đã đăng xuất', 'Logged out'),
+      description: tr('Hẹn gặp lại bạn!', 'See you again soon!'),
     });
     router.push('/');
   };
@@ -94,8 +100,8 @@ export default function SettingsPage() {
       // Revert on error
       setSettings((prev) => ({ ...prev, [key]: !newValue }));
       toast({
-        title: 'Lỗi',
-        description: 'Không thể lưu cài đặt',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Không thể lưu cài đặt', 'Could not save settings'),
         variant: 'destructive',
       });
     } finally {
@@ -106,20 +112,20 @@ export default function SettingsPage() {
   const profileSettings: SettingItem[] = [
     {
       icon: <User className="w-5 h-5" />,
-      label: 'Chỉnh sửa hồ sơ',
-      description: 'Cập nhật thông tin cá nhân',
+      label: tr('Chỉnh sửa hồ sơ', 'Edit profile'),
+      description: tr('Cập nhật thông tin cá nhân', 'Update personal information'),
       href: '/settings/profile',
     },
     {
       icon: <Heart className="w-5 h-5" />,
-      label: 'Người yêu ảo của tôi',
-      description: 'Xem và chỉnh sửa nhân vật',
+      label: tr('Người yêu ảo của tôi', 'My AI companion'),
+      description: tr('Xem và chỉnh sửa nhân vật', 'View and edit character'),
       href: '/settings/character',
     },
     {
       icon: <Brain className="w-5 h-5" />,
-      label: 'Quản lý Facts',
-      description: 'Xem và chỉnh sửa thông tin AI đã học',
+      label: tr('Quản lý Facts', 'Manage facts'),
+      description: tr('Xem và chỉnh sửa thông tin AI đã học', 'View and edit what AI has learned'),
       href: '/settings/facts',
     },
   ];
@@ -127,8 +133,8 @@ export default function SettingsPage() {
   const appSettings: SettingItem[] = [
     {
       icon: <Bell className="w-5 h-5" />,
-      label: 'Thông báo',
-      description: 'Nhận thông báo từ người yêu',
+      label: tr('Thông báo', 'Notifications'),
+      description: tr('Nhận thông báo từ người yêu', 'Receive companion notifications'),
       rightElement: (
         <ToggleSwitch
           checked={settings.notificationsEnabled}
@@ -138,8 +144,8 @@ export default function SettingsPage() {
     },
     {
       icon: <Volume2 className="w-5 h-5" />,
-      label: 'Âm thanh',
-      description: 'Hiệu ứng âm thanh trong app',
+      label: tr('Âm thanh', 'Sound'),
+      description: tr('Hiệu ứng âm thanh trong app', 'In-app sound effects'),
       rightElement: (
         <ToggleSwitch
           checked={settings.soundEnabled}
@@ -149,8 +155,8 @@ export default function SettingsPage() {
     },
     {
       icon: <Moon className="w-5 h-5" />,
-      label: 'Chế độ tối',
-      description: 'Giao diện tối',
+      label: tr('Chế độ tối', 'Dark mode'),
+      description: tr('Giao diện tối', 'Dark appearance'),
       rightElement: (
         <ToggleSwitch
           checked={settings.theme === 'dark'}
@@ -160,7 +166,7 @@ export default function SettingsPage() {
             api.patch('/users/settings', { theme: newTheme }).catch(() => {
               // Revert on error
               setSettings((prev) => ({ ...prev, theme: settings.theme }));
-              toast({ title: 'Lỗi', description: 'Không thể thay đổi chế độ tối', variant: 'destructive' });
+              toast({ title: tr('Lỗi', 'Error'), description: tr('Không thể thay đổi chế độ tối', 'Could not change dark mode'), variant: 'destructive' });
             });
           }}
         />
@@ -168,14 +174,14 @@ export default function SettingsPage() {
     },
     {
       icon: <Globe className="w-5 h-5" />,
-      label: 'Ngôn ngữ',
-      description: 'Tiếng Việt',
+      label: tr('Ngôn ngữ', 'Language'),
+      description: language === 'vi' ? 'Tiếng Việt' : 'English',
       href: '/settings/language',
     },
     {
       icon: <Palette className="w-5 h-5" />,
-      label: 'Giao diện',
-      description: 'Tùy chỉnh màu sắc và theme',
+      label: tr('Giao diện', 'Appearance'),
+      description: tr('Tùy chỉnh màu sắc và theme', 'Customize colors and theme'),
       href: '/settings/appearance',
     },
   ];
@@ -183,19 +189,19 @@ export default function SettingsPage() {
   const otherSettings: SettingItem[] = [
     {
       icon: <Shield className="w-5 h-5" />,
-      label: 'Quyền riêng tư',
-      description: 'Quản lý dữ liệu và bảo mật',
+      label: tr('Quyền riêng tư', 'Privacy'),
+      description: tr('Quản lý dữ liệu và bảo mật', 'Manage data and security'),
       href: '/settings/privacy',
     },
     {
       icon: <HelpCircle className="w-5 h-5" />,
-      label: 'Trợ giúp & Hỗ trợ',
+      label: tr('Trợ giúp & Hỗ trợ', 'Help & support'),
       href: '/settings/help',
     },
     {
       icon: <Info className="w-5 h-5" />,
-      label: 'Về ứng dụng',
-      description: 'Phiên bản 1.0.0',
+      label: tr('Về ứng dụng', 'About app'),
+      description: tr('Phiên bản 1.0.0', 'Version 1.0.0'),
       href: '/settings/about',
     },
   ];
@@ -203,12 +209,12 @@ export default function SettingsPage() {
   const dangerSettings: SettingItem[] = [
     {
       icon: <Trash2 className="w-5 h-5" />,
-      label: 'Xóa tài khoản',
-      description: 'Xóa vĩnh viễn tài khoản và dữ liệu',
+      label: tr('Xóa tài khoản', 'Delete account'),
+      description: tr('Xóa vĩnh viễn tài khoản và dữ liệu', 'Permanently delete account and data'),
       onClick: () => {
         // TODO: Show confirmation dialog
         toast({
-          title: 'Chức năng này chưa khả dụng',
+          title: tr('Chức năng này chưa khả dụng', 'This feature is not available yet'),
           variant: 'destructive',
         });
       },
@@ -216,7 +222,7 @@ export default function SettingsPage() {
     },
     {
       icon: <LogOut className="w-5 h-5" />,
-      label: 'Đăng xuất',
+      label: tr('Đăng xuất', 'Log out'),
       onClick: handleLogout,
       danger: true,
     },
@@ -233,7 +239,7 @@ export default function SettingsPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Settings className="w-6 h-6 text-love" />
-            Cài đặt
+            {tr('Cài đặt', 'Settings')}
           </h1>
         </div>
 
@@ -248,12 +254,12 @@ export default function SettingsPage() {
                 {user?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold">{user?.username || 'Người dùng'}</h2>
+                <h2 className="text-xl font-bold">{user?.username || tr('Người dùng', 'User')}</h2>
                 <p className="text-[#ba9cab]">{user?.email}</p>
                 <div className="flex items-center gap-2 mt-1 text-sm">
                   <span className="text-love">Premium</span>
                   <span className="text-[#ba9cab]">•</span>
-                  <span className="text-[#ba9cab]">Streak: {user?.streak || 1} ngày</span>
+                  <span className="text-[#ba9cab]">{tr('Chuỗi ngày', 'Streak')}: {user?.streak || 1} {tr('ngày', 'days')}</span>
                 </div>
               </div>
             </div>
@@ -266,7 +272,7 @@ export default function SettingsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <SettingsSection title="Hồ sơ" items={profileSettings} />
+          <SettingsSection title={tr('Hồ sơ', 'Profile')} items={profileSettings} />
         </motion.div>
 
         {/* App settings */}
@@ -275,7 +281,7 @@ export default function SettingsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <SettingsSection title="Ứng dụng" items={appSettings} />
+          <SettingsSection title={tr('Ứng dụng', 'App')} items={appSettings} />
         </motion.div>
 
         {/* Other settings */}
@@ -284,7 +290,7 @@ export default function SettingsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <SettingsSection title="Khác" items={otherSettings} />
+          <SettingsSection title={tr('Khác', 'Other')} items={otherSettings} />
         </motion.div>
 
         {/* Danger zone */}
@@ -293,7 +299,7 @@ export default function SettingsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <SettingsSection title="Vùng nguy hiểm" items={dangerSettings} />
+          <SettingsSection title={tr('Vùng nguy hiểm', 'Danger zone')} items={dangerSettings} />
         </motion.div>
       </div>
     </AppLayout>

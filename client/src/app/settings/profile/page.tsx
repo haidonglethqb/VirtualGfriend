@@ -9,11 +9,14 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
+import { useLanguageStore } from '@/store/language-store';
 
 export default function ProfileSettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated, user } = useAuthStore();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
@@ -39,8 +42,8 @@ export default function ProfileSettingsPage() {
   const handleSave = async () => {
     if (!formData.username.trim()) {
       toast({
-        title: 'Lỗi',
-        description: 'Vui lòng nhập tên người dùng',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Vui lòng nhập tên người dùng', 'Please enter a username'),
         variant: 'destructive',
       });
       return;
@@ -56,15 +59,15 @@ export default function ProfileSettingsPage() {
           setUser({ ...currentUser, username: formData.username, bio: formData.bio });
         }
         toast({
-          title: 'Thành công',
-          description: 'Hồ sơ đã được cập nhật',
+          title: tr('Thành công', 'Success'),
+          description: tr('Hồ sơ đã được cập nhật', 'Profile updated'),
         });
         router.push('/settings');
       }
     } catch {
       toast({
-        title: 'Lỗi',
-        description: 'Không thể cập nhật hồ sơ',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Không thể cập nhật hồ sơ', 'Unable to update profile'),
         variant: 'destructive',
       });
     } finally {
@@ -90,7 +93,7 @@ export default function ProfileSettingsPage() {
               <ArrowLeft className="w-5 h-5 text-love" />
             </button>
           </Link>
-          <h1 className="text-2xl font-bold">Chỉnh sửa hồ sơ</h1>
+          <h1 className="text-2xl font-bold">{tr('Chỉnh sửa hồ sơ', 'Edit profile')}</h1>
         </motion.div>
 
         {/* Form */}
@@ -102,38 +105,38 @@ export default function ProfileSettingsPage() {
         >
           <div>
             <label className="block text-sm font-medium text-[#ba9cab] mb-2">
-              Tên người dùng
+              {tr('Tên người dùng', 'Username')}
             </label>
             <input
               type="text"
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              placeholder="Nhập tên người dùng..."
+              placeholder={tr('Nhập tên người dùng...', 'Enter username...')}
               className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#ba9cab] px-4 py-3 focus:outline-none focus:border-love transition-colors"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-[#ba9cab] mb-2">
-              Email
+              {tr('Email', 'Email')}
             </label>
             <input
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="Nhập email..."
+              placeholder={tr('Nhập email...', 'Enter email...')}
               className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#ba9cab] px-4 py-3 focus:outline-none focus:border-love transition-colors"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-[#ba9cab] mb-2">
-              Tiểu sử
+              {tr('Tiểu sử', 'Bio')}
             </label>
             <textarea
               value={formData.bio}
               onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-              placeholder="Viết một vài dòng về bạn..."
+              placeholder={tr('Viết một vài dòng về bạn...', 'Write a few lines about yourself...')}
               className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#ba9cab] px-4 py-3 focus:outline-none focus:border-love transition-colors resize-none h-24"
             />
           </div>
@@ -141,7 +144,7 @@ export default function ProfileSettingsPage() {
           <div className="flex gap-3">
             <Link href="/settings" className="flex-1">
               <button className="w-full h-12 rounded-lg border border-[#392830] text-[#ba9cab] hover:text-white hover:border-white/30 transition-all">
-                Hủy
+                {tr('Hủy', 'Cancel')}
               </button>
             </Link>
             <button
@@ -152,12 +155,12 @@ export default function ProfileSettingsPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Đang lưu...</span>
+                  <span>{tr('Đang lưu...', 'Saving...')}</span>
                 </>
               ) : (
                 <>
                   <Check className="w-5 h-5" />
-                  <span>Lưu thay đổi</span>
+                  <span>{tr('Lưu thay đổi', 'Save changes')}</span>
                 </>
               )}
             </button>

@@ -11,6 +11,7 @@ import {
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
+import { useLanguageStore } from '@/store/language-store';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/utils';
 import api from '@/services/api';
@@ -33,14 +34,6 @@ interface Stats {
   totalGifts: number;
 }
 
-const typeLabels: Record<string, string> = {
-  MILESTONE: 'Cột mốc',
-  PHOTO: 'Hình ảnh',
-  CONVERSATION: 'Trò chuyện',
-  GIFT: 'Quà tặng',
-  EVENT: 'Sự kiện',
-};
-
 const typeIcons: Record<string, React.ReactNode> = {
   MILESTONE: <Flag className="w-4 h-4" />,
   PHOTO: <Grid3X3 className="w-4 h-4" />,
@@ -62,6 +55,25 @@ export default function MemoriesPage() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
   const { character } = useCharacterStore();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+  const locale = language === 'vi' ? 'vi-VN' : 'en-US';
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'MILESTONE':
+        return tr('Cột mốc', 'Milestone');
+      case 'PHOTO':
+        return tr('Hình ảnh', 'Photo');
+      case 'CONVERSATION':
+        return tr('Trò chuyện', 'Conversation');
+      case 'GIFT':
+        return tr('Quà tặng', 'Gift');
+      case 'EVENT':
+        return tr('Sự kiện', 'Event');
+      default:
+        return type;
+    }
+  };
   const [memories, setMemories] = useState<Memory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({
@@ -115,8 +127,8 @@ export default function MemoriesPage() {
       }
     } catch {
       toast({
-        title: 'Lỗi',
-        description: 'Không thể tải danh sách kỷ niệm',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Không thể tải danh sách kỷ niệm', 'Failed to load memories'),
         variant: 'destructive',
       });
     } finally {
@@ -139,8 +151,8 @@ export default function MemoriesPage() {
       }
     } catch {
       toast({
-        title: 'Lỗi',
-        description: 'Không thể cập nhật yêu thích',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Không thể cập nhật yêu thích', 'Failed to update favorite'),
         variant: 'destructive',
       });
     }
@@ -152,13 +164,13 @@ export default function MemoriesPage() {
       setMemories((prev) => prev.filter((m) => m.id !== memoryId));
       setSelectedMemory(null);
       toast({
-        title: 'Đã xóa',
-        description: 'Kỷ niệm đã được xóa',
+        title: tr('Đã xóa', 'Deleted'),
+        description: tr('Kỷ niệm đã được xóa', 'Memory has been deleted'),
       });
     } catch {
       toast({
-        title: 'Lỗi',
-        description: 'Không thể xóa kỷ niệm',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Không thể xóa kỷ niệm', 'Failed to delete memory'),
         variant: 'destructive',
       });
     }
@@ -167,8 +179,8 @@ export default function MemoriesPage() {
   const handleCreateMemory = async () => {
     if (!newMemory.title.trim()) {
       toast({
-        title: 'Lỗi',
-        description: 'Vui lòng nhập tiêu đề kỷ niệm',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Vui lòng nhập tiêu đề kỷ niệm', 'Please enter a memory title'),
         variant: 'destructive',
       });
       return;
@@ -187,14 +199,14 @@ export default function MemoriesPage() {
         setShowCreateModal(false);
         setNewMemory({ title: '', description: '', type: 'EVENT' });
         toast({
-          title: 'Thành công',
-          description: 'Đã ghi lại kỷ niệm mới!',
+          title: tr('Thành công', 'Success'),
+          description: tr('Đã ghi lại kỷ niệm mới!', 'New memory saved!'),
         });
       }
     } catch {
       toast({
-        title: 'Lỗi',
-        description: 'Không thể tạo kỷ niệm',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Không thể tạo kỷ niệm', 'Failed to create memory'),
         variant: 'destructive',
       });
     } finally {
@@ -216,7 +228,7 @@ export default function MemoriesPage() {
   // Group memories by month
   const groupedMemories = filteredMemories.reduce((acc, memory) => {
     const date = new Date(memory.createdAt);
-    const monthYear = date.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+    const monthYear = date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
     if (!acc[monthYear]) {
       acc[monthYear] = [];
     }
@@ -235,8 +247,8 @@ export default function MemoriesPage() {
         <aside className="hidden lg:flex flex-col w-64 sticky top-0 h-[calc(100vh-5rem)] p-6 overflow-y-auto border-r border-[#392830]/30 shrink-0">
           <div className="flex flex-col gap-6">
             <div>
-              <h1 className="text-white text-lg font-bold mb-1">Dòng thời gian</h1>
-              <p className="text-[#ba9cab] text-sm">Nhảy đến kỷ niệm</p>
+              <h1 className="text-white text-lg font-bold mb-1">{tr('Dòng thời gian', 'Timeline')}</h1>
+              <p className="text-[#ba9cab] text-sm">{tr('Nhảy đến kỷ niệm', 'Jump to memories')}</p>
             </div>
             
             <div className="flex flex-col gap-2">
@@ -249,7 +261,7 @@ export default function MemoriesPage() {
                 }`}
               >
                 <Grid3X3 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-bold">Tất cả kỷ niệm</span>
+                <span className="text-sm font-bold">{tr('Tất cả kỷ niệm', 'All memories')}</span>
               </button>
               <button 
                 onClick={() => setActiveFilter('conversation')}
@@ -260,7 +272,7 @@ export default function MemoriesPage() {
                 }`}
               >
                 <MessageCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium">Trò chuyện</span>
+                <span className="text-sm font-medium">{tr('Trò chuyện', 'Conversations')}</span>
               </button>
               <button 
                 onClick={() => setActiveFilter('gift')}
@@ -271,7 +283,7 @@ export default function MemoriesPage() {
                 }`}
               >
                 <Gift className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium">Quà tặng</span>
+                <span className="text-sm font-medium">{tr('Quà tặng', 'Gifts')}</span>
               </button>
               <button 
                 onClick={() => setActiveFilter('milestone')}
@@ -282,7 +294,7 @@ export default function MemoriesPage() {
                 }`}
               >
                 <Flag className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium">Cột mốc</span>
+                <span className="text-sm font-medium">{tr('Cột mốc', 'Milestones')}</span>
               </button>
               <button 
                 onClick={() => setActiveFilter('favorite')}
@@ -293,13 +305,13 @@ export default function MemoriesPage() {
                 }`}
               >
                 <Heart className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium">Yêu thích</span>
+                <span className="text-sm font-medium">{tr('Yêu thích', 'Favorites')}</span>
               </button>
             </div>
 
             {/* Archives by month */}
             <div className="mt-4 border-t border-[#392830] pt-6">
-              <p className="text-xs font-bold text-[#ba9cab] uppercase tracking-wider mb-4 px-4">Lưu trữ</p>
+              <p className="text-xs font-bold text-[#ba9cab] uppercase tracking-wider mb-4 px-4">{tr('Lưu trữ', 'Archive')}</p>
               <div className="flex flex-col gap-1 pl-4 relative border-l-2 border-[#392830]">
                 {Object.keys(groupedMemories).slice(0, 3).map((month, index) => (
                   <span 
@@ -326,10 +338,10 @@ export default function MemoriesPage() {
               <div className="flex flex-col gap-2">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-love/20 border border-love/30 w-fit">
                   <Flame className="w-4 h-4 text-love" />
-                  <span className="text-xs font-bold text-love uppercase tracking-wide">Level {Math.floor((character?.affection || 0) / 100) + 1} Kết nối</span>
+                  <span className="text-xs font-bold text-love uppercase tracking-wide">{tr('Level', 'Level')} {Math.floor((character?.affection || 0) / 100) + 1} {tr('Kết nối', 'Bond')}</span>
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white">Hành Trình Chung</h1>
-                <p className="text-[#ba9cab]">{stats.totalDays} ngày bên nhau • {stats.totalMessages.toLocaleString()} tin nhắn trao đổi</p>
+                <h1 className="text-3xl md:text-4xl font-bold text-white">{tr('Hành Trình Chung', 'Our Shared Journey')}</h1>
+                <p className="text-[#ba9cab]">{stats.totalDays} {tr('ngày bên nhau', 'days together')} • {stats.totalMessages.toLocaleString(locale)} {tr('tin nhắn trao đổi', 'messages exchanged')}</p>
               </div>
             </div>
           </div>
@@ -342,7 +354,7 @@ export default function MemoriesPage() {
               </div>
               <input 
                 className="w-full bg-transparent border-none text-white placeholder-[#ba9cab] h-11 px-4 focus:ring-0 text-sm focus:outline-none" 
-                placeholder="Tìm kiếm kỷ niệm, trò chuyện, hoặc quà tặng..."
+                placeholder={tr('Tìm kiếm kỷ niệm, trò chuyện, hoặc quà tặng...', 'Search memories, chats, or gifts...')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -361,7 +373,7 @@ export default function MemoriesPage() {
                 }`}
               >
                 <Grid3X3 className="w-4 h-4" />
-                Tất cả
+                {tr('Tất cả', 'All')}
               </button>
               <button 
                 onClick={() => setActiveFilter('conversation')}
@@ -372,7 +384,7 @@ export default function MemoriesPage() {
                 }`}
               >
                 <MessageCircle className="w-4 h-4" />
-                Trò chuyện
+                {tr('Trò chuyện', 'Conversations')}
               </button>
               <button 
                 onClick={() => setActiveFilter('gift')}
@@ -383,7 +395,7 @@ export default function MemoriesPage() {
                 }`}
               >
                 <Gift className="w-4 h-4" />
-                Quà tặng
+                {tr('Quà tặng', 'Gifts')}
               </button>
               <button 
                 onClick={() => setActiveFilter('milestone')}
@@ -394,7 +406,7 @@ export default function MemoriesPage() {
                 }`}
               >
                 <Flag className="w-4 h-4" />
-                Cột mốc
+                {tr('Cột mốc', 'Milestones')}
               </button>
               <button 
                 onClick={() => setActiveFilter('favorite')}
@@ -405,7 +417,7 @@ export default function MemoriesPage() {
                 }`}
               >
                 <Heart className="w-4 h-4" />
-                Yêu thích
+                {tr('Yêu thích', 'Favorites')}
               </button>
             </div>
           </div>
@@ -422,14 +434,14 @@ export default function MemoriesPage() {
                 {/* Stats Card */}
                 <div className="break-inside-avoid p-6 rounded-2xl bg-gradient-to-br from-[#271b21] to-[#392830] border border-[#392830]">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-sm font-bold text-[#ba9cab] uppercase">Cột mốc đạt được</h4>
+                    <h4 className="text-sm font-bold text-[#ba9cab] uppercase">{tr('Cột mốc đạt được', 'Milestones')}</h4>
                     <Clock className="w-5 h-5 text-green-400" />
                   </div>
                   <div className="flex items-baseline gap-2">
                     <span className="text-5xl font-black text-white tracking-tighter">{stats.totalDays}</span>
-                    <span className="text-xl font-medium text-white/60">Ngày</span>
+                    <span className="text-xl font-medium text-white/60">{tr('Ngày', 'Days')}</span>
                   </div>
-                  <p className="mt-2 text-sm text-[#ba9cab]">Bên nhau và trò chuyện mỗi ngày!</p>
+                  <p className="mt-2 text-sm text-[#ba9cab]">{tr('Bên nhau và trò chuyện mỗi ngày!', 'Together and chatting every day!')}</p>
                   <div className="w-full bg-[#392830]/50 rounded-full h-2 mt-4 overflow-hidden">
                     <div className="bg-green-400 h-full rounded-full" style={{ width: '100%' }} />
                   </div>
@@ -455,7 +467,7 @@ export default function MemoriesPage() {
                               <Flame className="w-5 h-5 text-white" />
                             </div>
                             <span className="px-3 py-1 rounded-full bg-[#392830] text-xs font-bold text-[#ba9cab]">
-                              {new Date(memory.createdAt).toLocaleDateString('vi-VN')}
+                              {new Date(memory.createdAt).toLocaleDateString(locale)}
                             </span>
                           </div>
                           <div>
@@ -469,14 +481,14 @@ export default function MemoriesPage() {
                       <div className="flex flex-col gap-3 p-6 rounded-2xl bg-[#271b21] border border-[#392830] hover:border-[#392830]/80 transition-colors shadow-sm cursor-pointer">
                         <div className="flex items-center gap-2 mb-1">
                           <MessageCircle className="w-4 h-4 text-blue-400" />
-                          <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">Trò chuyện sâu</span>
+                          <span className="text-xs font-bold text-blue-400 uppercase tracking-wide">{tr('Trò chuyện sâu', 'Deep conversation')}</span>
                         </div>
                         <p className="text-white/90 italic font-medium text-lg leading-relaxed">&quot;{memory.description}&quot;</p>
                         <div className="flex items-center justify-between mt-2 pt-4 border-t border-[#392830]/50">
                           <p className="text-[#ba9cab] text-xs">
-                            {new Date(memory.createdAt).toLocaleDateString('vi-VN')}
+                            {new Date(memory.createdAt).toLocaleDateString(locale)}
                           </p>
-                          <button className="text-love text-xs font-bold hover:underline">Xem chi tiết</button>
+                          <button className="text-love text-xs font-bold hover:underline">{tr('Xem chi tiết', 'View details')}</button>
                         </div>
                       </div>
                     ) : memory.type === 'GIFT' ? (
@@ -487,12 +499,12 @@ export default function MemoriesPage() {
                             <div className="bg-love/20 p-1.5 rounded-full text-love">
                               <Gift className="w-4 h-4" />
                             </div>
-                            <span className="text-xs font-bold text-white/80 bg-black/30 px-2 py-1 rounded-full">Quà đã nhận</span>
+                            <span className="text-xs font-bold text-white/80 bg-black/30 px-2 py-1 rounded-full">{tr('Quà đã nhận', 'Gift received')}</span>
                           </div>
                           <h3 className="text-white font-bold text-lg">{memory.title}</h3>
                           <p className="text-white/70 text-sm mt-1">{memory.description}</p>
                           <p className="text-[#ba9cab] text-xs mt-3">
-                            {new Date(memory.createdAt).toLocaleDateString('vi-VN')}
+                            {new Date(memory.createdAt).toLocaleDateString(locale)}
                           </p>
                         </div>
                       </div>
@@ -502,7 +514,7 @@ export default function MemoriesPage() {
                         <div className="flex items-center gap-2 mb-1">
                           {typeIcons[memory.type]}
                           <span className={`text-xs font-bold uppercase tracking-wide ${typeColors[memory.type]?.text || 'text-gray-400'}`}>
-                            {typeLabels[memory.type] || memory.type}
+                            {getTypeLabel(memory.type)}
                           </span>
                           {memory.isFavorite && <Heart className="w-4 h-4 text-love fill-love ml-auto" />}
                         </div>
@@ -510,7 +522,7 @@ export default function MemoriesPage() {
                         <p className="text-[#ba9cab] text-sm leading-relaxed">{memory.description}</p>
                         <div className="flex items-center justify-between mt-2 pt-4 border-t border-[#392830]/50">
                           <p className="text-[#ba9cab] text-xs">
-                            {new Date(memory.createdAt).toLocaleDateString('vi-VN')}
+                            {new Date(memory.createdAt).toLocaleDateString(locale)}
                           </p>
                         </div>
                       </div>
@@ -522,8 +534,8 @@ export default function MemoriesPage() {
               {filteredMemories.length === 0 && !isLoading && (
                 <div className="text-center py-12">
                   <Heart className="w-12 h-12 mx-auto mb-4 text-[#ba9cab] opacity-50" />
-                  <p className="text-[#ba9cab]">Chưa có kỷ niệm nào</p>
-                  <p className="text-sm text-[#ba9cab]/70">Trò chuyện nhiều hơn để tạo kỷ niệm!</p>
+                  <p className="text-[#ba9cab]">{tr('Chưa có kỷ niệm nào', 'No memories yet')}</p>
+                  <p className="text-sm text-[#ba9cab]/70">{tr('Trò chuyện nhiều hơn để tạo kỷ niệm!', 'Chat more to create memories!')}</p>
                 </div>
               )}
             </div>
@@ -534,7 +546,7 @@ export default function MemoriesPage() {
       {/* Floating Action Button */}
       <button onClick={() => setShowCreateModal(true)} className="fixed bottom-8 right-8 z-50 flex items-center gap-2 bg-love hover:bg-love/90 text-white rounded-full h-14 pl-5 pr-6 shadow-[0_4px_20px_rgba(244,37,140,0.4)] transition-transform hover:scale-105 active:scale-95">
         <Plus className="w-6 h-6" />
-        <span className="font-bold text-base">Ghi kỷ niệm</span>
+        <span className="font-bold text-base">{tr('Ghi kỷ niệm', 'Save memory')}</span>
       </button>
 
       {/* Create Memory Modal */}
@@ -555,7 +567,7 @@ export default function MemoriesPage() {
               className="bg-[#271b21] border border-[#392830] rounded-2xl p-6 max-w-md w-full shadow-2xl"
             >
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-white">Ghi kỷ niệm mới</h2>
+                <h2 className="text-2xl font-bold text-white">{tr('Ghi kỷ niệm mới', 'Create new memory')}</h2>
                 <button 
                   onClick={() => setShowCreateModal(false)}
                   className="p-2 rounded-full hover:bg-[#392830] transition-colors"
@@ -566,37 +578,37 @@ export default function MemoriesPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#ba9cab] mb-2">Loại kỷ niệm</label>
+                  <label className="block text-sm font-medium text-[#ba9cab] mb-2">{tr('Loại kỷ niệm', 'Memory type')}</label>
                   <select 
                     value={newMemory.type}
                     onChange={(e) => setNewMemory({ ...newMemory, type: e.target.value as Memory['type'] })}
                     className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white px-3 py-2 focus:outline-none focus:border-love"
                   >
-                    <option value="EVENT">Sự kiện</option>
-                    <option value="CONVERSATION">Trò chuyện</option>
-                    <option value="GIFT">Quà tặng</option>
-                    <option value="MILESTONE">Cột mốc</option>
-                    <option value="PHOTO">Hình ảnh</option>
+                    <option value="EVENT">{tr('Sự kiện', 'Event')}</option>
+                    <option value="CONVERSATION">{tr('Trò chuyện', 'Conversation')}</option>
+                    <option value="GIFT">{tr('Quà tặng', 'Gift')}</option>
+                    <option value="MILESTONE">{tr('Cột mốc', 'Milestone')}</option>
+                    <option value="PHOTO">{tr('Hình ảnh', 'Photo')}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#ba9cab] mb-2">Tiêu đề *</label>
+                  <label className="block text-sm font-medium text-[#ba9cab] mb-2">{tr('Tiêu đề', 'Title')} *</label>
                   <input 
                     type="text"
                     value={newMemory.title}
                     onChange={(e) => setNewMemory({ ...newMemory, title: e.target.value })}
-                    placeholder="Nhập tiêu đề kỷ niệm..."
+                    placeholder={tr('Nhập tiêu đề kỷ niệm...', 'Enter memory title...')}
                     className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#ba9cab] px-3 py-2 focus:outline-none focus:border-love"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#ba9cab] mb-2">Mô tả</label>
+                  <label className="block text-sm font-medium text-[#ba9cab] mb-2">{tr('Mô tả', 'Description')}</label>
                   <textarea 
                     value={newMemory.description}
                     onChange={(e) => setNewMemory({ ...newMemory, description: e.target.value })}
-                    placeholder="Nhập mô tả kỷ niệm..."
+                    placeholder={tr('Nhập mô tả kỷ niệm...', 'Enter memory description...')}
                     className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#ba9cab] px-3 py-2 focus:outline-none focus:border-love resize-none h-24"
                   />
                 </div>
@@ -606,7 +618,7 @@ export default function MemoriesPage() {
                     onClick={() => setShowCreateModal(false)}
                     className="flex-1 h-12 rounded-full border border-[#392830] text-[#ba9cab] hover:text-white hover:border-white/30 transition-all"
                   >
-                    Hủy
+                    {tr('Hủy', 'Cancel')}
                   </button>
                   <button 
                     onClick={handleCreateMemory}
@@ -616,10 +628,10 @@ export default function MemoriesPage() {
                     {isCreating ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Đang lưu...</span>
+                        <span>{tr('Đang lưu...', 'Saving...')}</span>
                       </>
                     ) : (
-                      <span>Ghi lưu</span>
+                      <span>{tr('Ghi lưu', 'Save')}</span>
                     )}
                   </button>
                 </div>
@@ -649,7 +661,7 @@ export default function MemoriesPage() {
               <div className="flex justify-between items-start mb-4">
                 <div className={`px-3 py-1 rounded-full ${typeColors[selectedMemory.type]?.bg || 'bg-gray-500/20'} ${typeColors[selectedMemory.type]?.text || 'text-gray-400'} text-xs font-bold flex items-center gap-2`}>
                   {typeIcons[selectedMemory.type]}
-                  {typeLabels[selectedMemory.type] || selectedMemory.type}
+                  {getTypeLabel(selectedMemory.type)}
                 </div>
                 <button 
                   onClick={() => setSelectedMemory(null)}
@@ -664,7 +676,7 @@ export default function MemoriesPage() {
               
               <p className="text-sm text-[#ba9cab] mb-6 flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
-                {formatDate(selectedMemory.createdAt)}
+                {formatDate(selectedMemory.createdAt, locale)}
               </p>
 
               <div className="flex items-center gap-3">
@@ -677,7 +689,7 @@ export default function MemoriesPage() {
                   }`}
                 >
                   <Heart className={`w-5 h-5 ${selectedMemory.isFavorite ? 'fill-love' : ''}`} />
-                  {selectedMemory.isFavorite ? 'Đã yêu thích' : 'Yêu thích'}
+                  {selectedMemory.isFavorite ? tr('Đã yêu thích', 'Favorited') : tr('Yêu thích', 'Favorite')}
                 </button>
                 <button 
                   onClick={() => handleDeleteMemory(selectedMemory.id)}
