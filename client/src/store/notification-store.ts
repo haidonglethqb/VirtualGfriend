@@ -38,8 +38,14 @@ interface GeneralNotification {
   type: string
   title: string
   message: string
+  durationMs?: number
   data?: Record<string, unknown>
 }
+
+const DEFAULT_GENERAL_NOTIFICATION_DURATION_MS = 5000
+const MIN_GENERAL_NOTIFICATION_DURATION_MS = 1000
+const MAX_GENERAL_NOTIFICATION_DURATION_MS = 60000
+let generalNotificationTimeout: ReturnType<typeof setTimeout> | null = null
 
 interface NotificationState {
   // Affection popup
@@ -185,14 +191,28 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   },
 
   showGeneralNotification: (data: GeneralNotification) => {
+    if (generalNotificationTimeout) {
+      clearTimeout(generalNotificationTimeout)
+      generalNotificationTimeout = null
+    }
+
+    const requestedDuration = Number(data.durationMs)
+    const durationMs = Number.isFinite(requestedDuration)
+      ? Math.min(MAX_GENERAL_NOTIFICATION_DURATION_MS, Math.max(MIN_GENERAL_NOTIFICATION_DURATION_MS, requestedDuration))
+      : DEFAULT_GENERAL_NOTIFICATION_DURATION_MS
+
     set({ generalNotification: data })
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
+    generalNotificationTimeout = setTimeout(() => {
       set({ generalNotification: null })
-    }, 5000)
+      generalNotificationTimeout = null
+    }, durationMs)
   },
 
   hideGeneralNotification: () => {
+    if (generalNotificationTimeout) {
+      clearTimeout(generalNotificationTimeout)
+      generalNotificationTimeout = null
+    }
     set({ generalNotification: null })
   },
 }))
