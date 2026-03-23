@@ -980,7 +980,7 @@ function TestimonialsSection() {
               <TiltCard className="group h-full" glowColor="#f4258c" intensity={8}>
                 <div className="relative h-full p-6 rounded-2xl bg-gradient-to-br from-white/[0.04] to-transparent border border-white/[0.05] transition-all duration-500 overflow-hidden group-hover:border-white/10">
                   {/* Quote mark */}
-                  <div className="absolute top-4 right-4 text-6xl text-love/10 font-serif leading-none">"</div>
+                  <div className="absolute top-4 right-4 text-6xl text-love/10 font-serif leading-none">&quot;</div>
                   
                   <div className="relative z-10 flex items-center gap-3 mb-4">
                     <div className="size-12 rounded-full bg-gradient-to-br from-love/20 to-purple-600/20 flex items-center justify-center text-2xl border border-white/10">

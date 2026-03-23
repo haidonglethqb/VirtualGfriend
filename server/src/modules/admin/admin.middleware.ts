@@ -2,24 +2,58 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD_HASH = '$2a$12$RXJp5BUPK1drH8oUvfVB7OILtO3Wj2Lx8QSmm4TmMGbcpNBMJ9qKq';
+interface AdminConfig {
+  username: string;
+  passwordHash: string;
+  jwtSecret: string;
+}
 
-const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'admin-super-secret-key-change-in-production';
+function getAdminConfig(): AdminConfig | null {
+  const username = process.env.ADMIN_USERNAME;
+  const passwordHash = process.env.ADMIN_PASSWORD_HASH;
+  const jwtSecret = process.env.ADMIN_JWT_SECRET;
+
+  if (!username || !passwordHash || !jwtSecret) {
+    return null;
+  }
+
+  return { username, passwordHash, jwtSecret };
+}
 
 export interface AdminRequest extends Request {
   admin?: { username: string };
 }
 
+export function isAdminConfigured(): boolean {
+  return getAdminConfig() !== null;
+}
+
+export function isAdminUsername(username: string): boolean {
+  const config = getAdminConfig();
+  if (!config) return false;
+  return username === config.username;
+}
+
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  return bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+  const config = getAdminConfig();
+  if (!config) return false;
+  return bcrypt.compare(password, config.passwordHash);
 }
 
 export function generateAdminToken(username: string): string {
-  return jwt.sign({ username, isAdmin: true }, ADMIN_JWT_SECRET, { expiresIn: '24h' });
+  const config = getAdminConfig();
+  if (!config) {
+    throw new Error('Admin authentication is not configured');
+  }
+  return jwt.sign({ username, isAdmin: true }, config.jwtSecret, { expiresIn: '24h' });
 }
 
 export function adminAuth(req: AdminRequest, res: Response, next: NextFunction) {
+  const config = getAdminConfig();
+  if (!config) {
+    return res.status(503).json({ error: 'Admin authentication is not configured' });
+  }
+
   const authHeader = req.headers.authorization;
   
   if (!authHeader?.startsWith('Bearer ')) {
@@ -29,7 +63,7 @@ export function adminAuth(req: AdminRequest, res: Response, next: NextFunction) 
   const token = authHeader.split(' ')[1];
   
   try {
-    const decoded = jwt.verify(token, ADMIN_JWT_SECRET) as { username: string; isAdmin: boolean };
+    const decoded = jwt.verify(token, config.jwtSecret) as { username: string; isAdmin: boolean };
     
     if (!decoded.isAdmin) {
       return res.status(403).json({ error: 'Admin access required' });
@@ -42,7 +76,6 @@ export function adminAuth(req: AdminRequest, res: Response, next: NextFunction) 
   }
 }
 
-export async function initAdminPassword() {
-  const hash = await bcrypt.hash('H@ichu321', 12);
-  console.log('Admin password hash:', hash);
+export async function hashAdminPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12);
 }

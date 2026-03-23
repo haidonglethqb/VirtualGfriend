@@ -99,6 +99,8 @@ export default function MessagesPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { isAuthenticated, user, accessToken } = useAuthStore()
+  const { language } = useLanguageStore()
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en)
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConvo, setActiveConvo] = useState<Conversation | null>(null)
@@ -137,7 +139,7 @@ export default function MessagesPage() {
         setMessages(res.data.messages || [])
       }
     } catch {
-      toast({ title: 'Lỗi', description: 'Không thể tải tin nhắn', variant: 'destructive' })
+      toast({ title: tr('Lỗi', 'Error'), description: tr('Không thể tải tin nhắn', 'Could not load messages'), variant: 'destructive' })
     }
   }, [toast])
 
@@ -244,7 +246,7 @@ export default function MessagesPage() {
         await new Promise(resolve => setTimeout(resolve, 500))
       }
       if (!socketService.isConnected()) {
-        toast({ title: 'Lỗi kết nối', description: 'Không thể kết nối server. Vui lòng thử lại.', variant: 'destructive' })
+        toast({ title: tr('Lỗi kết nối', 'Connection error'), description: tr('Không thể kết nối server. Vui lòng thử lại.', 'Cannot connect to server. Please try again.'), variant: 'destructive' })
         return
       }
     }
@@ -281,7 +283,7 @@ export default function MessagesPage() {
     if (!emitSuccess) {
       // Remove optimistic message and show error
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
-      toast({ title: 'Lỗi', description: 'Không thể gửi tin nhắn. Vui lòng thử lại.', variant: 'destructive' })
+      toast({ title: tr('Lỗi', 'Error'), description: tr('Không thể gửi tin nhắn. Vui lòng thử lại.', 'Could not send message. Please try again.'), variant: 'destructive' })
     }
 
     setTimeout(() => {
@@ -318,7 +320,7 @@ export default function MessagesPage() {
         await fetchMessages(res.data.id)
       }
     } catch {
-      toast({ title: 'Lỗi', description: 'Không thể bắt đầu cuộc trò chuyện', variant: 'destructive' })
+      toast({ title: tr('Lỗi', 'Error'), description: tr('Không thể bắt đầu cuộc trò chuyện', 'Could not start conversation'), variant: 'destructive' })
     }
   }
 
@@ -339,7 +341,7 @@ export default function MessagesPage() {
           <div className="p-4 border-b border-[#392830] flex items-center justify-between">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <Users className="w-5 h-5 text-love" />
-              Nhắn tin
+              {tr('Nhắn tin', 'Messages')}
             </h2>
             <button
               onClick={() => setShowSearch(true)}
@@ -365,7 +367,7 @@ export default function MessagesPage() {
                       autoFocus
                       value={searchQuery}
                       onChange={e => handleSearch(e.target.value)}
-                      placeholder="Tìm người dùng..."
+                      placeholder={tr('Tìm người dùng...', 'Search users...')}
                       className="w-full pl-10 pr-3 py-2 rounded-xl bg-[#181114] border border-[#392830] text-sm text-white placeholder-gray-500 focus:outline-none focus:border-love/50"
                     />
                   </div>
@@ -393,7 +395,7 @@ export default function MessagesPage() {
                   </button>
                 ))}
                 {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
-                  <p className="text-center text-xs text-gray-500 py-3">Không tìm thấy</p>
+                  <p className="text-center text-xs text-gray-500 py-3">{tr('Không tìm thấy', 'No results')}</p>
                 )}
               </motion.div>
             )}
@@ -408,12 +410,12 @@ export default function MessagesPage() {
             ) : conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
                 <MessageCircle className="w-12 h-12 text-gray-700 mb-4" />
-                <p className="text-gray-500 text-sm mb-2">Chưa có cuộc trò chuyện nào</p>
+                <p className="text-gray-500 text-sm mb-2">{tr('Chưa có cuộc trò chuyện nào', 'No conversations yet')}</p>
                 <button
                   onClick={() => setShowSearch(true)}
                   className="text-love text-sm font-semibold hover:underline"
                 >
-                  Bắt đầu nhắn tin
+                  {tr('Bắt đầu nhắn tin', 'Start messaging')}
                 </button>
               </div>
             ) : (
@@ -444,7 +446,7 @@ export default function MessagesPage() {
                     </div>
                     <div className="flex-1 min-w-0 text-left">
                       <p className="font-semibold text-sm truncate">
-                        {convo.isGroup ? convo.name : (other?.displayName || other?.username || 'Người dùng')}
+                        {convo.isGroup ? convo.name : (other?.displayName || other?.username || tr('Người dùng', 'User'))}
                       </p>
                       {lastMsg && (
                         <p className="text-xs text-gray-500 truncate mt-0.5">
@@ -488,7 +490,7 @@ export default function MessagesPage() {
                       : (getOtherUser(activeConvo)?.displayName || getOtherUser(activeConvo)?.username)}
                   </p>
                   {typingUsers.size > 0 && (
-                    <p className="text-xs text-love animate-pulse">Đang nhập...</p>
+                    <p className="text-xs text-love animate-pulse">{tr('Đang nhập...', 'Typing...')}</p>
                   )}
                 </div>
               </div>
@@ -537,7 +539,7 @@ export default function MessagesPage() {
                       socketService.emit('dm:typing', { conversationId: activeConvo.id })
                     }}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-                    placeholder="Nhập tin nhắn..."
+                    placeholder={tr('Nhập tin nhắn...', 'Type a message...')}
                     className="flex-1 px-4 py-3 rounded-xl bg-[#271b21] border border-[#392830] text-sm text-white placeholder-gray-500 focus:outline-none focus:border-love/50 transition-colors"
                   />
                   <button
@@ -557,13 +559,13 @@ export default function MessagesPage() {
               </div>
               <h3 className="text-xl font-bold mb-2">Nhắn tin với mọi người</h3>
               <p className="text-gray-500 text-sm mb-6 max-w-sm">
-                Chọn một cuộc trò chuyện bên trái hoặc tìm kiếm người dùng để bắt đầu nhắn tin.
+                {tr('Chọn một cuộc trò chuyện bên trái hoặc tìm kiếm người dùng để bắt đầu nhắn tin.', 'Select a conversation on the left or search users to start messaging.')}
               </p>
               <button
                 onClick={() => setShowSearch(true)}
                 className="px-6 py-3 rounded-xl bg-love text-white font-semibold text-sm hover:bg-love/80 transition-colors"
               >
-                Bắt đầu trò chuyện
+                {tr('Bắt đầu trò chuyện', 'Start conversation')}
               </button>
             </div>
           )}

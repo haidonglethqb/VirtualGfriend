@@ -9,11 +9,14 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
+import { useLanguageStore } from '@/store/language-store';
 
 export default function PrivacySettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   const [isLoading, setIsLoading] = useState(false);
   const [privacySettings, setPrivacySettings] = useState({
     profilePublic: false,
@@ -48,13 +51,13 @@ export default function PrivacySettingsPage() {
       setIsLoading(true);
       await api.patch('/users/privacy', { [key]: newValue });
       toast({
-        title: 'Thành công',
-        description: 'Cài đặt quyền riêng tư đã được cập nhật',
+        title: tr('Thành công', 'Success'),
+        description: tr('Cài đặt quyền riêng tư đã được cập nhật', 'Privacy settings updated'),
       });
     } catch {
       toast({
-        title: 'Lỗi',
-        description: 'Không thể cập nhật cài đặt',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Không thể cập nhật cài đặt', 'Unable to update settings'),
         variant: 'destructive',
       });
       setPrivacySettings((prev) => ({ ...prev, [key]: !newValue }));
@@ -82,7 +85,7 @@ export default function PrivacySettingsPage() {
             </button>
           </Link>
           <Lock className="w-6 h-6 text-love" />
-          <h1 className="text-2xl font-bold">Quyền riêng tư</h1>
+          <h1 className="text-2xl font-bold">{tr('Quyền riêng tư', 'Privacy')}</h1>
         </motion.div>
 
         {/* Privacy Settings */}
@@ -96,8 +99,8 @@ export default function PrivacySettingsPage() {
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-lg font-bold mb-2">Hồ sơ công khai</h3>
-                <p className="text-[#ba9cab]">Cho phép những người khác xem hồ sơ của bạn</p>
+                <h3 className="text-lg font-bold mb-2">{tr('Hồ sơ công khai', 'Public profile')}</h3>
+                <p className="text-[#ba9cab]">{tr('Cho phép những người khác xem hồ sơ của bạn', 'Allow others to view your profile')}</p>
               </div>
               <button
                 onClick={() => handleToggle('profilePublic')}
@@ -119,8 +122,8 @@ export default function PrivacySettingsPage() {
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-lg font-bold mb-2">Hiển thị hoạt động</h3>
-                <p className="text-[#ba9cab]">Cho phép xem lịch sử trò chuyện của bạn</p>
+                <h3 className="text-lg font-bold mb-2">{tr('Hiển thị hoạt động', 'Show activity')}</h3>
+                <p className="text-[#ba9cab]">{tr('Cho phép xem lịch sử trò chuyện của bạn', 'Allow others to see your chat activity')}</p>
               </div>
               <button
                 onClick={() => handleToggle('showActivity')}
@@ -142,8 +145,8 @@ export default function PrivacySettingsPage() {
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-lg font-bold mb-2">Cho phép tin nhắn</h3>
-                <p className="text-[#ba9cab]">Cho phép nhận tin nhắn từ người khác</p>
+                <h3 className="text-lg font-bold mb-2">{tr('Cho phép tin nhắn', 'Allow messages')}</h3>
+                <p className="text-[#ba9cab]">{tr('Cho phép nhận tin nhắn từ người khác', 'Allow receiving messages from others')}</p>
               </div>
               <button
                 onClick={() => handleToggle('allowMessages')}
@@ -165,11 +168,11 @@ export default function PrivacySettingsPage() {
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-lg font-bold mb-2">Tải xuống dữ liệu</h3>
-                <p className="text-[#ba9cab]">Tải xuống tất cả dữ liệu cá nhân của bạn</p>
+                <h3 className="text-lg font-bold mb-2">{tr('Tải xuống dữ liệu', 'Download data')}</h3>
+                <p className="text-[#ba9cab]">{tr('Tải xuống tất cả dữ liệu cá nhân của bạn', 'Download all of your personal data')}</p>
               </div>
               <button className="px-4 py-2 rounded-lg bg-love/10 border border-love/30 text-love hover:bg-love/20 transition-colors">
-                Tải xuống
+                {tr('Tải xuống', 'Download')}
               </button>
             </div>
           </div>
@@ -182,7 +185,7 @@ export default function PrivacySettingsPage() {
           className="mt-6 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20"
         >
           <p className="text-sm text-yellow-200">
-            💡 <strong>Mẹo:</strong> Bạn có thể thay đổi các cài đặt này bất kỳ lúc nào.
+            {tr('💡 Mẹo: Bạn có thể thay đổi các cài đặt này bất kỳ lúc nào.', '💡 Tip: You can change these settings at any time.')}
           </p>
         </motion.div>
       </div>

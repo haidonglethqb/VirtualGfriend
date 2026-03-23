@@ -39,6 +39,7 @@ const QUESTS_I18N = {
     claimed: 'Đã nhận',
     inProgress: 'Đang thực hiện',
     noQuests: 'Không có nhiệm vụ nào',
+    streak: 'Ngày liên tiếp',
     rewards: 'Phần thưởng',
     progress: 'Tiến độ',
   },
@@ -65,6 +66,7 @@ const QUESTS_I18N = {
     claimed: 'Claimed',
     inProgress: 'In Progress',
     noQuests: 'No quests available',
+    streak: 'Streak',
     rewards: 'Rewards',
     progress: 'Progress',
   },
@@ -358,7 +360,7 @@ function QuestCard({
   onClaim: (questId: string) => void;
   isClaiming: boolean;
   isStarting: boolean;
-  t: typeof QUESTS_I18N['vi'];
+  t: (typeof QUESTS_I18N)['vi' | 'en'];
 }) {
   const progress = quest.userProgress?.progress || 0;
   const target = quest.target || 1;

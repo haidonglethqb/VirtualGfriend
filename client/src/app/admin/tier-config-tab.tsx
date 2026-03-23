@@ -32,18 +32,18 @@ const BOOLEAN_FIELDS: Array<Exclude<keyof PremiumFeatures, 'maxCharacters' | 'ma
 ];
 
 const FIELD_LABELS: Record<keyof PremiumFeatures, string> = {
-  maxCharacters: 'So nhan vat',
-  maxMessagesPerDay: 'Tin nhan moi ngay',
-  adFree: 'An quang cao',
-  voiceMessages: 'Gui giong noi',
-  sendImages: 'Gui anh',
-  sendVideos: 'Gui video',
-  sendStickers: 'Gui sticker',
+  maxCharacters: 'Số nhân vật',
+  maxMessagesPerDay: 'Tin nhắn mỗi ngày',
+  adFree: 'Ẩn quảng cáo',
+  voiceMessages: 'Gửi giọng nói',
+  sendImages: 'Gửi ảnh',
+  sendVideos: 'Gửi video',
+  sendStickers: 'Gửi sticker',
   canAccessPremiumScenes: 'Scene premium',
-  canAccessPremiumGifts: 'Qua premium',
-  canAccessPremiumQuests: 'Nhiem vu premium',
-  prioritySupport: 'Ho tro uu tien',
-  earlyAccess: 'Truy cap som',
+  canAccessPremiumGifts: 'Quà premium',
+  canAccessPremiumQuests: 'Nhiệm vụ premium',
+  prioritySupport: 'Hỗ trợ ưu tiên',
+  earlyAccess: 'Truy cập sớm',
 };
 
 const FIELD_LABELS_EN: Record<keyof PremiumFeatures, string> = {
@@ -145,12 +145,12 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
       const payload = await response.json();
 
       if (!response.ok || !payload?.success || !payload?.data) {
-        throw new Error(payload?.error || (isVi ? 'Khong the tai cau hinh tier' : 'Unable to load tier configuration'));
+        throw new Error(payload?.error || (isVi ? 'Không thể tải cấu hình gói' : 'Unable to load tier configuration'));
       }
 
       setConfigs(payload.data as TierConfigs);
     } catch (error) {
-      const message = error instanceof Error ? error.message : (isVi ? 'Khong the tai cau hinh tier' : 'Unable to load tier configuration');
+      const message = error instanceof Error ? error.message : (isVi ? 'Không thể tải cấu hình gói' : 'Unable to load tier configuration');
       showToast(message, 'error');
     } finally {
       setIsLoading(false);
@@ -192,14 +192,14 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
 
       const payload = await response.json();
       if (!response.ok || !payload?.success || !payload?.data) {
-        throw new Error(payload?.error || (isVi ? `Khong the luu tier ${tier}` : `Unable to save ${tier} tier`));
+        throw new Error(payload?.error || (isVi ? `Không thể lưu gói ${tier}` : `Unable to save ${tier} tier`));
       }
 
       setConfigs(payload.data as TierConfigs);
       invalidateTierConfigs();
-      showToast(isVi ? `Da luu cau hinh ${tier}` : `${tier} configuration saved`);
+      showToast(isVi ? `Đã lưu cấu hình ${tier}` : `${tier} configuration saved`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : (isVi ? `Khong the luu tier ${tier}` : `Unable to save ${tier} tier`);
+      const message = error instanceof Error ? error.message : (isVi ? `Không thể lưu gói ${tier}` : `Unable to save ${tier} tier`);
       showToast(message, 'error');
     } finally {
       setSavingTier(null);
@@ -210,7 +210,7 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
     return (
       <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50 flex items-center justify-center gap-2 text-gray-300">
         <RefreshCw className="w-5 h-5 animate-spin" />
-        {isVi ? 'Dang tai cau hinh VIP...' : 'Loading VIP configuration...'}
+        {isVi ? 'Đang tải cấu hình VIP...' : 'Loading VIP configuration...'}
       </div>
     );
   }
@@ -218,7 +218,7 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">{isVi ? 'Cau hinh VIP' : 'VIP Configuration'}</h2>
+        <h2 className="text-2xl font-bold text-white">{isVi ? 'Cấu hình VIP' : 'VIP Configuration'}</h2>
         <button
           onClick={() => void fetchTierConfigs()}
           disabled={isSavingAny}
@@ -239,12 +239,12 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-love/80 hover:bg-love disabled:opacity-50 text-sm"
               >
                 <Save className="w-3.5 h-3.5" />
-                {savingTier === tier ? (isVi ? 'Dang luu...' : 'Saving...') : (isVi ? 'Luu' : 'Save')}
+                {savingTier === tier ? (isVi ? 'Đang lưu...' : 'Saving...') : (isVi ? 'Lưu' : 'Save')}
               </button>
             </div>
 
             <p className="text-[11px] text-[#ba9cab] mb-3">
-              {isVi ? '-1 nghia la khong gioi han' : '-1 means unlimited'}
+              {isVi ? '-1 nghĩa là không giới hạn' : '-1 means unlimited'}
             </p>
 
             <div className="space-y-3">

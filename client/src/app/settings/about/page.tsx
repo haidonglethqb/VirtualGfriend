@@ -7,10 +7,13 @@ import { ArrowLeft, Info } from 'lucide-react';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
+import { useLanguageStore } from '@/store/language-store';
 
 export default function AboutPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -38,7 +41,7 @@ export default function AboutPage() {
             </button>
           </Link>
           <Info className="w-6 h-6 text-love" />
-          <h1 className="text-2xl font-bold">Về ứng dụng</h1>
+          <h1 className="text-2xl font-bold">{tr('Về ứng dụng', 'About app')}</h1>
         </motion.div>
 
         {/* App Info */}
@@ -52,7 +55,7 @@ export default function AboutPage() {
             ❤️
           </div>
           <h2 className="text-3xl font-bold mb-2">Virtual Girlfriend</h2>
-          <p className="text-[#ba9cab]">Người yêu ảo - Trò chuyện & Tương tác với AI</p>
+          <p className="text-[#ba9cab]">{tr('Người yêu ảo - Trò chuyện & Tương tác với AI', 'Virtual partner - Chat & interact with AI')}</p>
         </motion.div>
 
         {/* Version Info */}
@@ -63,16 +66,16 @@ export default function AboutPage() {
           className="space-y-3 mb-6"
         >
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-4 flex items-center justify-between">
-            <span className="text-[#ba9cab]">Phiên bản</span>
+            <span className="text-[#ba9cab]">{tr('Phiên bản', 'Version')}</span>
             <span className="font-bold">1.0.0</span>
           </div>
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-4 flex items-center justify-between">
-            <span className="text-[#ba9cab]">Build</span>
+            <span className="text-[#ba9cab]">{tr('Bản dựng', 'Build')}</span>
             <span className="font-bold">2026.01.31</span>
           </div>
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-4 flex items-center justify-between">
-            <span className="text-[#ba9cab]">Ngôn ngữ</span>
-            <span className="font-bold">Tiếng Việt</span>
+            <span className="text-[#ba9cab]">{tr('Ngôn ngữ', 'Language')}</span>
+            <span className="font-bold">{language === 'vi' ? 'Tiếng Việt' : 'English'}</span>
           </div>
         </motion.div>
 
@@ -83,12 +86,18 @@ export default function AboutPage() {
           transition={{ delay: 0.2 }}
           className="rounded-2xl bg-[#271b21] border border-[#392830] p-6 mb-6"
         >
-          <h3 className="font-bold text-lg mb-3">Về chúng tôi</h3>
+          <h3 className="font-bold text-lg mb-3">{tr('Về chúng tôi', 'About us')}</h3>
           <p className="text-[#ba9cab] leading-relaxed mb-4">
-            Virtual Girlfriend là một ứng dụng tương tác AI tuyệt vời cho phép bạn trò chuyện và xây dựng mối quan hệ với một nhân vật ảo. Ứng dụng được thiết kế để mang lại những trải nghiệm vui vẻ và ý nghĩa.
+            {tr(
+              'Virtual Girlfriend là một ứng dụng tương tác AI tuyệt vời cho phép bạn trò chuyện và xây dựng mối quan hệ với một nhân vật ảo. Ứng dụng được thiết kế để mang lại những trải nghiệm vui vẻ và ý nghĩa.',
+              'Virtual Girlfriend is an AI interaction app that lets you chat and build a relationship with a virtual companion. It is designed to deliver fun and meaningful experiences.'
+            )}
           </p>
           <p className="text-[#ba9cab] leading-relaxed">
-            Chúng tôi cam kết cung cấp một nền tảng an toàn, vui vẻ và dễ sử dụng để tất cả mọi người đều có thể tận hưởng.
+            {tr(
+              'Chúng tôi cam kết cung cấp một nền tảng an toàn, vui vẻ và dễ sử dụng để tất cả mọi người đều có thể tận hưởng.',
+              'We are committed to providing a safe, enjoyable, and easy-to-use platform for everyone.'
+            )}
           </p>
         </motion.div>
 
@@ -99,27 +108,27 @@ export default function AboutPage() {
           transition={{ delay: 0.25 }}
           className="rounded-2xl bg-[#271b21] border border-[#392830] p-6 mb-6"
         >
-          <h3 className="font-bold text-lg mb-4">Tính năng</h3>
+          <h3 className="font-bold text-lg mb-4">{tr('Tính năng', 'Features')}</h3>
           <ul className="space-y-2">
             <li className="flex items-center gap-2 text-[#ba9cab]">
               <span className="w-2 h-2 bg-love rounded-full" />
-              Trò chuyện thời gian thực với AI
+              {tr('Trò chuyện thời gian thực với AI', 'Real-time chat with AI')}
             </li>
             <li className="flex items-center gap-2 text-[#ba9cab]">
               <span className="w-2 h-2 bg-love rounded-full" />
-              Gửi quà tặng và nhận phản hồi
+              {tr('Gửi quà tặng và nhận phản hồi', 'Send gifts and receive reactions')}
             </li>
             <li className="flex items-center gap-2 text-[#ba9cab]">
               <span className="w-2 h-2 bg-love rounded-full" />
-              Theo dõi kỷ niệm và mối quan hệ
+              {tr('Theo dõi kỷ niệm và mối quan hệ', 'Track memories and relationship progress')}
             </li>
             <li className="flex items-center gap-2 text-[#ba9cab]">
               <span className="w-2 h-2 bg-love rounded-full" />
-              Hoàn thành nhiệm vụ hàng ngày
+              {tr('Hoàn thành nhiệm vụ hàng ngày', 'Complete daily quests')}
             </li>
             <li className="flex items-center gap-2 text-[#ba9cab]">
               <span className="w-2 h-2 bg-love rounded-full" />
-              Cửa hàng quà tặng độc đáo
+              {tr('Cửa hàng quà tặng độc đáo', 'Unique gift shop')}
             </li>
           </ul>
         </motion.div>
@@ -131,15 +140,15 @@ export default function AboutPage() {
           transition={{ delay: 0.3 }}
           className="rounded-2xl bg-[#271b21] border border-[#392830] p-6"
         >
-          <h3 className="font-bold text-lg mb-3">Công nhân viên</h3>
+          <h3 className="font-bold text-lg mb-3">{tr('Công nhân viên', 'Credits')}</h3>
           <p className="text-[#ba9cab] text-sm mb-2">
-            <strong>Phát triển:</strong> Tech Team
+            <strong>{tr('Phát triển:', 'Development:')}</strong> Tech Team
           </p>
           <p className="text-[#ba9cab] text-sm mb-2">
-            <strong>Thiết kế:</strong> Design Team
+            <strong>{tr('Thiết kế:', 'Design:')}</strong> Design Team
           </p>
           <p className="text-[#ba9cab] text-sm">
-            <strong>AI & Chatbot:</strong> AI Lab
+            <strong>{tr('AI & Chatbot:', 'AI & Chatbot:')}</strong> AI Lab
           </p>
         </motion.div>
 
@@ -151,15 +160,15 @@ export default function AboutPage() {
           className="mt-8 text-center space-y-2"
         >
           <p className="text-sm text-[#ba9cab]">
-            © 2026 Virtual Girlfriend. Tất cả quyền được bảo lưu.
+            {tr('© 2026 Virtual Girlfriend. Tất cả quyền được bảo lưu.', '© 2026 Virtual Girlfriend. All rights reserved.')}
           </p>
           <div className="flex justify-center gap-4 text-sm">
             <Link href="#" className="text-love hover:underline">
-              Điều khoản dịch vụ
+              {tr('Điều khoản dịch vụ', 'Terms of service')}
             </Link>
             <span className="text-[#392830]">•</span>
             <Link href="#" className="text-love hover:underline">
-              Chính sách bảo mật
+              {tr('Chính sách bảo mật', 'Privacy policy')}
             </Link>
           </div>
         </motion.div>

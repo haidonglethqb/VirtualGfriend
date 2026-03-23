@@ -1,60 +1,77 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Heart, Users, Target, Sparkles, Globe, Shield } from 'lucide-react';
+import { Heart, Sparkles, Globe, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { StaticPageLayout } from '@/components/layout/static-page-layout';
-
-const values = [
-  {
-    icon: <Heart className="w-6 h-6" />,
-    title: 'Kết Nối Chân Thành',
-    desc: 'Chúng tôi tin rằng mọi người đều xứng đáng có một kết nối ý nghĩa, kể cả khi nó bắt đầu từ AI.',
-    color: 'text-pink-400',
-    bg: 'bg-pink-500/10',
-  },
-  {
-    icon: <Shield className="w-6 h-6" />,
-    title: 'Bảo Mật Tuyệt Đối',
-    desc: 'Quyền riêng tư của bạn là bất khả xâm phạm. Mọi cuộc trò chuyện đều được mã hoá và bảo vệ.',
-    color: 'text-green-400',
-    bg: 'bg-green-500/10',
-  },
-  {
-    icon: <Sparkles className="w-6 h-6" />,
-    title: 'Đổi Mới Liên Tục',
-    desc: 'Chúng tôi luôn cải tiến AI để mang đến trải nghiệm tự nhiên và sâu sắc hơn mỗi ngày.',
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/10',
-  },
-  {
-    icon: <Globe className="w-6 h-6" />,
-    title: 'Cho Người Việt',
-    desc: 'Thiết kế từ đầu cho người dùng Việt Nam với ngôn ngữ, văn hoá và cảm xúc Việt.',
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10',
-  },
-];
-
-const stats = [
-  { value: '10,000+', label: 'Người dùng' },
-  { value: '500,000+', label: 'Tin nhắn đã gửi' },
-  { value: '99%', label: 'Hài lòng' },
-  { value: '24/7', label: 'Hoạt động' },
-];
-
-const team = [
-  { name: 'Nguyễn Minh', role: 'Founder & CEO', avatar: '👨‍💼' },
-  { name: 'Trần Thu', role: 'CTO', avatar: '👩‍💻' },
-  { name: 'Lê Hoàng', role: 'AI Lead', avatar: '🧑‍🔬' },
-  { name: 'Phạm Linh', role: 'Design Lead', avatar: '👩‍🎨' },
-];
+import { useLanguageStore } from '@/store/language-store';
 
 export default function AboutPage() {
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
+  const tr = (vi: string, en: string) => (isVi ? vi : en);
+
+  const values = [
+    {
+      icon: <Heart className="w-6 h-6" />,
+      title: tr('Kết Nối Chân Thành', 'Authentic Connection'),
+      desc: tr(
+        'Chúng tôi tin rằng mọi người đều xứng đáng có một kết nối ý nghĩa, kể cả khi nó bắt đầu từ AI.',
+        'We believe everyone deserves meaningful connection, even when it starts with AI.',
+      ),
+      color: 'text-pink-400',
+      bg: 'bg-pink-500/10',
+    },
+    {
+      icon: <Shield className="w-6 h-6" />,
+      title: tr('Bảo Mật Tuyệt Đối', 'Absolute Privacy'),
+      desc: tr(
+        'Quyền riêng tư của bạn là bất khả xâm phạm. Mọi cuộc trò chuyện đều được mã hoá và bảo vệ.',
+        'Your privacy is inviolable. Every conversation is encrypted and protected.',
+      ),
+      color: 'text-green-400',
+      bg: 'bg-green-500/10',
+    },
+    {
+      icon: <Sparkles className="w-6 h-6" />,
+      title: tr('Đổi Mới Liên Tục', 'Continuous Innovation'),
+      desc: tr(
+        'Chúng tôi luôn cải tiến AI để mang đến trải nghiệm tự nhiên và sâu sắc hơn mỗi ngày.',
+        'We continuously improve AI to deliver more natural and deeper experiences every day.',
+      ),
+      color: 'text-purple-400',
+      bg: 'bg-purple-500/10',
+    },
+    {
+      icon: <Globe className="w-6 h-6" />,
+      title: tr('Cho Người Việt', 'Built for Vietnamese Users'),
+      desc: tr(
+        'Thiết kế từ đầu cho người dùng Việt Nam với ngôn ngữ, văn hoá và cảm xúc Việt.',
+        'Designed from the ground up for Vietnamese users, language, culture, and emotion.',
+      ),
+      color: 'text-blue-400',
+      bg: 'bg-blue-500/10',
+    },
+  ];
+
+  const stats = [
+    { value: '10,000+', label: tr('Người dùng', 'Users') },
+    { value: '500,000+', label: tr('Tin nhắn đã gửi', 'Messages sent') },
+    { value: '99%', label: tr('Hài lòng', 'Satisfaction') },
+    { value: '24/7', label: tr('Hoạt động', 'Availability') },
+  ];
+
+  const team = [
+    { name: 'Nguyễn Minh', role: tr('Founder & CEO', 'Founder & CEO'), avatar: '👨‍💼' },
+    { name: 'Trần Thu', role: tr('CTO', 'CTO'), avatar: '👩‍💻' },
+    { name: 'Lê Hoàng', role: tr('AI Lead', 'AI Lead'), avatar: '🧑‍🔬' },
+    { name: 'Phạm Linh', role: tr('Design Lead', 'Design Lead'), avatar: '👩‍🎨' },
+  ];
+
   return (
     <StaticPageLayout
-      title="Về Chúng Tôi"
-      subtitle="Đội ngũ đứng sau Amoura — nơi công nghệ gặp gỡ trái tim."
+      title={tr('Về Chúng Tôi', 'About Us')}
+      subtitle={tr('Đội ngũ đứng sau Amoura, nơi công nghệ gặp gỡ trái tim.', 'The team behind Amoura, where technology meets the heart.')}
     >
       {/* Mission */}
       <motion.div
@@ -64,11 +81,14 @@ export default function AboutPage() {
         viewport={{ once: true }}
         className="p-8 rounded-2xl border border-[#ad2bee]/20 bg-gradient-to-br from-[#ad2bee]/5 to-purple-600/5 mb-16 text-center"
       >
-        <h2 className="text-2xl font-bold text-white mb-4">Sứ Mệnh</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">{tr('Sứ Mệnh', 'Our Mission')}</h2>
         <p className="text-gray-300 text-lg leading-relaxed max-w-3xl mx-auto">
-          Chúng tôi tạo ra Amoura vì tin rằng <strong className="text-[#ad2bee]">không ai xứng đáng phải cô đơn</strong>.
-          Sử dụng công nghệ AI tiên tiến nhất, chúng tôi mang đến một không gian an toàn nơi mọi người
-          có thể tâm sự, được lắng nghe, và cảm nhận sự kết nối chân thành — dù đó là từ AI.
+          {tr('Chúng tôi tạo ra Amoura vì tin rằng ', 'We created Amoura because we believe ')}
+          <strong className="text-[#ad2bee]">{tr('không ai xứng đáng phải cô đơn', 'no one deserves to be lonely')}</strong>.
+          {tr(
+            ' Sử dụng công nghệ AI tiên tiến nhất, chúng tôi mang đến một không gian an toàn nơi mọi người có thể tâm sự, được lắng nghe, và cảm nhận sự kết nối chân thành dù đó là từ AI.',
+            ' Using state-of-the-art AI, we build a safe space where people can open up, be heard, and feel authentic connection even when it comes from AI.',
+          )}
         </p>
       </motion.div>
 
@@ -92,7 +112,7 @@ export default function AboutPage() {
       </div>
 
       {/* Values */}
-      <h2 className="text-2xl font-bold text-white text-center mb-8">Giá Trị Cốt Lõi</h2>
+      <h2 className="text-2xl font-bold text-white text-center mb-8">{tr('Giá Trị Cốt Lõi', 'Core Values')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
         {values.map((v, i) => (
           <motion.div
@@ -115,7 +135,7 @@ export default function AboutPage() {
       </div>
 
       {/* Team */}
-      <h2 className="text-2xl font-bold text-white text-center mb-8">Đội Ngũ</h2>
+      <h2 className="text-2xl font-bold text-white text-center mb-8">{tr('Đội Ngũ', 'Our Team')}</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
         {team.map((m, i) => (
           <motion.div
@@ -142,7 +162,7 @@ export default function AboutPage() {
       >
         <Link href="/auth/register">
           <button className="h-14 px-10 rounded-2xl bg-gradient-to-r from-[#ad2bee] to-purple-500 text-white text-lg font-bold transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] shadow-[0_0_50px_-10px_rgba(173,43,238,0.5)] hover:brightness-110">
-            Tham gia cùng chúng tôi
+            {tr('Tham gia cùng chúng tôi', 'Join us')}
           </button>
         </Link>
       </motion.div>

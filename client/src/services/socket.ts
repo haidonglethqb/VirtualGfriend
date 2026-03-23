@@ -242,6 +242,7 @@ class SocketService {
       type: string
       title: string
       message: string
+      durationMs?: number
       data?: Record<string, unknown>
     }) => {
       useNotificationStore.getState().showGeneralNotification(data)
@@ -277,21 +278,19 @@ class SocketService {
   }
 
   // Generic event handlers - track external listeners for re-registration after reconnect
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  on(event: string, callback: (...args: any[]) => void) {
+  on<T extends unknown[]>(event: string, callback: (...args: T) => void) {
     // Store for re-registration after reconnect
     this.externalListeners.push({ event, callback: callback as EventCallback })
-    this.socket?.on(event, callback)
+    this.socket?.on(event, callback as EventCallback)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  off(event: string, callback?: (...args: any[]) => void) {
+  off<T extends unknown[]>(event: string, callback?: (...args: T) => void) {
     if (callback) {
       // Remove from external listeners
       this.externalListeners = this.externalListeners.filter(
-        l => !(l.event === event && l.callback === callback)
+        l => !(l.event === event && l.callback === (callback as EventCallback))
       )
-      this.socket?.off(event, callback)
+      this.socket?.off(event, callback as EventCallback)
     } else {
       // Remove all listeners for this event
       this.externalListeners = this.externalListeners.filter(l => l.event !== event)

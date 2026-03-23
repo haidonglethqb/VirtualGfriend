@@ -7,48 +7,66 @@ import { ArrowLeft, HelpCircle, MessageSquare, Mail, AlertCircle } from 'lucide-
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
-
-const faqs = [
-  {
-    question: 'Tôi có thể thay đổi tên nhân vật không?',
-    answer: 'Có, bạn có thể thay đổi tên nhân vật bất kỳ lúc nào trong phần "Người yêu ảo của tôi" trong cài đặt.',
-  },
-  {
-    question: 'Làm cách nào để tăng mức độ yêu thích?',
-    answer: 'Bạn có thể tăng mức độ yêu thích bằng cách trò chuyện thường xuyên, gửi quà tặng, và tương tác với nhân vật.',
-  },
-  {
-    question: 'Dữ liệu của tôi có an toàn không?',
-    answer: 'Tất cả dữ liệu của bạn được mã hóa và lưu trữ an toàn. Bạn có thể xem chi tiết trong phần "Quyền riêng tư".',
-  },
-  {
-    question: 'Tôi có thể khôi phục tài khoản đã xóa không?',
-    answer: 'Không, khi bạn xóa tài khoản, tất cả dữ liệu sẽ bị xóa vĩnh viễn. Hãy cân nhắc kỹ trước khi xóa.',
-  },
-  {
-    question: 'Làm thế nào để báo cáo vấn đề?',
-    answer: 'Nếu gặp vấn đề, bạn có thể liên hệ với chúng tôi qua email hoặc sử dụng biểu mẫu báo cáo trong ứng dụng.',
-  },
-];
-
-const contacts = [
-  {
-    icon: <Mail className="w-5 h-5" />,
-    label: 'Email hỗ trợ',
-    value: 'support@virtualgfriend.com',
-    href: 'mailto:support@virtualgfriend.com',
-  },
-  {
-    icon: <MessageSquare className="w-5 h-5" />,
-    label: 'Discord',
-    value: 'Tham gia máy chủ Discord của chúng tôi',
-    href: '#',
-  },
-];
+import { useLanguageStore } from '@/store/language-store';
 
 export default function HelpPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+
+  const faqs = [
+    {
+      question: tr('Tôi có thể thay đổi tên nhân vật không?', 'Can I change my character name?'),
+      answer: tr(
+        'Có, bạn có thể thay đổi tên nhân vật bất kỳ lúc nào trong phần "Người yêu ảo của tôi" trong cài đặt.',
+        'Yes, you can change your character name at any time in the "My Virtual Partner" section in settings.'
+      ),
+    },
+    {
+      question: tr('Làm cách nào để tăng mức độ yêu thích?', 'How can I increase affection level?'),
+      answer: tr(
+        'Bạn có thể tăng mức độ yêu thích bằng cách trò chuyện thường xuyên, gửi quà tặng, và tương tác với nhân vật.',
+        'You can increase affection by chatting regularly, sending gifts, and interacting with your character.'
+      ),
+    },
+    {
+      question: tr('Dữ liệu của tôi có an toàn không?', 'Is my data safe?'),
+      answer: tr(
+        'Tất cả dữ liệu của bạn được mã hóa và lưu trữ an toàn. Bạn có thể xem chi tiết trong phần "Quyền riêng tư".',
+        'All your data is encrypted and stored securely. You can check details in the "Privacy" section.'
+      ),
+    },
+    {
+      question: tr('Tôi có thể khôi phục tài khoản đã xóa không?', 'Can I recover a deleted account?'),
+      answer: tr(
+        'Không, khi bạn xóa tài khoản, tất cả dữ liệu sẽ bị xóa vĩnh viễn. Hãy cân nhắc kỹ trước khi xóa.',
+        'No, once your account is deleted, all data is permanently removed. Please consider carefully before deleting.'
+      ),
+    },
+    {
+      question: tr('Làm thế nào để báo cáo vấn đề?', 'How do I report an issue?'),
+      answer: tr(
+        'Nếu gặp vấn đề, bạn có thể liên hệ với chúng tôi qua email hoặc sử dụng biểu mẫu báo cáo trong ứng dụng.',
+        'If you encounter issues, you can contact us via email or use the in-app report form.'
+      ),
+    },
+  ];
+
+  const contacts = [
+    {
+      icon: <Mail className="w-5 h-5" />,
+      label: tr('Email hỗ trợ', 'Support Email'),
+      value: 'support@virtualgfriend.com',
+      href: 'mailto:support@virtualgfriend.com',
+    },
+    {
+      icon: <MessageSquare className="w-5 h-5" />,
+      label: 'Discord',
+      value: tr('Tham gia máy chủ Discord của chúng tôi', 'Join our Discord server'),
+      href: '#',
+    },
+  ];
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -76,7 +94,7 @@ export default function HelpPage() {
             </button>
           </Link>
           <HelpCircle className="w-6 h-6 text-love" />
-          <h1 className="text-2xl font-bold">Trợ giúp & Hỗ trợ</h1>
+          <h1 className="text-2xl font-bold">{tr('Trợ giúp & Hỗ trợ', 'Help & Support')}</h1>
         </motion.div>
 
         {/* Contact Support */}
@@ -86,7 +104,7 @@ export default function HelpPage() {
           transition={{ delay: 0.1 }}
           className="space-y-3 mb-8"
         >
-          <h2 className="text-lg font-bold">Liên hệ hỗ trợ</h2>
+          <h2 className="text-lg font-bold">{tr('Liên hệ hỗ trợ', 'Contact Support')}</h2>
           {contacts.map((contact, index) => (
             <a
               key={index}
@@ -113,7 +131,7 @@ export default function HelpPage() {
           transition={{ delay: 0.2 }}
           className="space-y-3"
         >
-          <h2 className="text-lg font-bold">Câu hỏi thường gặp</h2>
+          <h2 className="text-lg font-bold">{tr('Câu hỏi thường gặp', 'Frequently Asked Questions')}</h2>
           {faqs.map((faq, index) => (
             <details
               key={index}
@@ -138,12 +156,15 @@ export default function HelpPage() {
           <div className="flex items-start gap-4">
             <AlertCircle className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-1" />
             <div>
-              <h3 className="font-bold mb-2">Gặp vấn đề?</h3>
+              <h3 className="font-bold mb-2">{tr('Gặp vấn đề?', 'Having an issue?')}</h3>
               <p className="text-[#ba9cab] text-sm mb-4">
-                Nếu bạn gặp phải bất kỳ vấn đề nào trong quá trình sử dụng ứng dụng, vui lòng liên hệ với chúng tôi. Chúng tôi sẽ cố gắng giải quyết vấn đề của bạn trong thời gian sớm nhất.
+                {tr(
+                  'Nếu bạn gặp phải bất kỳ vấn đề nào trong quá trình sử dụng ứng dụng, vui lòng liên hệ với chúng tôi. Chúng tôi sẽ cố gắng giải quyết vấn đề của bạn trong thời gian sớm nhất.',
+                  'If you encounter any issues while using the app, please contact us. We will do our best to resolve your issue as quickly as possible.'
+                )}
               </p>
               <button className="px-4 py-2 rounded-lg bg-love hover:bg-love/90 text-white transition-colors">
-                Báo cáo vấn đề
+                {tr('Báo cáo vấn đề', 'Report an issue')}
               </button>
             </div>
           </div>

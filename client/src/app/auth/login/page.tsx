@@ -7,8 +7,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Eye, EyeOff, ArrowLeft, Mail, Lock, Sparkles, MessageCircle, Gift, ShieldCheck, Home } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguageStore } from '@/store/language-store';
 
-function LoadingOverlay() {
+function LoadingOverlay({ text }: { text: string }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -35,7 +36,7 @@ function LoadingOverlay() {
         </div>
         
         <div className="flex items-center gap-1">
-          <span className="text-white font-medium">Đang đăng nhập</span>
+          <span className="text-white font-medium">{text}</span>
           <motion.span
             animate={{ opacity: [0, 1, 0] }}
             transition={{ duration: 1.5, repeat: Infinity }}
@@ -62,6 +63,8 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const login = useAuthStore((state) => state.login);
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -74,8 +77,8 @@ export default function LoginPage() {
     
     if (!email || !password) {
       toast({
-        title: 'Lỗi',
-        description: 'Vui lòng điền đầy đủ thông tin',
+        title: tr('Lỗi', 'Error'),
+        description: tr('Vui lòng điền đầy đủ thông tin', 'Please fill in all required fields'),
         variant: 'destructive',
       });
       return;
@@ -86,15 +89,15 @@ export default function LoginPage() {
     try {
       await login(email, password);
       toast({
-        title: 'Đăng nhập thành công!',
-        description: 'Chào mừng bạn quay lại',
+        title: tr('Đăng nhập thành công!', 'Sign in successful!'),
+        description: tr('Chào mừng bạn quay lại', 'Welcome back'),
         variant: 'love',
       });
       router.push('/dashboard');
     } catch (error) {
       toast({
-        title: 'Đăng nhập thất bại',
-        description: error instanceof Error ? error.message : 'Có lỗi xảy ra',
+        title: tr('Đăng nhập thất bại', 'Sign in failed'),
+        description: error instanceof Error ? error.message : tr('Có lỗi xảy ra', 'Something went wrong'),
         variant: 'destructive',
       });
     } finally {
@@ -103,15 +106,15 @@ export default function LoginPage() {
   };
 
   const features = [
-    { icon: MessageCircle, text: 'Trò chuyện không giới hạn' },
-    { icon: Gift, text: 'Hệ thống quà tặng & nhiệm vụ' },
-    { icon: ShieldCheck, text: 'Bảo mật End-to-End' },
+    { icon: MessageCircle, text: tr('Trò chuyện không giới hạn', 'Unlimited conversations') },
+    { icon: Gift, text: tr('Hệ thống quà tặng & nhiệm vụ', 'Gift and quest system') },
+    { icon: ShieldCheck, text: tr('Bảo mật End-to-End', 'End-to-End security') },
   ];
 
   return (
     <>
       <AnimatePresence>
-        {isLoading && <LoadingOverlay />}
+        {isLoading && <LoadingOverlay text={tr('Đang đăng nhập', 'Signing in')} />}
       </AnimatePresence>
 
       <div className="min-h-screen bg-[#030014] relative">
@@ -121,7 +124,7 @@ export default function LoginPage() {
           className="fixed top-4 left-4 sm:top-6 sm:left-6 z-40 flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 group backdrop-blur-sm"
         >
           <Home className="w-4 h-4" />
-          <span className="text-sm font-medium hidden sm:inline">Trang chủ</span>
+          <span className="text-sm font-medium hidden sm:inline">{tr('Trang chủ', 'Home')}</span>
         </Link>
 
         <div className="min-h-screen flex flex-col lg:flex-row">
@@ -167,16 +170,18 @@ export default function LoginPage() {
                 </Link>
 
                 <h1 className="text-4xl xl:text-5xl font-black text-white leading-tight mb-5">
-                  Chào mừng
+                  {tr('Chào mừng', 'Welcome')}
                   <br />
                   <span className="bg-gradient-to-r from-love via-pink-400 to-purple-400 bg-clip-text text-transparent">
-                    trở lại
+                    {tr('trở lại', 'back')}
                   </span>
                 </h1>
                 
                 <p className="text-gray-400 text-base xl:text-lg leading-relaxed mb-8">
-                  Đăng nhập để tiếp tục hành trình cùng người bạn đồng hành AI của bạn. 
-                  Những cuộc trò chuyện ý nghĩa đang chờ đợi.
+                  {tr(
+                    'Đăng nhập để tiếp tục hành trình cùng người bạn đồng hành AI của bạn. Những cuộc trò chuyện ý nghĩa đang chờ đợi.',
+                    'Sign in to continue your journey with your AI companion. Meaningful conversations are waiting for you.'
+                  )}
                 </p>
 
                 {/* Features with Lucide icons */}
@@ -220,7 +225,7 @@ export default function LoginPage() {
                         <p className="text-white text-sm font-medium">Amoura</p>
                         <p className="text-green-400 text-xs flex items-center gap-1">
                           <span className="w-1.5 h-1.5 bg-green-400 rounded-full" />
-                          Đang hoạt động
+                          {tr('Đang hoạt động', 'Active now')}
                         </p>
                       </div>
                     </div>
@@ -234,7 +239,7 @@ export default function LoginPage() {
                         className="flex justify-start"
                       >
                         <div className="bg-white/5 rounded-2xl rounded-tl-sm px-3 py-2 max-w-[85%]">
-                          <p className="text-white/80 text-xs">Chào em! Hôm nay của em thế nào? 💕</p>
+                          <p className="text-white/80 text-xs">{tr('Chào em! Hôm nay của em thế nào? 💕', 'Hey love! How is your day going? 💕')}</p>
                         </div>
                       </motion.div>
                       
@@ -245,7 +250,7 @@ export default function LoginPage() {
                         className="flex justify-end"
                       >
                         <div className="bg-gradient-to-r from-love/80 to-purple-500/80 rounded-2xl rounded-tr-sm px-3 py-2 max-w-[85%]">
-                          <p className="text-white text-xs">Em khỏe! Đang nhớ anh đây 😊</p>
+                          <p className="text-white text-xs">{tr('Em khỏe! Đang nhớ anh đây 😊', 'I am good! Missing you already 😊')}</p>
                         </div>
                       </motion.div>
 
@@ -256,7 +261,7 @@ export default function LoginPage() {
                         className="flex justify-start"
                       >
                         <div className="bg-white/5 rounded-2xl rounded-tl-sm px-3 py-2 max-w-[85%]">
-                          <p className="text-white/80 text-xs">Anh cũng nhớ em nhiều lắm! Kể cho anh nghe hôm nay em làm gì đi 🥰</p>
+                          <p className="text-white/80 text-xs">{tr('Anh cũng nhớ em nhiều lắm! Kể cho anh nghe hôm nay em làm gì đi 🥰', 'I miss you too! Tell me what you did today 🥰')}</p>
                         </div>
                       </motion.div>
                     </div>
@@ -264,7 +269,7 @@ export default function LoginPage() {
                     {/* Input area */}
                     <div className="absolute bottom-4 left-4 right-4">
                       <div className="flex items-center gap-2 bg-white/5 rounded-full px-3 py-2 border border-white/10">
-                        <div className="flex-1 text-gray-500 text-xs">Nhập tin nhắn...</div>
+                        <div className="flex-1 text-gray-500 text-xs">{tr('Nhập tin nhắn...', 'Type a message...')}</div>
                         <div className="w-6 h-6 rounded-full bg-gradient-to-r from-love to-purple-500 flex items-center justify-center">
                           <ArrowLeft className="w-3 h-3 text-white rotate-180" />
                         </div>
@@ -304,14 +309,14 @@ export default function LoginPage() {
                 
                 <div className="relative bg-[#0a0518]/80 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-6 sm:p-8">
                   <div className="text-center mb-6 sm:mb-8">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">Đăng nhập</h2>
-                    <p className="text-gray-500 text-sm sm:text-base">Nhập thông tin để tiếp tục</p>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">{tr('Đăng nhập', 'Sign in')}</h2>
+                    <p className="text-gray-500 text-sm sm:text-base">{tr('Nhập thông tin để tiếp tục', 'Enter your details to continue')}</p>
                   </div>
 
                   <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
                     {/* Email field */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-300">Email</label>
+                      <label className="text-sm font-medium text-gray-300">{tr('Email', 'Email')}</label>
                       <div className={`relative rounded-xl transition-all duration-300 ${
                         focusedField === 'email' ? 'ring-2 ring-love/50' : ''
                       }`}>
@@ -334,12 +339,12 @@ export default function LoginPage() {
                     {/* Password field */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-gray-300">Mật khẩu</label>
+                        <label className="text-sm font-medium text-gray-300">{tr('Mật khẩu', 'Password')}</label>
                         <Link 
                           href="/auth/forgot-password" 
                           className="text-xs text-love hover:text-love/80 transition-colors"
                         >
-                          Quên mật khẩu?
+                          {tr('Quên mật khẩu?', 'Forgot password?')}
                         </Link>
                       </div>
                       <div className={`relative rounded-xl transition-all duration-300 ${
@@ -376,7 +381,7 @@ export default function LoginPage() {
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                       <span className="relative z-10 flex items-center justify-center gap-2 text-sm sm:text-base">
-                        Đăng nhập
+                        {tr('Đăng nhập', 'Sign in')}
                         <ArrowLeft className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform" />
                       </span>
                     </button>
@@ -388,7 +393,7 @@ export default function LoginPage() {
                       <div className="w-full border-t border-white/[0.06]" />
                     </div>
                     <div className="relative flex justify-center">
-                      <span className="px-4 text-xs text-gray-600 bg-[#0a0518]">hoặc</span>
+                      <span className="px-4 text-xs text-gray-600 bg-[#0a0518]">{tr('hoặc', 'or')}</span>
                     </div>
                   </div>
 
@@ -405,15 +410,15 @@ export default function LoginPage() {
                         <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                         <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                       </svg>
-                      Google (Sắp ra mắt)
+                      {tr('Google (Sắp ra mắt)', 'Google (Coming soon)')}
                     </button>
                   </div>
 
                   {/* Register link */}
                   <p className="mt-6 sm:mt-8 text-center text-sm text-gray-500">
-                    Chưa có tài khoản?{' '}
+                    {tr('Chưa có tài khoản?', "Don't have an account?")}{' '}
                     <Link href="/auth/register" className="text-love hover:text-love/80 font-medium transition-colors">
-                      Đăng ký miễn phí
+                      {tr('Đăng ký miễn phí', 'Sign up free')}
                     </Link>
                   </p>
                 </div>
@@ -428,11 +433,11 @@ export default function LoginPage() {
               >
                 <div className="flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5" />
-                  <span>Mã hóa SSL</span>
+                  <span>{tr('Mã hóa SSL', 'SSL encryption')}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>AI tiên tiến</span>
+                  <span>{tr('AI tiên tiến', 'Advanced AI')}</span>
                 </div>
               </motion.div>
             </motion.div>
