@@ -203,7 +203,7 @@ jobs:
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
             ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
-            ADMIN_PASSWORD_HASH="${{ secrets.ADMIN_PASSWORD_HASH }}"
+            ADMIN_PASSWORD_HASH=${{ secrets.ADMIN_PASSWORD_HASH }}
             ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}
             GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
             CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
