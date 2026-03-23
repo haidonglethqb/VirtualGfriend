@@ -104,3 +104,6 @@ scripts/send-discord-release.cjs
 scripts/skills_data.yaml
 scripts/win_compat.py
 scripts/generate-release-manifest.cjs
+/.github/skills
+/.github
+/.github
