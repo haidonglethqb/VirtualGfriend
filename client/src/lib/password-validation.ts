@@ -24,13 +24,19 @@ export interface PasswordValidationResult {
   strength: 'weak' | 'fair' | 'good' | 'strong'
 }
 
-export function validatePassword(password: string): PasswordValidationResult {
+export type ValidationLanguage = 'vi' | 'en'
+
+export function validatePassword(password: string, language: ValidationLanguage = 'vi'): PasswordValidationResult {
   const errors: string[] = []
   let strengthScore = 0
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en)
   
   // Length checks
   if (password.length < PASSWORD_REQUIREMENTS.MIN_LENGTH) {
-    errors.push(`Mật khẩu phải có ít nhất ${PASSWORD_REQUIREMENTS.MIN_LENGTH} ký tự`)
+    errors.push(tr(
+      `Mật khẩu phải có ít nhất ${PASSWORD_REQUIREMENTS.MIN_LENGTH} ký tự`,
+      `Password must be at least ${PASSWORD_REQUIREMENTS.MIN_LENGTH} characters`
+    ))
   } else {
     strengthScore += 1
     if (password.length >= 12) strengthScore += 1
@@ -38,7 +44,10 @@ export function validatePassword(password: string): PasswordValidationResult {
   }
   
   if (password.length > PASSWORD_REQUIREMENTS.MAX_LENGTH) {
-    errors.push(`Mật khẩu không được quá ${PASSWORD_REQUIREMENTS.MAX_LENGTH} ký tự`)
+    errors.push(tr(
+      `Mật khẩu không được quá ${PASSWORD_REQUIREMENTS.MAX_LENGTH} ký tự`,
+      `Password must not exceed ${PASSWORD_REQUIREMENTS.MAX_LENGTH} characters`
+    ))
   }
   
   // Character type checks
@@ -48,25 +57,25 @@ export function validatePassword(password: string): PasswordValidationResult {
   const hasSpecial = PASSWORD_PATTERNS.HAS_SPECIAL.test(password)
   
   if (PASSWORD_REQUIREMENTS.REQUIRE_UPPERCASE && !hasUppercase) {
-    errors.push('Mật khẩu phải có ít nhất 1 chữ hoa')
+    errors.push(tr('Mật khẩu phải có ít nhất 1 chữ hoa', 'Password must include at least 1 uppercase letter'))
   } else if (hasUppercase) {
     strengthScore += 1
   }
   
   if (PASSWORD_REQUIREMENTS.REQUIRE_LOWERCASE && !hasLowercase) {
-    errors.push('Mật khẩu phải có ít nhất 1 chữ thường')
+    errors.push(tr('Mật khẩu phải có ít nhất 1 chữ thường', 'Password must include at least 1 lowercase letter'))
   } else if (hasLowercase) {
     strengthScore += 1
   }
   
   if (PASSWORD_REQUIREMENTS.REQUIRE_NUMBER && !hasNumber) {
-    errors.push('Mật khẩu phải có ít nhất 1 số')
+    errors.push(tr('Mật khẩu phải có ít nhất 1 số', 'Password must include at least 1 number'))
   } else if (hasNumber) {
     strengthScore += 1
   }
   
   if (PASSWORD_REQUIREMENTS.REQUIRE_SPECIAL && !hasSpecial) {
-    errors.push('Mật khẩu phải có ít nhất 1 ký tự đặc biệt')
+    errors.push(tr('Mật khẩu phải có ít nhất 1 ký tự đặc biệt', 'Password must include at least 1 special character'))
   } else if (hasSpecial) {
     strengthScore += 2 // Bonus for special chars
   }
@@ -89,11 +98,13 @@ export function getPasswordStrengthColor(strength: string): string {
   }
 }
 
-export function getPasswordStrengthLabel(strength: string): string {
+export function getPasswordStrengthLabel(strength: string, language: ValidationLanguage = 'vi'): string {
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en)
+
   switch (strength) {
-    case 'strong': return 'Mạnh'
-    case 'good': return 'Tốt'
-    case 'fair': return 'Trung bình'
-    default: return 'Yếu'
+    case 'strong': return tr('Mạnh', 'Strong')
+    case 'good': return tr('Tốt', 'Good')
+    case 'fair': return tr('Trung bình', 'Fair')
+    default: return tr('Yếu', 'Weak')
   }
 }

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import api from '@/services/api';
+import { useLanguageStore } from '@/store/language-store';
 
 interface AnalyticsData {
   affectionHistory: { date: string; affection: number; level: number }[];
@@ -57,6 +58,8 @@ interface AffectionChartProps {
 }
 
 function AffectionChart({ data }: AffectionChartProps) {
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   const maxAffection = Math.max(...data.map(d => d.affection), 100);
   const chartHeight = 120;
 
@@ -64,7 +67,7 @@ function AffectionChart({ data }: AffectionChartProps) {
     <div className="bg-[#271b21] rounded-xl border border-[#392830] p-4">
       <h3 className="text-sm font-medium text-white/80 mb-4 flex items-center gap-2">
         <TrendingUp className="w-4 h-4 text-pink-400" />
-        Lịch sử tình cảm
+        {tr('Lịch sử tình cảm', 'Affection history')}
       </h3>
       
       <div className="relative" style={{ height: chartHeight }}>
@@ -145,6 +148,8 @@ interface ActivityHeatmapProps {
 }
 
 function ActivityHeatmap({ data }: ActivityHeatmapProps) {
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   const maxCount = Math.max(...data.map(d => d.count), 1);
   
   // Group by weeks
@@ -181,7 +186,7 @@ function ActivityHeatmap({ data }: ActivityHeatmapProps) {
     <div className="bg-[#271b21] rounded-xl border border-[#392830] p-4">
       <h3 className="text-sm font-medium text-white/80 mb-4 flex items-center gap-2">
         <Calendar className="w-4 h-4 text-green-400" />
-        Hoạt động trong 12 tuần
+        {tr('Hoạt động trong 12 tuần', 'Activity in the last 12 weeks')}
       </h3>
       
       <div className="flex gap-1 overflow-x-auto">
@@ -197,7 +202,7 @@ function ActivityHeatmap({ data }: ActivityHeatmapProps) {
                   'w-3 h-3 rounded-sm',
                   getColor(day.count)
                 )}
-                title={`${day.date}: ${day.count} tin nhắn`}
+                title={language === 'vi' ? `${day.date}: ${day.count} tin nhắn` : `${day.date}: ${day.count} messages`}
               />
             ))}
           </div>
@@ -205,7 +210,7 @@ function ActivityHeatmap({ data }: ActivityHeatmapProps) {
       </div>
       
       <div className="flex items-center gap-2 mt-3 text-xs text-white/40">
-        <span>Ít</span>
+        <span>{tr('Ít', 'Less')}</span>
         <div className="flex gap-1">
           <div className="w-3 h-3 rounded-sm bg-white/5" />
           <div className="w-3 h-3 rounded-sm bg-pink-900/50" />
@@ -213,13 +218,15 @@ function ActivityHeatmap({ data }: ActivityHeatmapProps) {
           <div className="w-3 h-3 rounded-sm bg-pink-500/70" />
           <div className="w-3 h-3 rounded-sm bg-pink-400" />
         </div>
-        <span>Nhiều</span>
+        <span>{tr('Nhiều', 'More')}</span>
       </div>
     </div>
   );
 }
 
 export function AnalyticsDashboard() {
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -232,7 +239,7 @@ export function AnalyticsDashboard() {
           setData(response.data);
         }
       } catch (err) {
-        setError('Không thể tải thống kê');
+        setError(tr('Không thể tải thống kê', 'Could not load analytics'));
       } finally {
         setIsLoading(false);
       }
@@ -252,7 +259,7 @@ export function AnalyticsDashboard() {
   if (error || !data) {
     return (
       <div className="text-center py-8 text-white/60">
-        {error || 'Không có dữ liệu'}
+        {error || tr('Không có dữ liệu', 'No data available')}
       </div>
     );
   }
@@ -272,28 +279,28 @@ export function AnalyticsDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           icon={<MessageCircle className="w-5 h-5 text-blue-300" />}
-          label="Tổng tin nhắn"
-          value={data.totalMessages.toLocaleString()}
+          label={tr('Tổng tin nhắn', 'Total messages')}
+          value={data.totalMessages.toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US')}
           color="from-blue-500/20 to-cyan-500/20"
         />
         <StatCard
           icon={<Heart className="w-5 h-5 text-pink-300" />}
-          label="Ngày yêu nhau"
+          label={tr('Ngày yêu nhau', 'Relationship days')}
           value={data.relationshipDays}
-          subtext="ngày"
+          subtext={tr('ngày', 'days')}
           color="from-pink-500/20 to-rose-500/20"
         />
         <StatCard
           icon={<Gift className="w-5 h-5 text-purple-300" />}
-          label="Quà đã tặng"
+          label={tr('Quà đã tặng', 'Gifts sent')}
           value={data.totalGifts}
           color="from-purple-500/20 to-indigo-500/20"
         />
         <StatCard
           icon={<Flame className="w-5 h-5 text-orange-300" />}
-          label="TB/ngày"
+          label={tr('TB/ngày', 'Avg/day')}
           value={data.averageMessagesPerDay}
-          subtext="tin nhắn"
+          subtext={tr('tin nhắn', 'messages')}
           color="from-orange-500/20 to-amber-500/20"
         />
       </div>
@@ -310,7 +317,7 @@ export function AnalyticsDashboard() {
         <div className="bg-[#271b21] rounded-xl border border-[#392830] p-4">
           <h3 className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
             <Award className="w-4 h-4 text-yellow-400" />
-            Thành tựu gần đây
+            {tr('Thành tựu gần đây', 'Recent milestones')}
           </h3>
           <div className="space-y-2">
             {data.milestones.slice(0, 5).map((milestone, i) => (
@@ -321,7 +328,7 @@ export function AnalyticsDashboard() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-white truncate">{milestone.description}</p>
                   <p className="text-xs text-white/40">
-                    {new Date(milestone.achievedAt).toLocaleDateString('vi-VN')}
+                    {new Date(milestone.achievedAt).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')}
                   </p>
                 </div>
               </div>
@@ -334,7 +341,7 @@ export function AnalyticsDashboard() {
       {data.conversationTopics.length > 0 && (
         <div className="bg-[#271b21] rounded-xl border border-[#392830] p-4">
           <h3 className="text-sm font-medium text-white/80 mb-3">
-            💬 Chủ đề thường nói
+            {tr('💬 Chủ đề thường nói', '💬 Top conversation topics')}
           </h3>
           <div className="space-y-2">
             {data.conversationTopics.slice(0, 5).map((topic, i) => {

@@ -7,11 +7,14 @@ import { ArrowLeft, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
+import { useLanguageStore } from '@/store/language-store';
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
 
 export default function AnalyticsPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -44,8 +47,8 @@ export default function AnalyticsPage() {
                 <BarChart3 className="w-5 h-5 text-pink-400" />
               </div>
               <div>
-                <h1 className="text-lg font-semibold text-white">Thống kê</h1>
-                <p className="text-xs text-white/60">Xem tiến trình mối quan hệ</p>
+                <h1 className="text-lg font-semibold text-white">{tr('Thống kê', 'Analytics')}</h1>
+                <p className="text-xs text-white/60">{tr('Xem tiến trình mối quan hệ', 'Track your relationship progress')}</p>
               </div>
             </div>
           </div>

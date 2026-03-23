@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Calendar, Tag, ArrowLeft, Clock, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { StaticPageLayout } from '@/components/layout/static-page-layout';
+import { useLanguageStore } from '@/store/language-store';
 
 const blogPosts: Record<string, {
   title: string;
@@ -104,16 +105,21 @@ const blogPosts: Record<string, {
 
 export default function BlogPostPage() {
   const params = useParams();
+  const { language } = useLanguageStore();
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   const slug = params.slug as string;
   const post = blogPosts[slug];
 
   if (!post) {
     return (
-      <StaticPageLayout title="Không tìm thấy bài viết" subtitle="Bài viết bạn tìm kiếm không tồn tại hoặc đã bị xoá.">
+      <StaticPageLayout
+        title={tr('Không tìm thấy bài viết', 'Article not found')}
+        subtitle={tr('Bài viết bạn tìm kiếm không tồn tại hoặc đã bị xoá.', 'The article you are looking for does not exist or has been removed.')}
+      >
         <div className="text-center py-12">
           <Link href="/blog">
             <button className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#ad2bee] to-purple-500 text-sm font-bold text-white shadow-lg shadow-[#ad2bee]/25 hover:shadow-[#ad2bee]/40 hover:scale-105 active:scale-95 transition-all duration-300">
-              Quay về Blog
+              {tr('Quay về Blog', 'Back to Blog')}
             </button>
           </Link>
         </div>
@@ -132,7 +138,7 @@ export default function BlogPostPage() {
           <Calendar className="w-4 h-4" />{post.date}
         </span>
         <span className="flex items-center gap-1.5 text-sm text-gray-500">
-          <Clock className="w-4 h-4" />{post.readTime}
+          <Clock className="w-4 h-4" />{language === 'vi' ? post.readTime : post.readTime.replace('phút đọc', 'min read')}
         </span>
       </div>
 
@@ -164,7 +170,7 @@ export default function BlogPostPage() {
             className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors group"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Tất cả bài viết
+            {tr('Tất cả bài viết', 'All articles')}
           </Link>
           <button
             onClick={() => {
@@ -177,7 +183,7 @@ export default function BlogPostPage() {
             className="flex items-center gap-2 text-sm text-gray-400 hover:text-[#ad2bee] transition-colors"
           >
             <Share2 className="w-4 h-4" />
-            Chia sẻ
+            {tr('Chia sẻ', 'Share')}
           </button>
         </div>
       </motion.article>
@@ -190,11 +196,11 @@ export default function BlogPostPage() {
         viewport={{ once: true }}
         className="text-center mt-16 p-10 rounded-3xl border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent"
       >
-        <h3 className="text-xl font-extrabold text-white mb-3">Trải nghiệm ngay</h3>
-        <p className="text-gray-400 text-sm mb-6">Đăng ký miễn phí và bắt đầu cuộc trò chuyện đầu tiên.</p>
+        <h3 className="text-xl font-extrabold text-white mb-3">{tr('Trải nghiệm ngay', 'Try it now')}</h3>
+        <p className="text-gray-400 text-sm mb-6">{tr('Đăng ký miễn phí và bắt đầu cuộc trò chuyện đầu tiên.', 'Sign up for free and start your first conversation.')}</p>
         <Link href="/auth/register">
           <button className="h-11 px-8 rounded-xl bg-gradient-to-r from-[#ad2bee] to-purple-500 text-sm font-bold text-white shadow-lg shadow-[#ad2bee]/25 hover:shadow-[#ad2bee]/40 hover:scale-105 active:scale-95 transition-all duration-300">
-            Bắt Đầu Miễn Phí
+            {tr('Bắt Đầu Miễn Phí', 'Start Free')}
           </button>
         </Link>
       </motion.div>

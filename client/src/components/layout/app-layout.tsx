@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Heart, MessageCircle, Gift, Target, ImageIcon,
-  Settings, Star, LogOut, Users, Trophy, Crown, Languages
+  Settings, Star, LogOut, Users, Trophy, Crown, Languages, Bell, X
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
 import { useLanguageStore } from '@/store/language-store';
+import { useNotificationStore } from '@/store/notification-store';
 import { formatNumber } from '@/lib/utils';
 import api from '@/services/api';
 import { socketService } from '@/services/socket';
@@ -74,7 +75,8 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
   const { user, logout, isAuthenticated } = useAuthStore();
   const { character } = useCharacterStore();
   const { language, toggleLanguage } = useLanguageStore();
-  const t = APP_LAYOUT_I18N[language];
+  const { generalNotification, showGeneralNotification, hideGeneralNotification } = useNotificationStore();
+  const t = APP_LAYOUT_I18N[language] || APP_LAYOUT_I18N.vi;
 
   const [unreadDmCount, setUnreadDmCount] = useState(0);
   const [activeQuestCount, setActiveQuestCount] = useState(0);
@@ -129,6 +131,77 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
       setUnreadDmCount(0);
     }
   }, [pathname]);
+
+  // Load unread persisted admin broadcasts so offline users still receive them on next login.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const syncPersistedBroadcasts = async () => {
+      try {
+        const now = Date.now();
+        const pageLimit = 20;
+        const maxPages = 5;
+
+        let latest: {
+          id: string;
+          type: string;
+          title: string;
+          message: string;
+          isRead: boolean;
+          data?: { source?: string; displayType?: string; durationMs?: number; expiresAt?: string };
+        } | null = null;
+
+        for (let page = 1; page <= maxPages; page += 1) {
+          const response = await api.get<{
+            items: Array<{
+              id: string;
+              type: string;
+              title: string;
+              message: string;
+              isRead: boolean;
+              data?: { source?: string; displayType?: string; durationMs?: number; expiresAt?: string };
+            }>;
+            hasMore: boolean;
+          }>(`/users/notifications?page=${page}&limit=${pageLimit}`);
+
+          if (!response.success || !Array.isArray(response.data.items) || response.data.items.length === 0) {
+            break;
+          }
+
+          latest = response.data.items.find((item) => {
+            if (item.isRead) return false;
+            if (item.data?.source !== 'admin_broadcast') return false;
+            if (!item.data?.expiresAt) return true;
+            const expiresAtTs = Date.parse(item.data.expiresAt);
+            if (Number.isNaN(expiresAtTs)) return true;
+            return expiresAtTs > now;
+          }) || null;
+
+          if (latest || !response.data.hasMore) {
+            break;
+          }
+        }
+
+        if (!latest) return;
+
+        showGeneralNotification({
+          type: latest.data?.displayType || latest.type || 'info',
+          title: latest.title,
+          message: latest.message,
+          durationMs: latest.data?.durationMs,
+          data: latest.data,
+        });
+
+        await api.post('/users/notifications/read', {
+          ids: [latest.id],
+        });
+      } catch {
+        // Silent failure; realtime socket notifications continue working.
+      }
+    };
+
+    syncPersistedBroadcasts();
+  }, [isAuthenticated, showGeneralNotification]);
 
   // Badge count map
   const badgeCounts: Record<string, number> = {
@@ -208,7 +281,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                     {character?.gender === 'FEMALE' ? '👩' : '👨'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm truncate">{character?.name || (language === 'vi' ? 'Nguoi yeu' : 'Companion')}</p>
+                    <p className="font-bold text-sm truncate">{character?.name || (language === 'vi' ? 'Người yêu' : 'Companion')}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-xs text-[#ba9cab]">{t.level} {Math.floor((character?.affection || 0) / 100) + 1}</p>
                       <PremiumBadge tier={user?.premiumTier as PremiumTier} />
@@ -323,6 +396,28 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
           })}
         </div>
       </nav>
+
+      {generalNotification && (
+        <div className="fixed bottom-20 right-4 z-50 w-[min(92vw,420px)] rounded-2xl border border-[#4f3644] bg-[#23171d]/95 p-4 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-full bg-love/20 p-2 text-love">
+              <Bell className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-white">{generalNotification.title}</p>
+              <p className="mt-1 text-sm text-[#e6d6de]">{generalNotification.message}</p>
+            </div>
+            <button
+              aria-label="Dismiss notification"
+              className="rounded-full p-1 text-[#d8bfca] transition-colors hover:bg-[#3a2630] hover:text-white"
+              onClick={hideGeneralNotification}
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -15,18 +15,18 @@ export function formatNumber(num: number): string {
   return num.toString();
 }
 
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string, locale = 'vi-VN'): string {
   const d = new Date(date);
-  return d.toLocaleDateString('vi-VN', {
+  return d.toLocaleDateString(locale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   });
 }
 
-export function formatTime(date: Date | string): string {
+export function formatTime(date: Date | string, locale = 'vi-VN'): string {
   const d = new Date(date);
-  return d.toLocaleTimeString('vi-VN', {
+  return d.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
   });

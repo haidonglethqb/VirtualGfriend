@@ -1,13 +1,72 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
-import { AdminRequest, verifyAdminPassword, generateAdminToken } from './admin.middleware';
+import { AdminRequest, verifyAdminPassword, generateAdminToken, isAdminUsername, isAdminConfigured } from './admin.middleware';
 import { io } from '../../index';
+import { templateService } from '../character/template.service';
+
+const MIN_BROADCAST_DURATION_MS = 1000;
+const MAX_BROADCAST_DURATION_MS = 60000;
+const DEFAULT_BROADCAST_DURATION_MS = 5000;
+const TEMPLATE_GENDERS = ['FEMALE', 'MALE', 'NON_BINARY', 'OTHER'] as const;
+type TemplateGender = (typeof TEMPLATE_GENDERS)[number];
+const VALID_TEMPLATE_GENDERS = new Set<TemplateGender>(TEMPLATE_GENDERS);
+
+function parseTemplateGender(value: unknown): TemplateGender | null {
+  const normalized = String(value || '').trim() as TemplateGender;
+  if (!normalized || !VALID_TEMPLATE_GENDERS.has(normalized)) return null;
+  return normalized;
+}
+
+function parseBroadcastDuration(durationMs: unknown): number {
+  if (durationMs === undefined || durationMs === null) return DEFAULT_BROADCAST_DURATION_MS;
+  const parsed = Number(durationMs);
+  if (!Number.isFinite(parsed)) return DEFAULT_BROADCAST_DURATION_MS;
+  return Math.min(MAX_BROADCAST_DURATION_MS, Math.max(MIN_BROADCAST_DURATION_MS, Math.floor(parsed)));
+}
+
+function validateTemplateInput(payload: Record<string, unknown>, isPatch: boolean) {
+  const errors: string[] = [];
+
+  if (!isPatch || payload.name !== undefined) {
+    const name = String(payload.name || '').trim();
+    if (!name || name.length < 2) errors.push('Template name must be at least 2 characters');
+  }
+
+  if (!isPatch || payload.description !== undefined) {
+    const description = String(payload.description || '').trim();
+    if (!description || description.length < 5) errors.push('Template description must be at least 5 characters');
+  }
+
+  if (!isPatch || payload.avatarUrl !== undefined) {
+    const avatarUrl = String(payload.avatarUrl || '').trim();
+    if (!avatarUrl.startsWith('http://') && !avatarUrl.startsWith('https://')) {
+      errors.push('Template avatarUrl must be a valid URL');
+    }
+  }
+
+  if (payload.sortOrder !== undefined && (!Number.isFinite(Number(payload.sortOrder)) || Number(payload.sortOrder) < 0)) {
+    errors.push('Template sortOrder must be a non-negative number');
+  }
+
+  if (!isPatch || payload.gender !== undefined) {
+    const gender = String(payload.gender || '').trim();
+    if (gender && !parseTemplateGender(gender)) {
+      errors.push('Template gender must be one of FEMALE, MALE, NON_BINARY, OTHER');
+    }
+  }
+
+  return errors;
+}
 
 // ============== AUTH ==============
 export async function adminLogin(req: Request, res: Response) {
   const { username, password } = req.body;
 
-  if (username !== 'admin') {
+  if (!isAdminConfigured()) {
+    return res.status(503).json({ error: 'Admin authentication is not configured' });
+  }
+
+  if (!isAdminUsername(username)) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
@@ -443,31 +502,73 @@ export async function toggleQuestActive(req: AdminRequest, res: Response) {
 export async function createTemplate(req: AdminRequest, res: Response) {
   const { name, description, avatarUrl, gender, personality, style, isDefault, isActive, sortOrder } = req.body;
 
+  const errors = validateTemplateInput(req.body || {}, false);
+  if (errors.length > 0) {
+    return res.status(400).json({ error: errors[0] });
+  }
+
+  const trimmedName = String(name).trim();
+  const existing = await prisma.characterTemplate.findFirst({ where: { name: trimmedName } });
+  if (existing) {
+    return res.status(409).json({ error: 'Template name already exists' });
+  }
+
   const template = await prisma.characterTemplate.create({
     data: {
-      name,
-      description,
-      avatarUrl,
-      gender: gender || 'FEMALE',
+      name: trimmedName,
+      description: String(description).trim(),
+      avatarUrl: String(avatarUrl).trim(),
+      gender: parseTemplateGender(gender) || 'FEMALE',
       personality: personality || 'caring',
       style: style || 'anime',
-      isDefault: isDefault || false,
+      isDefault: isDefault === true,
       isActive: isActive !== false,
-      sortOrder: sortOrder || 0,
+      sortOrder: Number(sortOrder) || 0,
     },
   });
+
+  await templateService.invalidateCache();
 
   res.json({ message: 'Template created', template });
 }
 
 export async function updateTemplate(req: AdminRequest, res: Response) {
   const { id } = req.params;
-  const data = req.body;
+  const data = req.body || {};
+
+  const errors = validateTemplateInput(data, true);
+  if (errors.length > 0) {
+    return res.status(400).json({ error: errors[0] });
+  }
+
+  if (data.name !== undefined) {
+    const nextName = String(data.name).trim();
+    const duplicate = await prisma.characterTemplate.findFirst({
+      where: {
+        name: nextName,
+        id: { not: id },
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return res.status(409).json({ error: 'Template name already exists' });
+    }
+    data.name = nextName;
+  }
+
+  if (data.description !== undefined) data.description = String(data.description).trim();
+  if (data.avatarUrl !== undefined) data.avatarUrl = String(data.avatarUrl).trim();
+  if (data.sortOrder !== undefined) data.sortOrder = Number(data.sortOrder);
+  if (data.gender !== undefined) data.gender = String(data.gender).trim();
+  if (data.isDefault !== undefined) data.isDefault = data.isDefault === true;
+  if (data.isActive !== undefined) data.isActive = data.isActive !== false;
 
   const template = await prisma.characterTemplate.update({
     where: { id },
     data,
   });
+
+  await templateService.invalidateCache();
 
   res.json({ message: 'Template updated', template });
 }
@@ -487,6 +588,7 @@ export async function deleteTemplate(req: AdminRequest, res: Response) {
   }
 
   await prisma.characterTemplate.delete({ where: { id } });
+  await templateService.invalidateCache();
   res.json({ message: 'Template deleted' });
 }
 
@@ -502,6 +604,8 @@ export async function toggleTemplateActive(req: AdminRequest, res: Response) {
     where: { id },
     data: { isActive: !template.isActive },
   });
+
+  await templateService.invalidateCache();
 
   res.json({ message: `Template ${updated.isActive ? 'activated' : 'deactivated'}`, template: updated });
 }
@@ -738,21 +842,87 @@ export async function cleanupData(req: AdminRequest, res: Response) {
 
 // ============== BROADCAST ==============
 export async function broadcastNotification(req: AdminRequest, res: Response) {
-  const { title, message, type = 'info' } = req.body;
+  const { title, message, type = 'info', durationMs, targetFilter = 'all' } = req.body;
 
   if (!title || !message) {
     return res.status(400).json({ error: 'Title and message are required' });
   }
 
-  // Emit to all connected clients via Socket.IO
-  io.emit('admin:broadcast', {
-    title,
-    message,
-    type,
-    timestamp: new Date().toISOString(),
+  const normalizedTarget = ['all', 'free', 'premium'].includes(String(targetFilter))
+    ? String(targetFilter)
+    : 'all';
+
+  const where: Record<string, unknown> = {};
+  if (normalizedTarget === 'free') where.isPremium = false;
+  if (normalizedTarget === 'premium') where.isPremium = true;
+
+  const normalizedDurationMs = parseBroadcastDuration(durationMs);
+  const expiresAtIso = new Date(Date.now() + normalizedDurationMs).toISOString();
+
+  const users = await prisma.user.findMany({
+    where,
+    select: { id: true },
   });
 
-  res.json({ message: 'Broadcast sent to all connected users' });
+  if (users.length === 0) {
+    return res.status(200).json({
+      message: 'No users matched target filter',
+      total: 0,
+      deliveredRealtime: 0,
+      persisted: 0,
+    });
+  }
+
+  const payloadData = {
+    source: 'admin_broadcast',
+    displayType: String(type),
+    durationMs: normalizedDurationMs,
+    expiresAt: expiresAtIso,
+    target: normalizedTarget,
+    sentAt: new Date().toISOString(),
+  };
+
+  const batchSize = 500;
+  for (let i = 0; i < users.length; i += batchSize) {
+    const batch = users.slice(i, i + batchSize);
+    await prisma.notification.createMany({
+      data: batch.map((user) => ({
+        userId: user.id,
+        type: 'SYSTEM',
+        title: String(title),
+        message: String(message),
+        data: payloadData,
+      })),
+    });
+  }
+
+  // Emit to all connected authenticated sockets via Socket.IO
+  const socketPayload = {
+    type: String(type),
+    title: String(title),
+    message: String(message),
+    durationMs: normalizedDurationMs,
+    data: payloadData,
+    timestamp: new Date().toISOString(),
+  };
+
+  let deliveredRealtime = 0;
+  for (const user of users) {
+    const userRoom = `user:${user.id}`;
+    const onlineSocketsInRoom = io.sockets.adapter.rooms.get(userRoom)?.size || 0;
+    if (onlineSocketsInRoom === 0) continue;
+    deliveredRealtime += onlineSocketsInRoom;
+    io.to(userRoom).emit('notification:new', socketPayload);
+  }
+
+  res.json({
+    message: 'Broadcast sent',
+    total: users.length,
+    deliveredRealtime,
+    persisted: users.length,
+    durationMs: normalizedDurationMs,
+    targetFilter: normalizedTarget,
+  });
 }
 
 // ============== GIFT/SHOP MANAGEMENT ==============

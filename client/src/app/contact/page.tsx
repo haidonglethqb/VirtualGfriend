@@ -2,10 +2,15 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, MapPin, Clock, Send, MessageCircle, Phone } from 'lucide-react';
+import { Mail, MapPin, Clock, Send, MessageCircle } from 'lucide-react';
 import { StaticPageLayout } from '@/components/layout/static-page-layout';
+import { useLanguageStore } from '@/store/language-store';
 
 export default function ContactPage() {
+  const { language } = useLanguageStore();
+  const isVi = language === 'vi';
+  const tr = (vi: string, en: string) => (isVi ? vi : en);
+
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
 
@@ -25,23 +30,23 @@ export default function ContactPage() {
     },
     {
       icon: <MessageCircle className="w-5 h-5" />,
-      title: 'Chat hỗ trợ',
-      value: 'Trong ứng dụng',
+      title: tr('Chat hỗ trợ', 'Support chat'),
+      value: tr('Trong ứng dụng', 'In app'),
       href: '/chat',
       color: 'text-[#ad2bee]',
       bg: 'bg-[#ad2bee]/10',
     },
     {
       icon: <Clock className="w-5 h-5" />,
-      title: 'Giờ hỗ trợ',
-      value: '24/7 (AI) · 9:00-18:00 (Nhân viên)',
+      title: tr('Giờ hỗ trợ', 'Support hours'),
+      value: tr('24/7 (AI) · 9:00-18:00 (Nhân viên)', '24/7 (AI) · 9:00-18:00 (Staff)'),
       color: 'text-green-400',
       bg: 'bg-green-500/10',
     },
     {
       icon: <MapPin className="w-5 h-5" />,
-      title: 'Địa chỉ',
-      value: 'TP. Hồ Chí Minh, Việt Nam',
+      title: tr('Địa chỉ', 'Address'),
+      value: tr('TP. Hồ Chí Minh, Việt Nam', 'Ho Chi Minh City, Vietnam'),
       color: 'text-orange-400',
       bg: 'bg-orange-500/10',
     },
@@ -49,8 +54,8 @@ export default function ContactPage() {
 
   return (
     <StaticPageLayout
-      title="Liên Hệ"
-      subtitle="Chúng tôi luôn sẵn sàng hỗ trợ bạn. Đội ngũ sẽ phản hồi trong 24 giờ."
+      title={tr('Liên Hệ', 'Contact')}
+      subtitle={tr('Chúng tôi luôn sẵn sàng hỗ trợ bạn. Đội ngũ sẽ phản hồi trong 24 giờ.', 'We are always ready to help. Our team will respond within 24 hours.')}
     >
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
         {/* Contact info */}
@@ -95,21 +100,21 @@ export default function ContactPage() {
                 <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
                   <Send className="w-7 h-7 text-green-400" />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Đã gửi thành công!</h3>
-                <p className="text-gray-400">Chúng tôi sẽ phản hồi trong vòng 24 giờ qua email.</p>
+                <h3 className="text-xl font-bold text-white mb-2">{tr('Đã gửi thành công!', 'Sent successfully!')}</h3>
+                <p className="text-gray-400">{tr('Chúng tôi sẽ phản hồi trong vòng 24 giờ qua email.', 'We will respond via email within 24 hours.')}</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="flex flex-col gap-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Họ tên</label>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">{tr('Họ tên', 'Full name')}</label>
                     <input
                       type="text"
                       required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-gray-600 outline-none focus:border-[#ad2bee]/40 focus:shadow-[0_0_15px_-5px_rgba(173,43,238,0.2)] transition-all duration-300"
-                      placeholder="Nguyễn Văn A"
+                      placeholder={tr('Nguyễn Văn A', 'John Doe')}
                     />
                   </div>
                   <div>
@@ -125,25 +130,25 @@ export default function ContactPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Chủ đề</label>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">{tr('Chủ đề', 'Subject')}</label>
                   <input
                     type="text"
                     required
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-gray-600 outline-none focus:border-[#ad2bee]/40 focus:shadow-[0_0_15px_-5px_rgba(173,43,238,0.2)] transition-all duration-300"
-                    placeholder="Hỗ trợ tài khoản, báo lỗi..."
+                    placeholder={tr('Hỗ trợ tài khoản, báo lỗi...', 'Account support, bug report...')}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Nội dung</label>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">{tr('Nội dung', 'Message')}</label>
                   <textarea
                     required
                     rows={5}
                     value={formData.message}
                     onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-gray-600 outline-none focus:border-[#ad2bee]/40 focus:shadow-[0_0_15px_-5px_rgba(173,43,238,0.2)] transition-all duration-300 resize-none"
-                    placeholder="Mô tả chi tiết vấn đề của bạn..."
+                    placeholder={tr('Mô tả chi tiết vấn đề của bạn...', 'Describe your issue in detail...')}
                   />
                 </div>
                 <button
@@ -151,7 +156,7 @@ export default function ContactPage() {
                   className="h-12 rounded-xl bg-gradient-to-r from-[#ad2bee] to-purple-500 text-white font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#ad2bee]/25 hover:shadow-[0_8px_30px_-6px_rgba(173,43,238,0.4)] hover:brightness-110"
                 >
                   <Send className="w-4 h-4 inline mr-2" />
-                  Gửi tin nhắn
+                  {tr('Gửi tin nhắn', 'Send message')}
                 </button>
               </form>
             )}
