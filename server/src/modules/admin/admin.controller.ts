@@ -60,7 +60,14 @@ function validateTemplateInput(payload: Record<string, unknown>, isPatch: boolea
 
 // ============== AUTH ==============
 export async function adminLogin(req: Request, res: Response) {
-  const { username, password } = req.body;
+  const rawUsername = req.body?.username;
+  const rawPassword = req.body?.password;
+  const username = String(rawUsername || '').trim();
+  const password = String(rawPassword || '');
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
 
   if (!isAdminConfigured()) {
     return res.status(503).json({ error: 'Admin authentication is not configured' });
