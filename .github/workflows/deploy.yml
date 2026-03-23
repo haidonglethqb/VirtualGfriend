@@ -180,6 +180,21 @@ jobs:
             # Ensure required directories exist
             mkdir -p nginx/ssl nginx/logs
 
+            # Validate critical secrets to prevent partial deploy causing runtime 503s
+            check_required() {
+              if [ -z "$2" ]; then
+                echo "ERROR: Missing required deployment secret: $1"
+                exit 1
+              fi
+            }
+
+            check_required "POSTGRES_PASSWORD" "${{ secrets.POSTGRES_PASSWORD }}"
+            check_required "JWT_SECRET" "${{ secrets.JWT_SECRET }}"
+            check_required "JWT_REFRESH_SECRET" "${{ secrets.JWT_REFRESH_SECRET }}"
+            check_required "ADMIN_USERNAME" "${{ secrets.ADMIN_USERNAME }}"
+            check_required "ADMIN_PASSWORD_HASH" "${{ secrets.ADMIN_PASSWORD_HASH }}"
+            check_required "ADMIN_JWT_SECRET" "${{ secrets.ADMIN_JWT_SECRET }}"
+
             # ── Bước 1: Ghi .env ───────────────────────────────────
             cat > .env << 'ENVEOF'
             POSTGRES_USER=vgfriend
