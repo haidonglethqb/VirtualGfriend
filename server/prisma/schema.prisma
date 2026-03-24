@@ -51,6 +51,7 @@ model User {
   memories          Memory[]
   userAchievements  UserAchievement[]
   notifications     Notification[]
+  monitoringEvents  MonitoringEvent[]
   settings          UserSettings?
   dailyRewards      DailyReward[]
   relationshipHistory RelationshipHistory[]
@@ -669,6 +670,72 @@ model SystemConfig {
   updatedAt DateTime @updatedAt
 
   @@map("system_configs")
+}
+
+// ============================================
+// MONITORING & TELEMETRY
+// ============================================
+
+enum MonitoringEventType {
+  REQUEST
+  ERROR
+  AUTH
+  SOCKET
+  JOB
+  SECURITY
+  BUSINESS
+}
+
+model MonitoringEvent {
+  id          String              @id @default(uuid())
+  eventType   MonitoringEventType
+  metricKey   String
+  severity    String              @default("info") // debug, info, warn, error, critical
+  source      String              @default("api")  // api, socket, system, cron
+  requestId   String?
+  userId      String?
+  userTier    PremiumTier?
+  path        String?
+  method      String?
+  statusCode  Int?
+  durationMs  Int?
+  ip          String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime            @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventType, createdAt])
+  @@index([metricKey, createdAt])
+  @@index([path, method, createdAt])
+  @@index([statusCode, createdAt])
+  @@index([userId, createdAt])
+  @@map("monitoring_events")
+}
+
+model MonitoringMetricRollup {
+  id             String   @id @default(uuid())
+  bucketStart    DateTime
+  bucketSize     String   // hour, day
+  metricKey      String
+  dimensions     Json?
+  dimensionsHash String   @default("global")
+  count          Int      @default(0)
+  sumValue       Float?
+  avgValue       Float?
+  p95Value       Float?
+  p99Value       Float?
+  minValue       Float?
+  maxValue       Float?
+  lastEventAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([bucketStart, bucketSize, metricKey, dimensionsHash])
+  @@index([bucketStart, bucketSize])
+  @@index([metricKey, bucketStart])
+  @@map("monitoring_metric_rollups")
 }
 
 model AIPromptTemplate {
