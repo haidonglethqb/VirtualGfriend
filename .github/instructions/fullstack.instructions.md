@@ -16,7 +16,7 @@ description: use when using JavaScript, React, Next.js App Router, Zustand, Shad
   Standard.js Rules:
   - Use 2 space indentation.
   - Use single quotes for strings except to avoid escaping.
-  - No semicolons (unless required to disambiguate statements).
+  - No semicolons (unless required to disambiguate statements). 
   - No unused variables.
   - Add a space after keywords.
   - Add a space before a function declaration's parentheses.
