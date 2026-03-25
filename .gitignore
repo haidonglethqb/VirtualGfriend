@@ -49,7 +49,7 @@ e2e/node_modules/
 # TypeScript
 *.tsbuildinfo
 
-# Misc
+# Mmisc
 *.pem
 *.key
 *.crt
