@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
+import { Prisma } from '@prisma/client';
 import { AdminRequest, verifyAdminPassword, generateAdminToken, isAdminUsername, isAdminConfigured } from './admin.middleware';
 import { io } from '../../index';
 import { templateService } from '../character/template.service';
@@ -56,6 +57,146 @@ function validateTemplateInput(payload: Record<string, unknown>, isPatch: boolea
   }
 
   return errors;
+}
+
+type AnalyticsGroupBy = 'day' | 'week' | 'month';
+type AnalyticsUserSegment = 'all' | 'new' | 'returning';
+type AnalyticsMessageRole = 'ALL' | 'USER' | 'AI' | 'SYSTEM';
+type AnalyticsVerifiedFilter = 'all' | 'verified' | 'unverified';
+type TopUsersSortBy = 'messages' | 'coins' | 'gems' | 'streak' | 'lastActiveAt';
+
+const ANALYTICS_GROUP_BY_VALUES: AnalyticsGroupBy[] = ['day', 'week', 'month'];
+const ANALYTICS_USER_SEGMENTS: AnalyticsUserSegment[] = ['all', 'new', 'returning'];
+const ANALYTICS_MESSAGE_ROLES: AnalyticsMessageRole[] = ['ALL', 'USER', 'AI', 'SYSTEM'];
+const ANALYTICS_VERIFIED_FILTERS: AnalyticsVerifiedFilter[] = ['all', 'verified', 'unverified'];
+const TOP_USERS_SORT_VALUES: TopUsersSortBy[] = ['messages', 'coins', 'gems', 'streak', 'lastActiveAt'];
+const PREMIUM_TIERS = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'] as const;
+
+function parseIntInRange(value: unknown, defaultValue: number, min: number, max: number): number {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) return defaultValue;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function parseDateSafe(value: unknown): Date | null {
+  if (!value) return null;
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function toStartOfUTCDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+}
+
+function toEndOfUTCDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
+}
+
+function parseEnumValue<T extends readonly string[]>(value: unknown, valid: T, fallback: T[number]): T[number] {
+  const normalized = String(value ?? '').trim();
+  if ((valid as readonly string[]).includes(normalized)) {
+    return normalized as T[number];
+  }
+  return fallback;
+}
+
+function getBucketExpression(groupBy: AnalyticsGroupBy, columnSql: Prisma.Sql): Prisma.Sql {
+  if (groupBy === 'week') return Prisma.sql`TO_CHAR(DATE_TRUNC('week', ${columnSql} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`;
+  if (groupBy === 'month') return Prisma.sql`TO_CHAR(DATE_TRUNC('month', ${columnSql} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`;
+  return Prisma.sql`TO_CHAR(DATE_TRUNC('day', ${columnSql} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`;
+}
+
+function buildDateBuckets(startDate: Date, endDate: Date, groupBy: AnalyticsGroupBy): string[] {
+  const buckets: string[] = [];
+  const current = new Date(startDate);
+
+  if (groupBy === 'month') {
+    current.setUTCDate(1);
+  }
+
+  if (groupBy === 'week') {
+    const day = current.getUTCDay();
+    const diffToMonday = (day + 6) % 7;
+    current.setUTCDate(current.getUTCDate() - diffToMonday);
+  }
+
+  while (current <= endDate) {
+    buckets.push(current.toISOString().split('T')[0]);
+    if (groupBy === 'month') {
+      current.setUTCMonth(current.getUTCMonth() + 1);
+    } else if (groupBy === 'week') {
+      current.setUTCDate(current.getUTCDate() + 7);
+    } else {
+      current.setUTCDate(current.getUTCDate() + 1);
+    }
+  }
+
+  return buckets;
+}
+
+function buildUserFilterConditions(
+  query: Request['query'],
+  startDate: Date,
+  includeCreatedAtUpperBound: boolean,
+): {
+  conditions: Prisma.Sql[];
+  premiumTier: string;
+  userSegment: AnalyticsUserSegment;
+  verified: AnalyticsVerifiedFilter;
+} {
+  const premiumTier = parseEnumValue(query.premiumTier, [...PREMIUM_TIERS, 'ALL'] as const, 'ALL');
+  const userSegment = parseEnumValue(query.userSegment, ANALYTICS_USER_SEGMENTS, 'all');
+  const verified = parseEnumValue(query.verified, ANALYTICS_VERIFIED_FILTERS, 'all');
+  const endDate = parseDateSafe(query.to);
+
+  const conditions: Prisma.Sql[] = [Prisma.sql`1 = 1`];
+
+  if (premiumTier !== 'ALL') {
+    conditions.push(Prisma.sql`u."premiumTier" = CAST(${premiumTier} AS "PremiumTier")`);
+  }
+
+  if (userSegment === 'new') {
+    conditions.push(Prisma.sql`u."createdAt" >= ${startDate}`);
+  }
+  if (userSegment === 'returning') {
+    conditions.push(Prisma.sql`u."createdAt" < ${startDate}`);
+  }
+
+  if (verified === 'verified') {
+    conditions.push(Prisma.sql`u."isEmailVerified" = true`);
+  }
+  if (verified === 'unverified') {
+    conditions.push(Prisma.sql`u."isEmailVerified" = false`);
+  }
+
+  if (includeCreatedAtUpperBound && endDate) {
+    conditions.push(Prisma.sql`u."createdAt" <= ${toEndOfUTCDay(endDate)}`);
+  }
+
+  return { conditions, premiumTier, userSegment, verified };
+}
+
+function buildUserRealtimeConditions(query: Request['query']): {
+  conditions: Prisma.Sql[];
+  premiumTier: string;
+  verified: AnalyticsVerifiedFilter;
+} {
+  const premiumTier = parseEnumValue(query.premiumTier, [...PREMIUM_TIERS, 'ALL'] as const, 'ALL');
+  const verified = parseEnumValue(query.verified, ANALYTICS_VERIFIED_FILTERS, 'all');
+  const conditions: Prisma.Sql[] = [Prisma.sql`1 = 1`];
+
+  if (premiumTier !== 'ALL') {
+    conditions.push(Prisma.sql`u."premiumTier" = CAST(${premiumTier} AS "PremiumTier")`);
+  }
+  if (verified === 'verified') {
+    conditions.push(Prisma.sql`u."isEmailVerified" = true`);
+  }
+  if (verified === 'unverified') {
+    conditions.push(Prisma.sql`u."isEmailVerified" = false`);
+  }
+
+  return { conditions, premiumTier, verified };
 }
 
 // ============== AUTH ==============
@@ -676,93 +817,241 @@ export async function giveToUser(req: AdminRequest, res: Response) {
 // ============== ANALYTICS ==============
 export async function getAnalytics(req: AdminRequest, res: Response) {
   try {
-    const { days = 7 } = req.query;
-    const daysNum = Math.min(Number(days) || 7, 365);
+    const daysNum = parseIntInRange(req.query.days, 7, 1, 365);
+    const fromQuery = parseDateSafe(req.query.from);
+    const toQuery = parseDateSafe(req.query.to);
+    const groupBy = parseEnumValue(req.query.groupBy, ANALYTICS_GROUP_BY_VALUES, 'day');
+    const messageRole = parseEnumValue(req.query.messageRole, ANALYTICS_MESSAGE_ROLES, 'ALL');
+    const topLimit = parseIntInRange(req.query.topLimit, 10, 1, 100);
+    const minMessageCount = parseIntInRange(req.query.minMessageCount, 0, 0, 1000000);
+    const sortBy = parseEnumValue(req.query.sortBy, TOP_USERS_SORT_VALUES, 'messages');
 
-    const startDate = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000);
+    const endDate = toEndOfUTCDay(toQuery || new Date());
+    const startDate = toStartOfUTCDay(fromQuery || new Date(endDate.getTime() - (daysNum - 1) * 24 * 60 * 60 * 1000));
+    const bucketExpression = getBucketExpression(groupBy, Prisma.sql`m."createdAt"`);
+    const userBucketExpression = getBucketExpression(groupBy, Prisma.sql`u."createdAt"`);
 
-    // Use SQL aggregation instead of loading all records into memory
-    const [usersByDate, messagesByDate, topUsers, premiumDistribution, activeUsersPerDay] = await Promise.all([
-      // User registrations per day
-      prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
-        SELECT DATE("createdAt") as date, COUNT(*)::bigint as count
-        FROM "users"
-        WHERE "createdAt" >= ${startDate}
-        GROUP BY DATE("createdAt")
-        ORDER BY date
+    const { conditions: userConditions, premiumTier, userSegment, verified } = buildUserFilterConditions(req.query, startDate, true);
+    const { conditions: realtimeUserConditions } = buildUserRealtimeConditions(req.query);
+    const messageConditions: Prisma.Sql[] = [
+      Prisma.sql`m."createdAt" >= ${startDate}`,
+      Prisma.sql`m."createdAt" <= ${endDate}`,
+      ...userConditions,
+    ];
+    if (messageRole !== 'ALL') {
+      messageConditions.push(Prisma.sql`m."role" = CAST(${messageRole} AS "MessageRole")`);
+    }
+
+    const topUsersOrderBy =
+      sortBy === 'coins'
+        ? Prisma.sql`u."coins" DESC, message_count DESC`
+        : sortBy === 'gems'
+          ? Prisma.sql`u."gems" DESC, message_count DESC`
+          : sortBy === 'streak'
+            ? Prisma.sql`u."streak" DESC, message_count DESC`
+            : sortBy === 'lastActiveAt'
+              ? Prisma.sql`u."lastActiveAt" DESC NULLS LAST, message_count DESC`
+              : Prisma.sql`message_count DESC, u."lastActiveAt" DESC NULLS LAST`;
+
+    const includeReturningUsers = userSegment !== 'new';
+
+    const [
+      usersByBucket,
+      messagesByBucket,
+      activeUsersByBucket,
+      topUsers,
+      premiumDistribution,
+      totals,
+      returningUsers,
+      churnRiskUsers,
+      activeNow,
+    ] = await Promise.all([
+      prisma.$queryRaw<Array<{ bucket: string; count: bigint }>>`
+        SELECT ${userBucketExpression} AS bucket, COUNT(*)::bigint AS count
+        FROM "users" u
+        WHERE u."createdAt" >= ${startDate}
+          AND u."createdAt" <= ${endDate}
+          AND ${Prisma.join(userConditions, ' AND ')}
+        GROUP BY bucket
+        ORDER BY bucket
       `,
-      // Messages per day
-      prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
-        SELECT DATE("createdAt") as date, COUNT(*)::bigint as count
-        FROM "messages"
-        WHERE "createdAt" >= ${startDate}
-        GROUP BY DATE("createdAt")
-        ORDER BY date
+      prisma.$queryRaw<Array<{ bucket: string; count: bigint }>>`
+        SELECT ${bucketExpression} AS bucket, COUNT(*)::bigint AS count
+        FROM "messages" m
+        INNER JOIN "users" u ON u.id = m."userId"
+        WHERE ${Prisma.join(messageConditions, ' AND ')}
+        GROUP BY bucket
+        ORDER BY bucket
       `,
-      // Top users by messages
-      prisma.user.findMany({
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          email: true,
-          _count: { select: { messages: true } },
-        },
-        orderBy: { messages: { _count: 'desc' } },
-        take: 10,
-      }),
-      // Premium tier distribution
-      prisma.user.groupBy({
-        by: ['premiumTier'],
-        _count: true,
-      }),
-      // Active users per day (users who sent messages)
-      prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
-        SELECT DATE("createdAt") as date, COUNT(DISTINCT "userId")::bigint as count
-        FROM "messages"
-        WHERE "createdAt" >= ${startDate}
-        GROUP BY DATE("createdAt")
-        ORDER BY date
+      prisma.$queryRaw<Array<{ bucket: string; count: bigint }>>`
+        SELECT ${bucketExpression} AS bucket, COUNT(DISTINCT m."userId")::bigint AS count
+        FROM "messages" m
+        INNER JOIN "users" u ON u.id = m."userId"
+        WHERE ${Prisma.join(messageConditions, ' AND ')}
+        GROUP BY bucket
+        ORDER BY bucket
+      `,
+      prisma.$queryRaw<Array<{
+        id: string;
+        username: string | null;
+        displayName: string | null;
+        email: string;
+        coins: number;
+        gems: number;
+        streak: number;
+        premiumTier: string;
+        isEmailVerified: boolean;
+        lastActiveAt: Date | null;
+        message_count: bigint;
+        last_message_at: Date | null;
+      }>>`
+        SELECT
+          u.id,
+          u.username,
+          u."displayName",
+          u.email,
+          u.coins,
+          u.gems,
+          u.streak,
+          u."premiumTier",
+          u."isEmailVerified",
+          u."lastActiveAt",
+          COUNT(m.id)::bigint AS message_count,
+          MAX(m."createdAt") AS last_message_at
+        FROM "users" u
+        LEFT JOIN "messages" m
+          ON m."userId" = u.id
+          AND m."createdAt" >= ${startDate}
+          AND m."createdAt" <= ${endDate}
+          ${messageRole !== 'ALL' ? Prisma.sql`AND m."role" = CAST(${messageRole} AS "MessageRole")` : Prisma.sql``}
+        WHERE ${Prisma.join(userConditions, ' AND ')}
+        GROUP BY u.id
+        HAVING COUNT(m.id) >= ${minMessageCount}
+        ORDER BY ${topUsersOrderBy}
+        LIMIT ${topLimit}
+      `,
+      prisma.$queryRaw<Array<{ premiumTier: string; count: bigint }>>`
+        SELECT u."premiumTier", COUNT(*)::bigint AS count
+        FROM "users" u
+        WHERE ${Prisma.join(userConditions, ' AND ')}
+        GROUP BY u."premiumTier"
+        ORDER BY u."premiumTier"
+      `,
+      prisma.$queryRaw<Array<{ total_users: bigint; new_users: bigint; total_messages: bigint; active_users: bigint; premium_users: bigint }>>`
+        SELECT
+          COUNT(DISTINCT u.id)::bigint AS total_users,
+          COUNT(DISTINCT CASE WHEN u."createdAt" >= ${startDate} AND u."createdAt" <= ${endDate} THEN u.id END)::bigint AS new_users,
+          COUNT(m.id)::bigint AS total_messages,
+          COUNT(DISTINCT m."userId")::bigint AS active_users,
+          COUNT(DISTINCT CASE WHEN u."premiumTier" != 'FREE' THEN u.id END)::bigint AS premium_users
+        FROM "users" u
+        LEFT JOIN "messages" m ON m."userId" = u.id
+          AND m."createdAt" >= ${startDate}
+          AND m."createdAt" <= ${endDate}
+          ${messageRole !== 'ALL' ? Prisma.sql`AND m."role" = CAST(${messageRole} AS "MessageRole")` : Prisma.sql``}
+        WHERE ${Prisma.join(userConditions, ' AND ')}
+      `,
+      includeReturningUsers
+        ? prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(DISTINCT m."userId")::bigint AS count
+          FROM "messages" m
+          INNER JOIN "users" u ON u.id = m."userId"
+          WHERE m."createdAt" >= ${startDate}
+            AND m."createdAt" <= ${endDate}
+            AND u."createdAt" < ${startDate}
+            ${messageRole !== 'ALL' ? Prisma.sql`AND m."role" = CAST(${messageRole} AS "MessageRole")` : Prisma.sql``}
+            AND ${Prisma.join(realtimeUserConditions, ' AND ')}
+        `
+          : Promise.resolve([{ count: 0 as unknown as bigint }]),
+      prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS count
+        FROM "users" u
+        WHERE u."lastActiveAt" >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)}
+          AND u."lastActiveAt" < ${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)}
+          AND ${Prisma.join(realtimeUserConditions, ' AND ')}
+      `,
+      prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS count
+        FROM "users" u
+        WHERE u."lastActiveAt" >= ${new Date(Date.now() - 15 * 60 * 1000)}
+          AND ${Prisma.join(realtimeUserConditions, ' AND ')}
       `,
     ]);
 
-    // Build date maps for quick lookup
-    const userMap = new Map(usersByDate.map(d => [new Date(d.date).toISOString().split('T')[0], Number(d.count)]));
-    const messageMap = new Map(messagesByDate.map(d => [new Date(d.date).toISOString().split('T')[0], Number(d.count)]));
-    const activeUserMap = new Map(activeUsersPerDay.map(d => [new Date(d.date).toISOString().split('T')[0], Number(d.count)]));
+    const allBuckets = buildDateBuckets(startDate, endDate, groupBy);
+    const userMap = new Map(usersByBucket.map((row) => [row.bucket, Number(row.count)]));
+    const messageMap = new Map(messagesByBucket.map((row) => [row.bucket, Number(row.count)]));
+    const activeUserMap = new Map(activeUsersByBucket.map((row) => [row.bucket, Number(row.count)]));
 
-    // Generate all dates in range
-    const allDates: string[] = [];
-    for (let i = 0; i < daysNum; i++) {
-      const d = new Date(Date.now() - (daysNum - 1 - i) * 24 * 60 * 60 * 1000);
-      allDates.push(d.toISOString().split('T')[0]);
-    }
-
-    // Build daily stats with all dates
-    const dailyStats = allDates.map(date => ({
+    const dailyStats = allBuckets.map((date) => ({
       date,
       new_users: userMap.get(date) || 0,
       messages: messageMap.get(date) || 0,
       active_users: activeUserMap.get(date) || 0,
     }));
 
-    // Build message stats with all dates
-    const messageStats = allDates.map(date => ({
+    const messageStats = allBuckets.map((date) => ({
       date,
       count: messageMap.get(date) || 0,
     }));
 
+    const summaryRow = totals[0];
+    const totalUsers = Number(summaryRow?.total_users || 0);
+    const totalMessages = Number(summaryRow?.total_messages || 0);
+    const activeUsers = Number(summaryRow?.active_users || 0);
+    const premiumUsers = Number(summaryRow?.premium_users || 0);
+
     res.json({
       dailyStats,
       messageStats,
-      topUsers: topUsers.map(u => ({ 
-        id: u.id,
-        username: u.username,
-        displayName: u.displayName,
-        email: u.email,
-        messageCount: u._count.messages 
+      topUsers: topUsers.map((user) => ({
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        email: user.email,
+        coins: user.coins,
+        gems: user.gems,
+        streak: user.streak,
+        premiumTier: user.premiumTier,
+        isEmailVerified: user.isEmailVerified,
+        lastActiveAt: user.lastActiveAt,
+        lastMessageAt: user.last_message_at,
+        messageCount: Number(user.message_count || 0),
       })),
-      premiumDistribution,
+      premiumDistribution: premiumDistribution.map((item) => ({
+        premiumTier: item.premiumTier,
+        _count: Number(item.count || 0),
+      })),
+      summary: {
+        totalUsers,
+        newUsers: Number(summaryRow?.new_users || 0),
+        activeUsers,
+        totalMessages,
+        premiumUsers,
+        premiumRate: totalUsers > 0 ? Number(((premiumUsers / totalUsers) * 100).toFixed(2)) : 0,
+        avgMessagesPerActiveUser: activeUsers > 0 ? Number((totalMessages / activeUsers).toFixed(2)) : 0,
+        returningUsers: Number(returningUsers[0]?.count || 0),
+        churnRiskUsers: Number(churnRiskUsers[0]?.count || 0),
+        activeNow: Number(activeNow[0]?.count || 0),
+      },
+      realtimeSummary: {
+        churnRiskWindowDays: { min: 7, max: 30 },
+        activeNowWindowMinutes: 15,
+        churnRiskUsers: Number(churnRiskUsers[0]?.count || 0),
+        activeNow: Number(activeNow[0]?.count || 0),
+      },
+      filtersApplied: {
+        from: startDate.toISOString(),
+        to: endDate.toISOString(),
+        groupBy,
+        premiumTier,
+        userSegment,
+        verified,
+        messageRole,
+        topLimit,
+        minMessageCount,
+        sortBy,
+      },
     });
   } catch (error) {
     console.error('[Admin] Analytics error:', error);
@@ -772,30 +1061,156 @@ export async function getAnalytics(req: AdminRequest, res: Response) {
 
 // ============== SYSTEM ==============
 export async function getSystemInfo(req: AdminRequest, res: Response) {
-  const [
-    dbSize,
-    tableStats,
-  ] = await Promise.all([
-    prisma.$queryRaw<Array<{ size: string }>>`
-      SELECT pg_size_pretty(pg_database_size(current_database())) as size
-    `,
-    prisma.$queryRaw<Array<{ table_name: string; row_count: bigint }>>`
-      SELECT 
-        relname as table_name,
-        n_live_tup as row_count
-      FROM pg_stat_user_tables
-      ORDER BY n_live_tup DESC
-      LIMIT 20
-    `,
-  ]);
+  try {
+    const windowMinutes = parseIntInRange(req.query.windowMinutes, 60, 5, 24 * 60);
+    const tableLimit = parseIntInRange(req.query.tableLimit, 20, 5, 100);
+    const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
 
-  res.json({
-    databaseSize: dbSize[0]?.size || 'Unknown',
-    tables: tableStats.map(t => ({ name: t.table_name, rows: Number(t.row_count) })),
-    nodeVersion: process.version,
-    uptime: process.uptime(),
-    memoryUsage: process.memoryUsage(),
-  });
+    const [
+      dbSizeResult,
+      tableStatsResult,
+      connectionsResult,
+      dbStatsResult,
+      activityStatsResult,
+      requestStatsResult,
+      errorStatsResult,
+    ] = await Promise.allSettled([
+      prisma.$queryRaw<Array<{ size: string; bytes: bigint }>>`
+        SELECT pg_size_pretty(pg_database_size(current_database())) as size,
+               pg_database_size(current_database())::bigint as bytes
+      `,
+      prisma.$queryRaw<Array<{ table_name: string; row_count: bigint; seq_scan: bigint; idx_scan: bigint; dead_rows: bigint }>>`
+        SELECT 
+          relname as table_name,
+          n_live_tup as row_count,
+          seq_scan,
+          idx_scan,
+          n_dead_tup as dead_rows
+        FROM pg_stat_user_tables
+        ORDER BY n_live_tup DESC
+        LIMIT ${tableLimit}
+      `,
+      prisma.$queryRaw<Array<{ total: bigint; active: bigint; idle: bigint }>>`
+        SELECT
+          COUNT(*)::bigint as total,
+          COUNT(*) FILTER (WHERE state = 'active')::bigint as active,
+          COUNT(*) FILTER (WHERE state = 'idle')::bigint as idle
+        FROM pg_stat_activity
+        WHERE datname = current_database()
+      `,
+      prisma.$queryRaw<Array<{ commits: bigint; rollbacks: bigint; blks_hit: bigint; blks_read: bigint }>>`
+        SELECT
+          xact_commit::bigint as commits,
+          xact_rollback::bigint as rollbacks,
+          blks_hit::bigint as blks_hit,
+          blks_read::bigint as blks_read
+        FROM pg_stat_database
+        WHERE datname = current_database()
+      `,
+      prisma.$queryRaw<Array<{ messages: bigint; new_users: bigint; notifications: bigint; active_users: bigint; monitoring_events: bigint }>>`
+        SELECT
+          (SELECT COUNT(*)::bigint FROM "messages" WHERE "createdAt" >= ${windowStart}) as messages,
+          (SELECT COUNT(*)::bigint FROM "users" WHERE "createdAt" >= ${windowStart}) as new_users,
+          (SELECT COUNT(*)::bigint FROM "notifications" WHERE "createdAt" >= ${windowStart}) as notifications,
+          (SELECT COUNT(*)::bigint FROM "users" WHERE "lastActiveAt" >= ${windowStart}) as active_users,
+          (SELECT COUNT(*)::bigint FROM "monitoring_events" WHERE "createdAt" >= ${windowStart}) as monitoring_events
+      `,
+      prisma.$queryRaw<Array<{ path: string | null; method: string | null; requests: bigint; avg_duration: number | null; p95_duration: number | null }>>`
+        SELECT
+          path,
+          method,
+          COUNT(*)::bigint as requests,
+          AVG("durationMs")::float as avg_duration,
+          PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "durationMs")::float as p95_duration
+        FROM "monitoring_events"
+        WHERE "createdAt" >= ${windowStart}
+          AND "eventType" = 'REQUEST'
+        GROUP BY path, method
+        ORDER BY requests DESC
+        LIMIT 20
+      `,
+      prisma.$queryRaw<Array<{ severity: string; count: bigint }>>`
+        SELECT
+          severity,
+          COUNT(*)::bigint as count
+        FROM "monitoring_events"
+        WHERE "createdAt" >= ${windowStart}
+          AND (
+            "eventType" = 'ERROR'
+            OR severity IN ('error', 'critical')
+            OR ("statusCode" IS NOT NULL AND "statusCode" >= 500)
+          )
+        GROUP BY severity
+        ORDER BY count DESC
+      `,
+    ]);
+
+    const dbSize = dbSizeResult.status === 'fulfilled' ? dbSizeResult.value : [];
+    const tableStats = tableStatsResult.status === 'fulfilled' ? tableStatsResult.value : [];
+    const connections = connectionsResult.status === 'fulfilled' ? connectionsResult.value : [];
+    const dbStats = dbStatsResult.status === 'fulfilled' ? dbStatsResult.value : [];
+    const activityStats = activityStatsResult.status === 'fulfilled' ? activityStatsResult.value : [];
+    const requestStats = requestStatsResult.status === 'fulfilled' ? requestStatsResult.value : [];
+    const errorStats = errorStatsResult.status === 'fulfilled' ? errorStatsResult.value : [];
+
+    const dbStat = dbStats[0];
+    const totalBlocks = Number(dbStat?.blks_hit || 0) + Number(dbStat?.blks_read || 0);
+    const cacheHitRate = totalBlocks > 0 ? Number(((Number(dbStat?.blks_hit || 0) / totalBlocks) * 100).toFixed(2)) : 0;
+    const conn = connections[0];
+    const activity = activityStats[0];
+
+    res.json({
+      databaseSize: dbSize[0]?.size || 'Unknown',
+      databaseSizeBytes: Number(dbSize[0]?.bytes || 0),
+      tables: tableStats.map(t => ({
+        name: t.table_name,
+        rows: Number(t.row_count),
+        seqScan: Number(t.seq_scan),
+        idxScan: Number(t.idx_scan),
+        deadRows: Number(t.dead_rows),
+      })),
+      nodeVersion: process.version,
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+      filtersApplied: {
+        windowMinutes,
+        tableLimit,
+        from: windowStart.toISOString(),
+        to: new Date().toISOString(),
+      },
+      connections: {
+        total: Number(conn?.total || 0),
+        active: Number(conn?.active || 0),
+        idle: Number(conn?.idle || 0),
+      },
+      dbPerformance: {
+        commits: Number(dbStat?.commits || 0),
+        rollbacks: Number(dbStat?.rollbacks || 0),
+        cacheHitRate,
+      },
+      realtimeActivity: {
+        messages: Number(activity?.messages || 0),
+        newUsers: Number(activity?.new_users || 0),
+        notifications: Number(activity?.notifications || 0),
+        activeUsers: Number(activity?.active_users || 0),
+        monitoringEvents: Number(activity?.monitoring_events || 0),
+      },
+      requestStats: requestStats.map((row) => ({
+        path: row.path || 'unknown',
+        method: row.method || 'unknown',
+        requests: Number(row.requests || 0),
+        avgDurationMs: row.avg_duration ? Number(row.avg_duration.toFixed(2)) : 0,
+        p95DurationMs: row.p95_duration ? Number(row.p95_duration.toFixed(2)) : 0,
+      })),
+      errorStats: errorStats.map((row) => ({
+        severity: row.severity,
+        count: Number(row.count || 0),
+      })),
+    });
+  } catch (error) {
+    console.error('[Admin] System monitor error:', error);
+    res.status(500).json({ error: 'Failed to fetch system monitor data' });
+  }
 }
 
 export async function cleanupData(req: AdminRequest, res: Response) {
