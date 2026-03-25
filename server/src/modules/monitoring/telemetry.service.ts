@@ -1,5 +1,6 @@
 import { MonitoringEventType, PremiumTier, prisma } from '../../lib/prisma';
 import { createModuleLogger } from '../../lib/logger';
+import { Prisma } from '@prisma/client';
 
 const log = createModuleLogger('TelemetryService');
 
@@ -59,7 +60,7 @@ export const telemetryService = {
           durationMs: input.durationMs,
           ip: safeString(input.ip, 64),
           userAgent: safeString(input.userAgent, 500),
-          metadata: input.metadata,
+          metadata: input.metadata as Prisma.InputJsonValue | undefined,
         },
       });
     } catch (error) {

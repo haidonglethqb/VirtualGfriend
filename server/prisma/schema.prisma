@@ -61,6 +61,10 @@ model User {
 
   @@index([streak])               // Leaderboard: top by streak
   @@index([username])             // Search: find user by username
+  @@index([createdAt])            // Analytics: registration trends and date filters
+  @@index([lastActiveAt])         // Realtime monitor: active user windows
+  @@index([premiumTier, createdAt])      // Analytics: tier + date segment filters
+  @@index([isEmailVerified, createdAt])  // Analytics: verified/unverified segmentation
   @@map("users")
 }
 
@@ -324,6 +328,7 @@ model Message {
   @@index([userId, characterId, createdAt])
   @@index([characterId, createdAt])       // Optimize queries by character for recent messages
   @@index([userId, createdAt])             // Optimize user message history
+  @@index([createdAt, role, userId])       // Analytics: time-window role filtering and top users
   @@map("messages")
 }
 
@@ -627,6 +632,7 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead, createdAt])
+  @@index([createdAt])
   @@map("notifications")
 }
 
@@ -711,6 +717,8 @@ model MonitoringEvent {
   @@index([path, method, createdAt])
   @@index([statusCode, createdAt])
   @@index([userId, createdAt])
+  @@index([createdAt])
+  @@index([eventType, createdAt, path, method])
   @@map("monitoring_events")
 }
 
