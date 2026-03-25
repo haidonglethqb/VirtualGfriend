@@ -119,7 +119,7 @@ description: use when using JavaScript, React, Next.js App Router, Zustand, Shad
   - Implement proper error logging and user-friendly error messages.
   - Model expected errors as return values in Server Actions.
 
-  Accessibility (a11y)
+  Accessibility (a11y)  
   - Use semantic HTML elements.
   - Implement proper ARIA attributes.
   - Ensure keyboard navigation support.
