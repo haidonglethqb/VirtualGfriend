@@ -13,7 +13,7 @@ description: use when using JavaScript, React, Next.js App Router, Zustand, Shad
   - Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError).
   - Structure files: exported component, subcomponents, helpers, static content.
 
-  Standard.js Rules
+  Standard.js Rules:
   - Use 2 space indentation.
   - Use single quotes for strings except to avoid escaping.
   - No semicolons (unless required to disambiguate statements).
