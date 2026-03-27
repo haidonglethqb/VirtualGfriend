@@ -14,7 +14,11 @@ const verifyOTPSchema = z.object({
 const resetPasswordSchema = z.object({
   email: z.string().email('Email không hợp lệ'),
   token: z.string().min(1, 'Token là bắt buộc'),
-  newPassword: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
+  newPassword: z.string()
+    .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
+    .regex(/[A-Z]/, 'Mật khẩu phải có ít nhất 1 chữ hoa')
+    .regex(/[a-z]/, 'Mật khẩu phải có ít nhất 1 chữ thường')
+    .regex(/[0-9]/, 'Mật khẩu phải có ít nhất 1 số'),
 });
 
 export const passwordResetController = {

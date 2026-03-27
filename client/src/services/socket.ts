@@ -20,6 +20,7 @@ class SocketService {
   private socketId: string | null = null
   private currentToken: string | null = null
   private externalListeners: ExternalListener[] = []
+  private typingTimeoutId: number | null = null
 
   connect(token: string) {
     // If already connected with the same token, do nothing
@@ -116,8 +117,12 @@ class SocketService {
 
     this.socket.on('character:typing', (data: { characterId: string; sourceSocketId?: string }) => {
       useChatStore.getState().setTyping(true)
+      // Clear any existing typing timeout to prevent accumulation
+      if (this.typingTimeoutId) {
+        clearTimeout(this.typingTimeoutId)
+      }
       // Safety timeout: auto-clear typing if AI response never arrives
-      setTimeout(() => useChatStore.getState().setTyping(false), 30000)
+      this.typingTimeoutId = window.setTimeout(() => useChatStore.getState().setTyping(false), 30000)
       // NO BroadcastChannel here - socket room already syncs all tabs
     })
 

@@ -48,15 +48,43 @@ export const errorHandler = (
     });
   }
 
-  // Prisma errors
+  // Prisma errors - map specific error codes to proper HTTP statuses
   if (err.name === 'PrismaClientKnownRequestError') {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: 'DATABASE_ERROR',
-        message: 'Database operation failed',
-      },
-    });
+    const prismaErr = err as any;
+    switch (prismaErr.code) {
+      case 'P2002': // Unique constraint violation
+        return res.status(409).json({
+          success: false,
+          error: {
+            code: 'DUPLICATE_ENTRY',
+            message: 'A record with this data already exists',
+          },
+        });
+      case 'P2025': // Record not found
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'The requested record was not found',
+          },
+        });
+      case 'P2003': // Foreign key constraint failure
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'REFERENCE_ERROR',
+            message: 'Referenced record does not exist',
+          },
+        });
+      default:
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'DATABASE_ERROR',
+            message: 'Database operation failed',
+          },
+        });
+    }
   }
 
   // JWT errors

@@ -32,47 +32,50 @@ export const dmService = {
       throw new AppError('User does not accept messages', 403, 'MESSAGES_DISABLED')
     }
 
-    // Find existing 1-on-1 conversation
-    const existing = await prisma.conversation.findFirst({
-      where: {
-        isGroup: false,
-        AND: [
-          { members: { some: { userId, isActive: true } } },
-          { members: { some: { userId: targetUserId, isActive: true } } },
-        ],
-      },
-      include: {
-        members: {
-          include: {
-            user: { select: { id: true, displayName: true, username: true, avatar: true } },
-          },
-        },
-      },
-    })
-
-    if (existing) return existing
-
-    // Create new conversation
-    const conversation = await prisma.conversation.create({
-      data: {
-        isGroup: false,
-        members: {
-          create: [
-            { userId, role: 'member' },
-            { userId: targetUserId, role: 'member' },
+    // Use serializable transaction to prevent race condition creating duplicate conversations
+    const conversation = await prisma.$transaction(async (tx) => {
+      // Find existing 1-on-1 conversation inside transaction
+      const existing = await tx.conversation.findFirst({
+        where: {
+          isGroup: false,
+          AND: [
+            { members: { some: { userId, isActive: true } } },
+            { members: { some: { userId: targetUserId, isActive: true } } },
           ],
         },
-      },
-      include: {
-        members: {
-          include: {
-            user: { select: { id: true, displayName: true, username: true, avatar: true } },
+        include: {
+          members: {
+            include: {
+              user: { select: { id: true, displayName: true, username: true, avatar: true } },
+            },
           },
         },
-      },
-    })
+      })
 
-    log.info(`Conversation created: ${conversation.id} between ${userId} and ${targetUserId}`)
+      if (existing) return existing
+
+      // Create new conversation atomically
+      return tx.conversation.create({
+        data: {
+          isGroup: false,
+          members: {
+            create: [
+              { userId, role: 'member' },
+              { userId: targetUserId, role: 'member' },
+            ],
+          },
+        },
+        include: {
+          members: {
+            include: {
+              user: { select: { id: true, displayName: true, username: true, avatar: true } },
+            },
+          },
+        },
+      })
+    }, { isolationLevel: 'Serializable' })
+
+    log.info(`Conversation created/found: ${conversation.id} between ${userId} and ${targetUserId}`)
     return conversation
   },
 

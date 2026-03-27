@@ -121,7 +121,8 @@ export const authController = {
 
   async refreshToken(req: Request, res: Response, next: NextFunction) {
     try {
-      const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
+      // Only accept refresh token from httpOnly cookie — never from request body
+      const refreshToken = req.cookies.refreshToken;
       
       if (!refreshToken) {
         throw new AppError('Refresh token is required', 400, 'NO_REFRESH_TOKEN');

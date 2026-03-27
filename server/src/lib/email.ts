@@ -36,7 +36,9 @@ class EmailService {
     if (user && pass) {
       this.transporter = nodemailer.createTransport(emailConfig);
       this.initialized = true;
-      log.info('Service initialized with user:', user);
+      // Mask email for security — only show first 3 chars + domain
+      const maskedUser = user.length > 3 ? user.substring(0, 3) + '***@' + user.split('@')[1] : '***';
+      log.info('Service initialized with user:', maskedUser);
     } else {
       log.warn('Service not configured - SMTP_USER: ' + (user ? 'SET' : 'MISSING') + ', SMTP_PASS: ' + (pass ? 'SET' : 'MISSING'));
     }

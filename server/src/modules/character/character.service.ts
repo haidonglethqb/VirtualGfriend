@@ -407,6 +407,11 @@ export const characterService = {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
+    // Validate XP input
+    if (xp <= 0 || xp > 10000 || !Number.isFinite(xp)) {
+      throw new AppError('Invalid XP amount', 400, 'INVALID_XP');
+    }
+
     const previousLevel = character.level;
     let newXp = character.experience + xp;
     let newLevel = character.level;
@@ -435,43 +440,45 @@ export const characterService = {
       },
     });
 
-    // If leveled up and hit a milestone, give rewards
+    // If leveled up and hit a milestone, give rewards atomically
     if (milestoneReward && character.userId) {
-      await prisma.user.update({
-        where: { id: character.userId },
-        data: {
-          coins: { increment: milestoneReward.coins },
-          gems: { increment: milestoneReward.gems },
-        },
-      });
-
-      // Add milestone affection
-      if (milestoneReward.affection > 0) {
-        await prisma.character.update({
-          where: { id: characterId },
+      await prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: character.userId! },
           data: {
-            affection: { increment: milestoneReward.affection },
+            coins: { increment: milestoneReward!.coins },
+            gems: { increment: milestoneReward!.gems },
           },
         });
-      }
 
-      // Create memory for milestone
-      await prisma.memory.create({
-        data: {
-          userId: character.userId,
-          characterId,
-          type: 'MILESTONE',
-          title: `Đạt Level ${milestoneReward.level}! 🎉`,
-          description: `Bạn đã đạt level ${milestoneReward.level} với ${character.name}. Mở khóa: ${milestoneReward.unlocks.join(', ')}`,
-          milestone: `LEVEL_${milestoneReward.level}`,
-          metadata: {
-            level: milestoneReward.level,
-            coins: milestoneReward.coins,
-            gems: milestoneReward.gems,
-            affection: milestoneReward.affection,
-            unlocks: milestoneReward.unlocks,
+        // Add milestone affection
+        if (milestoneReward!.affection > 0) {
+          await tx.character.update({
+            where: { id: characterId },
+            data: {
+              affection: { increment: milestoneReward!.affection },
+            },
+          });
+        }
+
+        // Create memory for milestone
+        await tx.memory.create({
+          data: {
+            userId: character.userId!,
+            characterId,
+            type: 'MILESTONE',
+            title: `Đạt Level ${milestoneReward!.level}! 🎉`,
+            description: `Bạn đã đạt level ${milestoneReward!.level} với ${character.name}. Mở khóa: ${milestoneReward!.unlocks.join(', ')}`,
+            milestone: `LEVEL_${milestoneReward!.level}`,
+            metadata: {
+              level: milestoneReward!.level,
+              coins: milestoneReward!.coins,
+              gems: milestoneReward!.gems,
+              affection: milestoneReward!.affection,
+              unlocks: milestoneReward!.unlocks,
+            },
           },
-        },
+        });
       });
     }
 

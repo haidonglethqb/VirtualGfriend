@@ -54,6 +54,8 @@ async function getClient(): Promise<import('ioredis').default | null> {
 
     redisClient.on('close', () => {
       isConnected = false;
+      // Allow reconnection attempt on next getClient() call
+      connectionAttempted = false;
     });
 
     await redisClient.connect();
@@ -81,7 +83,8 @@ export const cache = {
       if (!data) return null;
 
       return JSON.parse(data) as T;
-    } catch {
+    } catch (err) {
+      log.warn('Cache get failed for key ' + key + ': ' + (err as Error).message);
       return null;
     }
   },
@@ -95,8 +98,8 @@ export const cache = {
       if (!client) return;
 
       await client.setex(key, ttlSeconds, JSON.stringify(value));
-    } catch {
-      // Silently fail - caching is best-effort
+    } catch (err) {
+      log.warn('Cache set failed for key ' + key + ': ' + (err as Error).message);
     }
   },
 
@@ -109,8 +112,8 @@ export const cache = {
       if (!client || keys.length === 0) return;
 
       await client.del(...keys);
-    } catch {
-      // Silently fail
+    } catch (err) {
+      log.warn('Cache del failed: ' + (err as Error).message);
     }
   },
 
@@ -130,8 +133,8 @@ export const cache = {
           await client.del(...keys);
         }
       } while (cursor !== '0');
-    } catch {
-      // Silently fail
+    } catch (err) {
+      log.warn('Cache delPattern failed for ' + pattern + ': ' + (err as Error).message);
     }
   },
 

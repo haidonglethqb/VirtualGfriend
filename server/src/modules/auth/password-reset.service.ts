@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { timingSafeEqual } from 'crypto';
 import { emailService } from '../../lib/email';
 import { cache } from '../../lib/redis';
 import bcrypt from 'bcryptjs';
@@ -86,10 +87,10 @@ export const passwordResetService = {
   async verifyOTP(email: string, otp: string): Promise<{ success: boolean; message: string; token?: string }> {
     log.debug('Verify OTP attempt:', { email, otp });
 
+    // Fetch most recent unused OTP for this email and compare with constant-time check
     const otpRecord = await prisma.passwordResetOTP.findFirst({
       where: {
         email: email.toLowerCase(),
-        otp,
         used: false,
       },
       orderBy: {
@@ -99,15 +100,20 @@ export const passwordResetService = {
 
     log.debug('OTP record found:', otpRecord ? 'YES' : 'NO');
 
-    if (!otpRecord) {
-      // Debug: Check if OTP exists but is used or wrong email
+    // Constant-time OTP comparison to prevent timing attacks
+    const otpMatch = otpRecord
+      ? timingSafeEqual(Buffer.from(otp), Buffer.from(otpRecord.otp))
+      : false;
+
+    if (!otpRecord || !otpMatch) {
+      // Check if OTP was already used
       const usedOtp = await prisma.passwordResetOTP.findFirst({
-        where: { otp, used: true },
+        where: { email: email.toLowerCase(), used: true },
         orderBy: { createdAt: 'desc' },
       });
       
-      if (usedOtp) {
-        log.debug('OTP already used:', usedOtp.email);
+      if (usedOtp && timingSafeEqual(Buffer.from(otp), Buffer.from(usedOtp.otp))) {
+        log.debug('OTP already used for email:', email);
         return {
           success: false,
           message: 'Mã OTP đã được sử dụng. Vui lòng yêu cầu mã mới.',

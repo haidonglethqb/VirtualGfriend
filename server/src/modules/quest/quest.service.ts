@@ -174,31 +174,33 @@ export const questService = {
 
     const quest = userQuest.quest;
 
-    // Use transaction to ensure atomicity of claim + reward
-    await prisma.$transaction([
+    // Find character before transaction for XP/affection rewards
+    const character = await prisma.character.findFirst({
+      where: { userId, isActive: true },
+    });
+
+    // Use interactive transaction to ensure atomicity of claim + all rewards
+    await prisma.$transaction(async (tx) => {
       // Update user quest to claimed
-      prisma.userQuest.update({
+      await tx.userQuest.update({
         where: { id: userQuest.id },
         data: {
           status: 'CLAIMED',
           claimedAt: new Date(),
         },
-      }),
+      });
       // Give currency rewards
-      prisma.user.update({
+      await tx.user.update({
         where: { id: userId },
         data: {
           coins: { increment: quest.rewardCoins },
           gems: { increment: quest.rewardGems },
         },
-      }),
-    ]);
-
-    // Update character XP/affection (outside transaction as these are non-critical)
-    const character = await prisma.character.findFirst({
-      where: { userId, isActive: true },
+      });
     });
 
+    // XP/affection updates use characterService methods that have their own DB calls
+    // These are lower-priority and won't cause data inconsistency if they fail
     if (character) {
       if (quest.rewardXp > 0) {
         await characterService.addExperience(character.id, quest.rewardXp);

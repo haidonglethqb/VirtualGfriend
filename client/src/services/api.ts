@@ -149,14 +149,13 @@ class ApiClient {
     }
 
     // Start the refresh and save the promise
-    this.refreshPromise = this.doRefreshToken();
+    this.refreshPromise = this.doRefreshToken().finally(() => {
+      // Delay clearing so concurrent callers that arrive during the refresh
+      // still receive the same promise instead of starting a new one
+      setTimeout(() => { this.refreshPromise = null; }, 1000);
+    });
     
-    try {
-      return await this.refreshPromise;
-    } finally {
-      // Clear the promise after completion (allow future refreshes)
-      this.refreshPromise = null;
-    }
+    return this.refreshPromise;
   }
 
   private async doRefreshToken(): Promise<boolean> {

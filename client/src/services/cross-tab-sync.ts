@@ -81,16 +81,12 @@ class CrossTabSyncService {
       }
 
       case 'state:response': {
-        // Only accept first response to avoid multiple merges
-        if (this.hasReceivedState) return
-        this.hasReceivedState = true
-
         const stateData = data as { 
           messages: Message[]
           isTyping: boolean 
         }
         
-        // Only merge if we received more messages than we have
+        // Always merge if remote has more messages (not just first response)
         const currentMessages = useChatStore.getState().messages
         if (stateData.messages.length > currentMessages.length) {
           const mergedMessages = this.mergeMessages(currentMessages, stateData.messages)

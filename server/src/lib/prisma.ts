@@ -30,7 +30,10 @@ export const prisma = global.prisma || new PrismaClient({
 // Log connection events
 prisma.$connect()
   .then(() => log.info('Connected to database'))
-  .catch((err) => log.error('Failed to connect to database:', err));
+  .catch((err) => {
+    log.error('Failed to connect to database:', err);
+    process.exit(1);
+  });
 
 if (process.env.NODE_ENV !== 'production') {
   global.prisma = prisma;

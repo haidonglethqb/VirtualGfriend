@@ -134,13 +134,16 @@ export const gameEventService = {
    * Optimized: batch queries instead of per-quest DB calls
    */
   async autoStartDailyQuests(userId: string): Promise<void> {
-    // Debounce: check Redis flag to avoid running on every action
-    const cacheKey = `daily_quests_started:${userId}`;
-    const alreadyStarted = await cache.get<boolean>(cacheKey);
-    if (alreadyStarted) return;
-
+    // Atomic debounce: use setNX to prevent multiple concurrent executions
+    // TTL = seconds until midnight to auto-reset for next day
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const midnight = new Date(today);
+    midnight.setDate(midnight.getDate() + 1);
+    const ttlSeconds = Math.max(1, Math.floor((midnight.getTime() - Date.now()) / 1000));
+    const cacheKey = `daily_quests_started:${userId}`;
+    const acquired = await cache.setNX(cacheKey, true, ttlSeconds);
+    if (!acquired) return;
 
     // Get all daily quests (single query)
     const dailyQuests = await prisma.quest.findMany({
@@ -192,12 +195,6 @@ export const gameEventService = {
         });
       }),
     ]);
-
-    // Set Redis flag — TTL = seconds until midnight
-    const midnight = new Date(today);
-    midnight.setDate(midnight.getDate() + 1);
-    const ttlSeconds = Math.max(1, Math.floor((midnight.getTime() - Date.now()) / 1000));
-    await cache.set(cacheKey, true, ttlSeconds);
   },
 
   /**

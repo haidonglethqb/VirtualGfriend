@@ -51,7 +51,8 @@ export function setupSocketHandlers(io: Server) {
   // Authentication middleware
   io.use(async (socket: AuthenticatedSocket, next) => {
     try {
-      const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1]
+      // Only accept token from handshake auth object, never from headers (prevents CORS bypass)
+      const token = socket.handshake.auth.token
       
       if (!token) {
         return next(new Error('Authentication required'))

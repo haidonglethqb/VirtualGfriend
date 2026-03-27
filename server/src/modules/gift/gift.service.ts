@@ -62,6 +62,9 @@ export const giftService = {
     }
 
     const price = data.paymentMethod === 'coins' ? gift.priceCoins : gift.priceGems;
+    if (data.quantity < 1 || data.quantity > 9999) {
+      throw new AppError('Invalid quantity', 400, 'INVALID_QUANTITY');
+    }
     const totalPrice = price * data.quantity;
     const userBalance = data.paymentMethod === 'coins' ? user.coins : user.gems;
 
@@ -73,15 +76,27 @@ export const giftService = {
       );
     }
 
-    // Use transaction for atomicity
+    // Use transaction for atomicity — balance check inside transaction via WHERE clause
     const result = await prisma.$transaction(async (tx) => {
-      // Deduct balance
-      await tx.user.update({
-        where: { id: userId },
+      // Atomically deduct balance only if sufficient funds
+      const balanceField = data.paymentMethod;
+      const updated = await tx.user.updateMany({
+        where: {
+          id: userId,
+          [balanceField]: { gte: totalPrice },
+        },
         data: {
-          [data.paymentMethod]: { decrement: totalPrice },
+          [balanceField]: { decrement: totalPrice },
         },
       });
+
+      if (updated.count === 0) {
+        throw new AppError(
+          `Not enough ${data.paymentMethod}`,
+          400,
+          'INSUFFICIENT_BALANCE'
+        );
+      }
 
       // Add to inventory
       const userGift = await tx.userGift.upsert({
