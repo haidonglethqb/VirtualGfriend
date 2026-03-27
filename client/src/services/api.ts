@@ -23,6 +23,8 @@ class ApiClient {
   private baseUrl: string;
   private refreshPromise: Promise<boolean> | null = null;
   private tokenSyncChannel: BroadcastChannel | null = null;
+  // Callback registered by auth-store to keep Zustand in-memory state in sync with localStorage
+  onTokenRefreshed: ((token: string, user?: unknown) => void) | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -179,6 +181,9 @@ class ApiClient {
           if (newUser) parsed.state.user = newUser;
           localStorage.setItem('vgfriend-auth', JSON.stringify(parsed));
         }
+        
+        // Update in-memory Zustand state so reactive components get the new token immediately
+        this.onTokenRefreshed?.(newToken, newUser);
         
         // Broadcast to other tabs so they get the new token immediately
         this.broadcastTokenUpdate(newToken, newUser);

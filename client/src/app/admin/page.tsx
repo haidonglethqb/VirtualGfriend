@@ -3,343 +3,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Users, MessageSquare, Heart, Coins, Shield, LogOut, Search,
-  ChevronLeft, ChevronRight, Edit2, Trash2, Key, RefreshCw,
-  TrendingUp, Crown, Sparkles, LayoutDashboard, Settings,
-  Target, Image, Gift, Brain, Bell, Database, BarChart3,
-  Plus, X, Check, AlertTriangle, Megaphone, Server, HardDrive,
-  Zap, Clock, Activity, Languages,
+  Users, MessageSquare, Heart, Coins, Shield, LogOut,
+  Crown, Sparkles, LayoutDashboard, Settings,
+  Target, Image, BarChart3, Check, AlertTriangle,
+  Megaphone, Server, Languages,
 } from 'lucide-react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
-import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import { TierConfigTab } from './tier-config-tab';
 import { useLanguageStore } from '@/store/language-store';
-
-ChartJS.register(
-  CategoryScale, LinearScale, BarElement, LineElement,
-  PointElement, ArcElement, Title, Tooltip, Legend, Filler,
-);
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-type TabType = 'dashboard' | 'users' | 'characters' | 'messages' | 'quests' | 'templates' | 'analytics' | 'system' | 'tier-configs';
-
-interface User {
-  id: string;
-  email: string;
-  username: string;
-  displayName: string | null;
-  avatar: string | null;
-  isEmailVerified: boolean;
-  isPremium: boolean;
-  premiumTier: string | null;
-  coins: number;
-  gems: number;
-  streak: number;
-  createdAt: string;
-  lastLoginAt: string | null;
-}
-
-interface Character {
-  id: string;
-  name: string;
-  nickname: string | null;
-  gender: string;
-  personality: string;
-  level: number;
-  affection: number;
-  isActive: boolean;
-  createdAt: string;
-  user: { email: string; username: string };
-}
-
-interface Message {
-  id: string;
-  role: string;
-  content: string;
-  createdAt: string;
-  user: { email: string; username: string };
-  character: { name: string } | null;
-}
-
-interface Quest {
-  id: string;
-  title: string;
-  description: string;
-  type: string;
-  category: string;
-  rewardCoins: number;
-  rewardGems: number;
-  rewardXp: number;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-interface Template {
-  id: string;
-  name: string;
-  description: string;
-  avatarUrl: string;
-  gender: string;
-  personality: string;
-  style?: string;
-  isDefault?: boolean;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-interface TemplateFormData {
-  name: string;
-  description: string;
-  avatarUrl: string;
-  gender: string;
-  personality: string;
-  style: string;
-  isDefault: boolean;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-interface Stats {
-  totalUsers: number;
-  premiumUsers: number;
-  totalCharacters: number;
-  totalMessages: number;
-  activeUsersToday: number;
-  newUsersToday: number;
-  premiumRate: string;
-}
-
-interface SystemInfo {
-  databaseSize: string;
-  databaseSizeBytes?: number;
-  tables: { name: string; rows: number; seqScan?: number; idxScan?: number; deadRows?: number }[];
-  nodeVersion: string;
-  uptime: number;
-  memoryUsage: { heapUsed: number; heapTotal: number; rss: number };
-  filtersApplied?: { windowMinutes: number; tableLimit: number; from: string; to: string };
-  connections?: { total: number; active: number; idle: number };
-  dbPerformance?: { commits: number; rollbacks: number; cacheHitRate: number };
-  realtimeActivity?: { messages: number; newUsers: number; notifications: number; activeUsers: number; monitoringEvents: number };
-  requestStats?: Array<{ path: string; method: string; requests: number; avgDurationMs: number; p95DurationMs: number }>;
-  errorStats?: Array<{ severity: string; count: number }>;
-}
-
-interface AnalyticsData {
-  dailyStats: Array<{ date: string; new_users: number; messages: number; active_users: number }>;
-  messageStats: Array<{ date: string; count: number }>;
-  topUsers: Array<{
-    id: string;
-    username: string | null;
-    displayName: string | null;
-    email: string;
-    messageCount: number;
-    coins?: number;
-    gems?: number;
-    streak?: number;
-    premiumTier?: string;
-    isEmailVerified?: boolean;
-    lastActiveAt?: string | null;
-    lastMessageAt?: string | null;
-  }>;
-  premiumDistribution: Array<{ premiumTier: string; _count: number }>;
-  summary?: {
-    totalUsers: number;
-    newUsers: number;
-    activeUsers: number;
-    totalMessages: number;
-    premiumUsers: number;
-    premiumRate: number;
-    avgMessagesPerActiveUser: number;
-    returningUsers: number;
-    churnRiskUsers: number;
-    activeNow: number;
-  };
-  filtersApplied?: {
-    from: string;
-    to: string;
-    groupBy: 'day' | 'week' | 'month';
-    premiumTier: 'ALL' | 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE';
-    userSegment: 'all' | 'new' | 'returning';
-    verified: 'all' | 'verified' | 'unverified';
-    messageRole: 'ALL' | 'USER' | 'AI' | 'SYSTEM';
-    topLimit: number;
-    minMessageCount: number;
-    sortBy: 'messages' | 'coins' | 'gems' | 'streak' | 'lastActiveAt';
-  };
-}
-
-interface Pagination {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
-
-// Chart.js dark theme defaults
-const chartDefaults = {
-  color: '#9ca3af',
-  borderColor: 'rgba(255,255,255,0.06)',
-};
-
-function formatAnalyticsBucketLabel(bucket: string): string {
-  const parts = bucket.split('-').map((part) => Number(part));
-  const [year, month, day] = parts;
-  if (!year || !month || !day) return bucket;
-  return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`;
-}
-
-const createTemplateFormData = (template?: Template): TemplateFormData => ({
-  name: template?.name || '',
-  description: template?.description || '',
-  avatarUrl: template?.avatarUrl || '',
-  gender: template?.gender || 'FEMALE',
-  personality: template?.personality || 'caring',
-  style: template?.style || 'anime',
-  isDefault: Boolean(template?.isDefault),
-  isActive: template?.isActive ?? true,
-  sortOrder: template?.sortOrder ?? 0,
-});
-
-const ADMIN_I18N = {
-  vi: {
-    loginTitle: 'Trang Quản Trị',
-    loginSubtitle: 'Hệ thống quản lý Amoura',
-    username: 'Tên đăng nhập',
-    password: 'Mật khẩu',
-    loginButton: 'Đăng nhập',
-    loggingIn: 'Đang đăng nhập...',
-    tabs: {
-      dashboard: 'Tổng quan',
-      users: 'Người dùng',
-      characters: 'Nhân vật',
-      messages: 'Tin nhắn',
-      quests: 'Nhiệm vụ',
-      templates: 'Mẫu nhân vật',
-      analytics: 'Phân tích',
-      system: 'Hệ thống',
-      tierConfigs: 'Cấu hình VIP',
-    },
-    broadcast: 'Thông báo',
-    giveCoinsAll: 'Tặng xu (tất cả)',
-    giveGemsAll: 'Tặng ngọc (tất cả)',
-    logout: 'Đăng xuất',
-    languageTitle: 'Ngôn ngữ',
-  },
-  en: {
-    loginTitle: 'Admin Panel',
-    loginSubtitle: 'Amoura Management System',
-    username: 'Username',
-    password: 'Password',
-    loginButton: 'Login',
-    loggingIn: 'Logging in...',
-    tabs: {
-      dashboard: 'Dashboard',
-      users: 'Users',
-      characters: 'Characters',
-      messages: 'Messages',
-      quests: 'Quests',
-      templates: 'Templates',
-      analytics: 'Analytics',
-      system: 'System',
-      tierConfigs: 'VIP Config',
-    },
-    broadcast: 'Broadcast',
-    giveCoinsAll: 'Give Coins (All)',
-    giveGemsAll: 'Give Gems (All)',
-    logout: 'Logout',
-    languageTitle: 'Language',
-  },
-} as const;
-
-// Pagination Controls Component
-function PaginationControls({ 
-  pagination, 
-  setPagination,
-  language,
-}: { 
-  pagination: Pagination; 
-  setPagination: React.Dispatch<React.SetStateAction<Pagination>>;
-  language: 'vi' | 'en';
-}) {
-  const isVi = language === 'vi';
-  return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700/50">
-      <p className="text-sm text-gray-400">
-        {isVi ? 'Hiển thị' : 'Showing'} {Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total)} {isVi ? 'đến' : 'to'}{' '}
-        {Math.min(pagination.page * pagination.limit, pagination.total)} {isVi ? 'trong tổng số' : 'of'} {pagination.total}
-      </p>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
-          disabled={pagination.page === 1}
-          className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <span className="px-4 py-2 bg-gray-700/50 rounded-lg">
-          {pagination.page} / {pagination.totalPages || 1}
-        </span>
-        <button
-          onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
-          disabled={pagination.page >= pagination.totalPages}
-          className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// Modal Component
-function Modal({ 
-  title, 
-  onClose, 
-  children 
-}: { 
-  title: string; 
-  onClose: () => void; 
-  children: React.ReactNode 
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-gray-800 rounded-2xl p-6 max-w-md w-full border border-gray-700"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold">{title}</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        {children}
-      </motion.div>
-    </motion.div>
-  );
-}
+import { API_URL, ADMIN_I18N, createTemplateFormData } from './admin-types';
+import type { TabType, User, Character, Message, Quest, Template, Stats, SystemInfo, AnalyticsData, Pagination } from './admin-types';
+import { DashboardTab } from './tabs/admin-dashboard-tab';
+import { UsersTab } from './tabs/admin-users-tab';
+import { CharactersTab } from './tabs/admin-characters-tab';
+import { MessagesTab } from './tabs/admin-messages-tab';
+import { QuestsTab } from './tabs/admin-quests-tab';
+import { TemplatesTab } from './tabs/admin-templates-tab';
+import { AnalyticsTab } from './tabs/admin-analytics-tab';
+import { SystemTab } from './tabs/admin-system-tab';
+// Side-effectful import: registers Chart.js components used by analytics tab
 
 export default function AdminPage() {
   const { language, toggleLanguage } = useLanguageStore();
@@ -1109,1291 +790,194 @@ export default function AdminPage() {
       </aside>
 
       {/* Main Content */}
+
       <main className="ml-64 p-8">
+
         <AnimatePresence mode="wait">
-          {/* DASHBOARD */}
+
           {activeTab === 'dashboard' && stats && (
+
             <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <h2 className="text-2xl font-bold mb-6">{tr('Tổng quan', 'Dashboard')}</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                {[
-                  { label: tr('Tổng người dùng', 'Total Users'), value: stats.totalUsers, icon: Users, color: 'blue' },
-                  { label: tr('Người dùng Premium', 'Premium Users'), value: stats.premiumUsers, icon: Crown, color: 'yellow' },
-                  { label: tr('Nhân vật', 'Characters'), value: stats.totalCharacters, icon: Heart, color: 'pink' },
-                  { label: tr('Tin nhắn', 'Messages'), value: stats.totalMessages, icon: MessageSquare, color: 'green' },
-                ].map((stat, i) => (
-                  <div key={i} className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                    <div className="flex items-center justify-between mb-4">
-                      <stat.icon className={`w-8 h-8 text-${stat.color}-400`} />
-                      <span className="text-2xl font-bold">{stat.value.toLocaleString()}</span>
-                    </div>
-                    <p className="text-gray-400">{stat.label}</p>
-                  </div>
-                ))}
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-5 h-5 text-green-400" />
-                    <span className="text-gray-400">{tr('Hoạt động hôm nay', 'Active Today')}</span>
-                  </div>
-                  <p className="text-3xl font-bold">{stats.activeUsersToday}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-5 h-5 text-purple-400" />
-                    <span className="text-gray-400">{tr('Người dùng mới hôm nay', 'New Users Today')}</span>
-                  </div>
-                  <p className="text-3xl font-bold">{stats.newUsersToday}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Crown className="w-5 h-5 text-yellow-400" />
-                    <span className="text-gray-400">{tr('Tỷ lệ Premium', 'Premium Rate')}</span>
-                  </div>
-                  <p className="text-3xl font-bold">{stats.premiumRate}%</p>
-                </div>
-              </div>
+              <DashboardTab stats={stats} language={language} />
+
             </motion.div>
+
           )}
 
-          {/* USERS */}
           {activeTab === 'users' && (
+
             <motion.div key="users" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">{tr('Quản lý người dùng', 'Users Management')}</h2>
-                <button onClick={fetchUsers} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
-                  <RefreshCw className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="mb-6">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setPagination(p => ({ ...p, page: 1 })); }}
-                    placeholder={tr('Tìm theo email, tên người dùng...', 'Search by email, username...')}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-              </div>
+              <UsersTab
 
-              <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-700/50">
-                    <tr>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Người dùng', 'User')}</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">Email</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">Premium</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Xu', 'Coins')}</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Ngọc', 'Gems')}</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Thao tác', 'Actions')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map((user) => (
-                      <tr key={user.id} className="border-t border-gray-700/50 hover:bg-gray-700/30">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-medium">
-                              {(user.displayName || user.username || 'U')[0].toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-medium">{user.displayName || user.username}</p>
-                              <p className="text-sm text-gray-400">@{user.username}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-gray-300">{user.email}</td>
-                        <td className="px-6 py-4 text-center">
-                          {user.isPremium ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-sm">
-                              <Crown className="w-3 h-3" />
-                              {user.premiumTier || 'Premium'}
-                            </span>
-                          ) : (
-                            <span className="text-gray-500">{tr('Miễn phí', 'Free')}</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center text-yellow-400">{user.coins}</td>
-                        <td className="px-6 py-4 text-center text-purple-400">{user.gems}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => {
-                                setSelectedItem(user);
-                                setFormData({ coins: user.coins, gems: user.gems, isPremium: user.isPremium });
-                                setShowModal('editUser');
-                              }}
-                              className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30"
-                              title={tr('Sửa', 'Edit')}
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleResetPassword(user.id)}
-                              className="p-2 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30"
-                              title={tr('Đặt lại mật khẩu', 'Reset Password')}
-                            >
-                              <Key className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleGiveRewards(user.id)}
-                              className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
-                              title={tr('Tặng thưởng', 'Give Rewards')}
-                            >
-                              <Gift className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <PaginationControls pagination={pagination} setPagination={setPagination} language={language} />
-              </div>
+                users={users} pagination={pagination} setPagination={setPagination}
+
+                searchQuery={searchQuery} setSearchQuery={setSearchQuery} language={language}
+
+                fetchUsers={fetchUsers} formData={formData} setFormData={setFormData}
+
+                showModal={showModal} setShowModal={setShowModal}
+
+                selectedItem={selectedItem} setSelectedItem={setSelectedItem}
+
+                handleUpdateUser={handleUpdateUser} handleResetPassword={handleResetPassword}
+
+                handleGiveRewards={handleGiveRewards} actionLoading={actionLoading}
+
+              />
+
             </motion.div>
+
           )}
 
-          {/* CHARACTERS */}
           {activeTab === 'characters' && (
+
             <motion.div key="characters" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">{tr('Quản lý nhân vật', 'Characters Management')}</h2>
-                <button onClick={fetchCharacters} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
-                  <RefreshCw className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-700/50">
-                    <tr>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Nhân vật', 'Character')}</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Chủ sở hữu', 'Owner')}</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Cấp độ', 'Level')}</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Độ thân mật', 'Affection')}</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Trạng thái', 'Status')}</th>
-                      <th className="text-center px-6 py-4 text-gray-400 font-medium">{tr('Thao tác', 'Actions')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {characters.map((char) => (
-                      <tr key={char.id} className="border-t border-gray-700/50 hover:bg-gray-700/30">
-                        <td className="px-6 py-4">
-                          <div>
-                            <p className="font-medium">{char.name}</p>
-                            <p className="text-sm text-gray-400">{char.personality} • {char.gender}</p>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-gray-300">{char.user.email}</td>
-                        <td className="px-6 py-4 text-center">{char.level}</td>
-                        <td className="px-6 py-4 text-center text-pink-400">{char.affection}%</td>
-                        <td className="px-6 py-4 text-center">
-                          <span className={`px-2 py-1 rounded-full text-sm ${char.isActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                            {char.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => handleDeleteCharacter(char.id)}
-                            className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
-                            title={tr('Xóa', 'Delete')}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <PaginationControls pagination={pagination} setPagination={setPagination} language={language} />
-              </div>
+              <CharactersTab
+
+                characters={characters} pagination={pagination} setPagination={setPagination}
+
+                language={language} fetchCharacters={fetchCharacters}
+
+                handleDeleteCharacter={handleDeleteCharacter}
+
+              />
+
             </motion.div>
+
           )}
 
-          {/* MESSAGES */}
           {activeTab === 'messages' && (
+
             <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">{tr('Tin nhắn', 'Messages')} ({pagination.total.toLocaleString()})</h2>
-                <button onClick={fetchMessages} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
-                  <RefreshCw className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-700/50">
-                    <tr>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Người dùng', 'User')}</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Nhân vật', 'Character')}</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Vai trò', 'Role')}</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Nội dung', 'Content')}</th>
-                      <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Ngày', 'Date')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {messages.map((msg) => (
-                      <tr key={msg.id} className="border-t border-gray-700/50 hover:bg-gray-700/30">
-                        <td className="px-6 py-4 text-gray-300">{msg.user.email}</td>
-                        <td className="px-6 py-4 text-gray-300">{msg.character?.name || '-'}</td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded text-xs ${msg.role === 'user' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
-                            {msg.role}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-gray-300 max-w-md truncate">{msg.content}</td>
-                        <td className="px-6 py-4 text-gray-400 text-sm">{new Date(msg.createdAt).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <PaginationControls pagination={pagination} setPagination={setPagination} language={language} />
-              </div>
+              <MessagesTab
+
+                messages={messages} pagination={pagination} setPagination={setPagination}
+
+                language={language} fetchMessages={fetchMessages}
+
+              />
+
             </motion.div>
+
           )}
 
-          {/* QUESTS */}
           {activeTab === 'quests' && (
+
             <motion.div key="quests" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">{tr('Quản lý nhiệm vụ', 'Quests Management')}</h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { setFormData({}); setShowModal('createQuest'); }}
-                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" /> {tr('Tạo nhiệm vụ', 'Create Quest')}
-                  </button>
-                  <button onClick={fetchQuests} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
-                    <RefreshCw className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
 
-              <div className="grid gap-4">
-                {['DAILY', 'WEEKLY', 'ACHIEVEMENT'].map((type) => (
-                  <div key={type} className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
-                    <h3 className="text-lg font-semibold mb-4 text-purple-400">{type} {tr('Nhiệm vụ', 'Quests')}</h3>
-                    <div className="grid gap-3">
-                      {quests.filter(q => q.type === type).map((quest) => (
-                        <div key={quest.id} className="flex items-center justify-between p-4 bg-gray-700/30 rounded-xl">
-                          <div>
-                            <p className="font-medium">{quest.title}</p>
-                            <p className="text-sm text-gray-400">{quest.description}</p>
-                            <div className="flex gap-2 mt-2">
-                              {quest.rewardCoins > 0 && <span className="text-yellow-400 text-sm">{quest.rewardCoins} {tr('xu', 'coins')}</span>}
-                              {quest.rewardGems > 0 && <span className="text-purple-400 text-sm">{quest.rewardGems} {tr('ngọc', 'gems')}</span>}
-                              {quest.rewardXp > 0 && <span className="text-blue-400 text-sm">{quest.rewardXp} XP</span>}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded text-xs ${quest.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                              {quest.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
-                            </span>
-                            <button
-                              onClick={() => handleToggleQuest(quest.id)}
-                              className="p-2 bg-gray-600/50 rounded-lg hover:bg-gray-600"
-                            >
-                              <Zap className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <QuestsTab
+
+                quests={quests} language={language} fetchQuests={fetchQuests}
+
+                handleToggleQuest={handleToggleQuest} handleCreateQuest={handleCreateQuest}
+
+                formData={formData} setFormData={setFormData}
+
+                showModal={showModal} setShowModal={setShowModal} actionLoading={actionLoading}
+
+              />
+
             </motion.div>
+
           )}
 
-          {/* TEMPLATES */}
           {activeTab === 'templates' && (
+
             <motion.div key="templates" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">{tr('Mẫu nhân vật', 'Character Templates')}</h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedTemplate(null);
-                      setFormData({ ...createTemplateFormData() });
-                      setShowModal('createTemplate');
-                    }}
-                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" /> {tr('Thêm mẫu', 'Add Template')}
-                  </button>
-                  <button onClick={fetchTemplates} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
-                    <RefreshCw className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {templates.map((template) => (
-                  <div key={template.id} className="bg-gray-800/50 rounded-2xl border border-gray-700/50 overflow-hidden">
-                    {template.avatarUrl && (
-                      <div className="h-48 bg-gray-700">
-                        <img src={template.avatarUrl} alt={template.name} className="w-full h-full object-cover" />
-                      </div>
-                    )}
-                    <div className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold">{template.name}</h3>
-                        <span className={`px-2 py-1 rounded text-xs ${template.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {template.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-400 mb-3">{template.description}</p>
-                      <div className="flex items-center justify-between text-sm text-gray-500">
-                        <span>{template.gender} • {template.personality} • #{template.sortOrder}</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedTemplate(template);
-                              setFormData({ ...createTemplateFormData(template) });
-                              setShowModal('editTemplate');
-                            }}
-                            className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30"
-                            title={tr('Sửa', 'Edit')}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTemplate(template.id)}
-                            className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
-                            title={tr('Xóa', 'Delete')}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleToggleTemplate(template.id)}
-                            className="p-2 bg-gray-600/50 rounded-lg hover:bg-gray-600"
-                            title={tr('Bật/tắt', 'Toggle')}
-                          >
-                            <Zap className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <TemplatesTab
+
+                templates={templates} language={language} fetchTemplates={fetchTemplates}
+
+                handleToggleTemplate={handleToggleTemplate} handleCreateTemplate={handleCreateTemplate}
+
+                handleUpdateTemplate={handleUpdateTemplate} handleDeleteTemplate={handleDeleteTemplate}
+
+                formData={formData} setFormData={setFormData}
+
+                showModal={showModal} setShowModal={setShowModal}
+
+                selectedTemplate={selectedTemplate} setSelectedTemplate={setSelectedTemplate}
+
+                createTemplateFormData={createTemplateFormData} actionLoading={actionLoading}
+
+              />
+
             </motion.div>
+
           )}
 
-          {/* ANALYTICS */}
           {activeTab === 'analytics' && (
+
             <motion.div key="analytics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">{tr('Bảng điều khiển phân tích', 'Analytics Dashboard')}</h2>
-                <button onClick={() => fetchAnalytics()} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
-                  <RefreshCw className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-                <select
-                  value={analyticsDays}
-                  onChange={(e) => setAnalyticsDays(Number(e.target.value))}
-                  className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm"
-                >
-                  <option value={7}>{tr('7 ngày', '7 days')}</option>
-                  <option value={14}>{tr('14 ngày', '14 days')}</option>
-                  <option value={30}>{tr('30 ngày', '30 days')}</option>
-                  <option value={90}>{tr('90 ngày', '90 days')}</option>
-                  <option value={180}>{tr('180 ngày', '180 days')}</option>
-                </select>
-                <select value={analyticsGroupBy} onChange={(e) => setAnalyticsGroupBy(e.target.value as 'day' | 'week' | 'month')} className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm">
-                  <option value="day">{tr('Nhóm theo ngày', 'Group by day')}</option>
-                  <option value="week">{tr('Nhóm theo tuần', 'Group by week')}</option>
-                  <option value="month">{tr('Nhóm theo tháng', 'Group by month')}</option>
-                </select>
-                <select value={analyticsPremiumTier} onChange={(e) => setAnalyticsPremiumTier(e.target.value as 'ALL' | 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE')} className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm">
-                  <option value="ALL">{tr('Mọi gói', 'All tiers')}</option>
-                  <option value="FREE">FREE</option>
-                  <option value="BASIC">BASIC</option>
-                  <option value="PRO">PRO</option>
-                  <option value="ULTIMATE">ULTIMATE</option>
-                </select>
-                <select value={analyticsUserSegment} onChange={(e) => setAnalyticsUserSegment(e.target.value as 'all' | 'new' | 'returning')} className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm">
-                  <option value="all">{tr('Mọi nhóm người dùng', 'All user segments')}</option>
-                  <option value="new">{tr('Người dùng mới', 'New users')}</option>
-                  <option value="returning">{tr('Người dùng quay lại', 'Returning users')}</option>
-                </select>
-                <button
-                  onClick={() => fetchAnalytics()}
-                  className="px-3 py-2 bg-purple-500 rounded-xl text-white text-sm hover:bg-purple-600"
-                >
-                  {tr('Áp dụng filter', 'Apply filters')}
-                </button>
-              </div>
+              <AnalyticsTab
 
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-                <select value={analyticsVerified} onChange={(e) => setAnalyticsVerified(e.target.value as 'all' | 'verified' | 'unverified')} className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm">
-                  <option value="all">{tr('Mọi trạng thái email', 'All email status')}</option>
-                  <option value="verified">{tr('Đã xác minh email', 'Verified email')}</option>
-                  <option value="unverified">{tr('Chưa xác minh email', 'Unverified email')}</option>
-                </select>
-                <select value={analyticsMessageRole} onChange={(e) => setAnalyticsMessageRole(e.target.value as 'ALL' | 'USER' | 'AI' | 'SYSTEM')} className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm">
-                  <option value="ALL">{tr('Mọi loại tin nhắn', 'All message roles')}</option>
-                  <option value="USER">USER</option>
-                  <option value="AI">AI</option>
-                  <option value="SYSTEM">SYSTEM</option>
-                </select>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={analyticsTopLimit}
-                  onChange={(e) => setAnalyticsTopLimit(Math.min(100, Math.max(1, Number(e.target.value) || 10)))}
-                  className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm"
-                  placeholder={tr('Top N người dùng', 'Top N users')}
-                />
-                <select value={analyticsSortBy} onChange={(e) => setAnalyticsSortBy(e.target.value as 'messages' | 'coins' | 'gems' | 'streak' | 'lastActiveAt')} className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm">
-                  <option value="messages">{tr('Sắp xếp theo tin nhắn', 'Sort by messages')}</option>
-                  <option value="coins">{tr('Sắp xếp theo xu', 'Sort by coins')}</option>
-                  <option value="gems">{tr('Sắp xếp theo ngọc', 'Sort by gems')}</option>
-                  <option value="streak">{tr('Sắp xếp theo streak', 'Sort by streak')}</option>
-                  <option value="lastActiveAt">{tr('Sắp xếp theo hoạt động gần nhất', 'Sort by last active')}</option>
-                </select>
-                <input
-                  type="number"
-                  min={0}
-                  value={analyticsMinMessageCount}
-                  onChange={(e) => setAnalyticsMinMessageCount(Math.max(0, Number(e.target.value) || 0))}
-                  className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm"
-                  placeholder={tr('Tin nhắn tối thiểu', 'Min messages')}
-                />
-              </div>
+                analytics={analytics} analyticsDays={analyticsDays} setAnalyticsDays={setAnalyticsDays}
 
-              {!analytics ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Summary Stats Cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-                      <p className="text-sm text-gray-400 mb-1">{tr('Người dùng mới', 'New Users')} ({analyticsDays}{tr(' ngày', 'd')})</p>
-                      <p className="text-2xl font-bold text-blue-400">
-                        {analytics.summary?.newUsers ?? analytics.dailyStats.reduce((acc, d) => acc + d.new_users, 0)}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-                      <p className="text-sm text-gray-400 mb-1">{tr('Tin nhắn', 'Messages')} ({analyticsDays}{tr(' ngày', 'd')})</p>
-                      <p className="text-2xl font-bold text-green-400">
-                        {(analytics.summary?.totalMessages ?? analytics.messageStats.reduce((acc, d) => acc + d.count, 0)).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-                      <p className="text-sm text-gray-400 mb-1">{tr('TB tin nhắn/ngày', 'Avg Messages/Day')}</p>
-                      <p className="text-2xl font-bold text-purple-400">
-                        {analytics.messageStats.length > 0
-                          ? Math.round(analytics.messageStats.reduce((acc, d) => acc + d.count, 0) / analytics.messageStats.length).toLocaleString()
-                          : 0}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-                      <p className="text-sm text-gray-400 mb-1">{tr('TB người dùng hoạt động/ngày', 'Avg Active Users/Day')}</p>
-                      <p className="text-2xl font-bold text-amber-400">
-                        {analytics.dailyStats.length > 0
-                          ? Math.round(analytics.dailyStats.reduce((acc, d) => acc + (d.active_users || 0), 0) / analytics.dailyStats.length)
-                          : 0}
-                      </p>
-                    </div>
-                  </div>
+                analyticsGroupBy={analyticsGroupBy} setAnalyticsGroupBy={setAnalyticsGroupBy}
 
-                  {analytics.summary && (
-                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                      <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50">
-                        <p className="text-xs text-gray-400">{tr('Tổng user trong scope', 'Total users in scope')}</p>
-                        <p className="text-xl font-bold text-white">{analytics.summary.totalUsers.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50">
-                        <p className="text-xs text-gray-400">{tr('Returning users', 'Returning users')}</p>
-                        <p className="text-xl font-bold text-emerald-400">{analytics.summary.returningUsers.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50">
-                        <p className="text-xs text-gray-400">{tr('Premium rate', 'Premium rate')}</p>
-                        <p className="text-xl font-bold text-yellow-400">{analytics.summary.premiumRate}%</p>
-                      </div>
-                      <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50">
-                        <p className="text-xs text-gray-400">{tr('Churn risk users', 'Churn risk users')}</p>
-                        <p className="text-xl font-bold text-red-400">{analytics.summary.churnRiskUsers.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50">
-                        <p className="text-xs text-gray-400">{tr('Hoạt động 15 phút gần nhất', 'Active in last 15 minutes')}</p>
-                        <p className="text-xl font-bold text-cyan-400">{analytics.summary.activeNow.toLocaleString()}</p>
-                      </div>
-                    </div>
-                  )}
+                analyticsPremiumTier={analyticsPremiumTier} setAnalyticsPremiumTier={setAnalyticsPremiumTier}
 
-                  {/* User Growth & Messages - Combined Line Chart */}
-                  <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-blue-400" />
-                      {tr('Đăng ký người dùng và tin nhắn', 'User Registrations & Messages')}
-                    </h3>
-                    <div className="h-72">
-                      <Line
-                        data={{
-                          labels: analytics.dailyStats.map(d => {
-                            return formatAnalyticsBucketLabel(d.date);
-                          }),
-                          datasets: [
-                            {
-                              label: tr('Người dùng mới', 'New Users'),
-                              data: analytics.dailyStats.map(d => d.new_users),
-                              borderColor: '#3b82f6',
-                              backgroundColor: 'rgba(59,130,246,0.1)',
-                              fill: true,
-                              tension: 0.4,
-                              pointRadius: 3,
-                              pointHoverRadius: 6,
-                              yAxisID: 'y',
-                            },
-                            {
-                              label: tr('Tin nhắn', 'Messages'),
-                              data: analytics.dailyStats.map(d => d.messages),
-                              borderColor: '#22c55e',
-                              backgroundColor: 'rgba(34,197,94,0.1)',
-                              fill: true,
-                              tension: 0.4,
-                              pointRadius: 3,
-                              pointHoverRadius: 6,
-                              yAxisID: 'y1',
-                            },
-                          ],
-                        }}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          interaction: { mode: 'index', intersect: false },
-                          plugins: {
-                            legend: { labels: { color: chartDefaults.color, usePointStyle: true, padding: 20 } },
-                            tooltip: {
-                              backgroundColor: '#1f2937',
-                              titleColor: '#fff',
-                              bodyColor: '#9ca3af',
-                              borderColor: '#374151',
-                              borderWidth: 1,
-                              padding: 12,
-                            },
-                          },
-                          scales: {
-                            x: { ticks: { color: chartDefaults.color }, grid: { color: chartDefaults.borderColor } },
-                            y: {
-                              type: 'linear', position: 'left',
-                              title: { display: true, text: tr('Người dùng mới', 'New Users'), color: '#3b82f6' },
-                              ticks: { color: '#3b82f6' },
-                              grid: { color: chartDefaults.borderColor },
-                              beginAtZero: true,
-                            },
-                            y1: {
-                              type: 'linear', position: 'right',
-                              title: { display: true, text: tr('Tin nhắn', 'Messages'), color: '#22c55e' },
-                              ticks: { color: '#22c55e' },
-                              grid: { drawOnChartArea: false },
-                              beginAtZero: true,
-                            },
-                          },
-                        }}
-                      />
-                    </div>
-                  </div>
+                analyticsUserSegment={analyticsUserSegment} setAnalyticsUserSegment={setAnalyticsUserSegment}
 
-                  {/* Active Users Bar Chart */}
-                  <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <Activity className="w-5 h-5 text-amber-400" />
-                      {tr('Người dùng hoạt động theo ngày', 'Daily Active Users')}
-                    </h3>
-                    <div className="h-64">
-                      <Bar
-                        data={{
-                          labels: analytics.dailyStats.map(d => {
-                            return formatAnalyticsBucketLabel(d.date);
-                          }),
-                          datasets: [{
-                            label: tr('Người dùng hoạt động', 'Active Users'),
-                            data: analytics.dailyStats.map(d => d.active_users || 0),
-                            backgroundColor: 'rgba(251,191,36,0.6)',
-                            borderColor: '#fbbf24',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                          }],
-                        }}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                              backgroundColor: '#1f2937',
-                              titleColor: '#fff',
-                              bodyColor: '#9ca3af',
-                              borderColor: '#374151',
-                              borderWidth: 1,
-                            },
-                          },
-                          scales: {
-                            x: { ticks: { color: chartDefaults.color }, grid: { color: chartDefaults.borderColor } },
-                            y: { ticks: { color: chartDefaults.color }, grid: { color: chartDefaults.borderColor }, beginAtZero: true },
-                          },
-                        }}
-                      />
-                    </div>
-                  </div>
+                analyticsVerified={analyticsVerified} setAnalyticsVerified={setAnalyticsVerified}
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Premium Distribution - Doughnut */}
-                    <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-purple-400" />
-                        {tr('Phân bố gói Premium', 'Premium Distribution')}
-                      </h3>
-                      {analytics.premiumDistribution.length > 0 ? (
-                        <div className="h-64 flex items-center justify-center">
-                          <Doughnut
-                            data={{
-                              labels: analytics.premiumDistribution.map(t => t.premiumTier),
-                              datasets: [{
-                                data: analytics.premiumDistribution.map(t => t._count),
-                                backgroundColor: [
-                                  'rgba(107,114,128,0.7)',  // FREE - gray
-                                  'rgba(59,130,246,0.7)',   // BASIC - blue
-                                  'rgba(168,85,247,0.7)',   // PRO - purple
-                                  'rgba(251,191,36,0.7)',   // ULTIMATE - yellow
-                                ],
-                                borderColor: [
-                                  '#6b7280',
-                                  '#3b82f6',
-                                  '#a855f7',
-                                  '#fbbf24',
-                                ],
-                                borderWidth: 2,
-                              }],
-                            }}
-                            options={{
-                              responsive: true,
-                              maintainAspectRatio: false,
-                              plugins: {
-                                legend: {
-                                  position: 'bottom',
-                                  labels: {
-                                    color: chartDefaults.color,
-                                    usePointStyle: true,
-                                    padding: 16,
-                                    font: { size: 13 },
-                                  },
-                                },
-                                tooltip: {
-                                  backgroundColor: '#1f2937',
-                                  titleColor: '#fff',
-                                  bodyColor: '#9ca3af',
-                                  borderColor: '#374151',
-                                  borderWidth: 1,
-                                  callbacks: {
-                                    label: (ctx: any) => {
-                                      const total = analytics.premiumDistribution.reduce((acc, t) => acc + t._count, 0);
-                                      const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0';
-                                      return language === 'vi'
-                                        ? ` ${ctx.label}: ${ctx.parsed} người dùng (${pct}%)`
-                                        : ` ${ctx.label}: ${ctx.parsed} users (${pct}%)`;
-                                    },
-                                  },
-                                },
-                              },
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 text-center py-4">{tr('Chưa có người dùng premium', 'No premium users yet')}</p>
-                      )}
-                    </div>
+                analyticsMessageRole={analyticsMessageRole} setAnalyticsMessageRole={setAnalyticsMessageRole}
 
-                    {/* Top Users */}
-                    <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Crown className="w-5 h-5 text-yellow-400" />
-                        {tr('Top người dùng theo số tin nhắn', 'Top Users by Messages')}
-                      </h3>
-                      <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {analytics.topUsers.map((user, idx) => (
-                          <div key={user.id} className="flex items-center justify-between p-3 bg-gray-700/30 rounded-xl">
-                            <div className="flex items-center gap-3">
-                              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                idx === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                                idx === 1 ? 'bg-gray-400/20 text-gray-300' :
-                                idx === 2 ? 'bg-orange-500/20 text-orange-400' :
-                                'bg-gray-600/30 text-gray-400'
-                              }`}>
-                                {idx + 1}
-                              </span>
-                              <div>
-                                <p className="font-medium text-sm">{user.displayName || user.username || tr('Ẩn danh', 'Anonymous')}</p>
-                                <p className="text-xs text-gray-400">{user.email}</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-bold text-purple-400">{user.messageCount.toLocaleString()}</p>
-                              <p className="text-xs text-gray-500">{tr('tin nhắn', 'messages')}</p>
-                            </div>
-                          </div>
-                        ))}
-                        {analytics.topUsers.length === 0 && (
-                          <p className="text-gray-500 text-center py-4">{tr('Không có dữ liệu', 'No data available')}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+                analyticsTopLimit={analyticsTopLimit} setAnalyticsTopLimit={setAnalyticsTopLimit}
+
+                analyticsSortBy={analyticsSortBy} setAnalyticsSortBy={setAnalyticsSortBy}
+
+                analyticsMinMessageCount={analyticsMinMessageCount} setAnalyticsMinMessageCount={setAnalyticsMinMessageCount}
+
+                fetchAnalytics={fetchAnalytics} language={language}
+
+              />
+
             </motion.div>
+
           )}
 
-          {/* SYSTEM */}
           {activeTab === 'system' && systemInfo && (
+
             <motion.div key="system" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">{tr('Thông tin hệ thống', 'System Information')}</h2>
-                <button onClick={fetchSystemInfo} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
-                  <RefreshCw className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-                <select
-                  value={systemWindowMinutes}
-                  onChange={(e) => setSystemWindowMinutes(Number(e.target.value))}
-                  className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm"
-                >
-                  <option value={15}>{tr('15 phút', '15 minutes')}</option>
-                  <option value={30}>{tr('30 phút', '30 minutes')}</option>
-                  <option value={60}>{tr('60 phút', '60 minutes')}</option>
-                  <option value={360}>{tr('6 giờ', '6 hours')}</option>
-                  <option value={1440}>{tr('24 giờ', '24 hours')}</option>
-                </select>
-                <input
-                  type="number"
-                  min={5}
-                  max={100}
-                  value={systemTableLimit}
-                  onChange={(e) => setSystemTableLimit(Math.min(100, Math.max(5, Number(e.target.value) || 20)))}
-                  className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm"
-                  placeholder={tr('Số bảng', 'Table limit')}
-                />
-                <button
-                  onClick={fetchSystemInfo}
-                  className="px-3 py-2 bg-purple-500 rounded-xl text-white text-sm hover:bg-purple-600"
-                >
-                  {tr('Cập nhật monitor', 'Refresh monitor')}
-                </button>
-                <div className="px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-xl text-xs text-gray-300 flex items-center">
-                  {tr('Window', 'Window')}: {systemInfo.filtersApplied?.windowMinutes || systemWindowMinutes}m
-                </div>
-              </div>
+              <SystemTab
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Database className="w-5 h-5 text-blue-400" />
-                    <span className="text-gray-400">{tr('Dung lượng cơ sở dữ liệu', 'Database Size')}</span>
-                  </div>
-                  <p className="text-2xl font-bold">{systemInfo.databaseSize}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-5 h-5 text-green-400" />
-                    <span className="text-gray-400">{tr('Thời gian hoạt động', 'Uptime')}</span>
-                  </div>
-                  <p className="text-2xl font-bold">{Math.floor(systemInfo.uptime / 3600)}h {Math.floor((systemInfo.uptime % 3600) / 60)}m</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <HardDrive className="w-5 h-5 text-purple-400" />
-                    <span className="text-gray-400">{tr('Bộ nhớ', 'Memory')}</span>
-                  </div>
-                  <p className="text-2xl font-bold">{Math.round(systemInfo.memoryUsage.heapUsed / 1024 / 1024)} MB</p>
-                </div>
-              </div>
+                systemInfo={systemInfo} systemWindowMinutes={systemWindowMinutes}
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50">
-                  <p className="text-xs text-gray-400 mb-1">{tr('Kết nối DB (active/total)', 'DB connections (active/total)')}</p>
-                  <p className="text-lg font-bold text-cyan-400">{systemInfo.connections?.active || 0}/{systemInfo.connections?.total || 0}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50">
-                  <p className="text-xs text-gray-400 mb-1">{tr('Cache hit rate', 'Cache hit rate')}</p>
-                  <p className="text-lg font-bold text-emerald-400">{systemInfo.dbPerformance?.cacheHitRate || 0}%</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50">
-                  <p className="text-xs text-gray-400 mb-1">{tr('Messages trong window', 'Messages in window')}</p>
-                  <p className="text-lg font-bold text-green-400">{(systemInfo.realtimeActivity?.messages || 0).toLocaleString()}</p>
-                </div>
-                <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50">
-                  <p className="text-xs text-gray-400 mb-1">{tr('Error events trong window', 'Error events in window')}</p>
-                  <p className="text-lg font-bold text-red-400">{(systemInfo.errorStats || []).reduce((sum, item) => sum + item.count, 0).toLocaleString()}</p>
-                </div>
-              </div>
+                setSystemWindowMinutes={setSystemWindowMinutes} systemTableLimit={systemTableLimit}
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <h3 className="font-semibold mb-4">{tr('Thống kê bảng dữ liệu', 'Table Statistics')}</h3>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {systemInfo.tables.map((table) => (
-                      <div key={table.name} className="flex justify-between p-2 bg-gray-700/30 rounded">
-                        <div>
-                          <p className="text-gray-300">{table.name}</p>
-                          <p className="text-xs text-gray-500">seq:{table.seqScan || 0} idx:{table.idxScan || 0} dead:{table.deadRows || 0}</p>
-                        </div>
-                        <span className="text-gray-400">{table.rows.toLocaleString()} {tr('dòng', 'rows')}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                setSystemTableLimit={setSystemTableLimit} fetchSystemInfo={fetchSystemInfo}
 
-                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <h3 className="font-semibold mb-4">{tr('Tác vụ dọn dẹp', 'Cleanup Actions')}</h3>
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => handleCleanup('expired_tokens')}
-                      disabled={actionLoading}
-                      className="w-full p-4 bg-gray-700/50 rounded-xl hover:bg-gray-700 text-left"
-                    >
-                      <p className="font-medium">{tr('Dọn token hết hạn', 'Clean Expired Tokens')}</p>
-                      <p className="text-sm text-gray-400">{tr('Xóa refresh token đã hết hạn hoặc bị thu hồi', 'Remove expired and revoked refresh tokens')}</p>
-                    </button>
-                    <button
-                      onClick={() => handleCleanup('old_messages')}
-                      disabled={actionLoading}
-                      className="w-full p-4 bg-gray-700/50 rounded-xl hover:bg-gray-700 text-left"
-                    >
-                      <p className="font-medium">{tr('Dọn tin nhắn cũ', 'Clean Old Messages')}</p>
-                      <p className="text-sm text-gray-400">{tr('Xóa tin nhắn cũ hơn 6 tháng (chỉ người dùng miễn phí)', 'Delete messages older than 6 months (free users only)')}</p>
-                    </button>
-                    <button
-                      onClick={() => handleCleanup('inactive_users')}
-                      disabled={actionLoading}
-                      className="w-full p-4 bg-gray-700/50 rounded-xl hover:bg-gray-700 text-left"
-                    >
-                      <p className="font-medium">{tr('Tìm người dùng không hoạt động', 'Find Inactive Users')}</p>
-                      <p className="text-sm text-gray-400">{tr('Liệt kê người dùng không hoạt động trên 90 ngày', 'List users inactive for 90+ days')}</p>
-                    </button>
-                    <button
-                      onClick={handleCleanupDuplicates}
-                      disabled={actionLoading}
-                      className="w-full p-4 bg-red-700/50 rounded-xl hover:bg-red-700 text-left"
-                    >
-                      <p className="font-medium">{tr('Dọn mẫu trùng lặp', 'Clean Duplicate Templates')}</p>
-                      <p className="text-sm text-gray-400">{tr('Xóa mẫu nhân vật trùng và chuyển nhân vật sang mẫu còn lại', 'Remove duplicate character templates and migrate characters')}</p>
-                    </button>
-                  </div>
-                </div>
-              </div>
+                handleCleanup={handleCleanup} handleCleanupDuplicates={handleCleanupDuplicates}
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <h3 className="font-semibold mb-4">{tr('Top request routes', 'Top request routes')}</h3>
-                  <div className="space-y-2 max-h-72 overflow-y-auto">
-                    {(systemInfo.requestStats || []).map((item, idx) => (
-                      <div key={`${item.path}-${item.method}-${idx}`} className="p-3 bg-gray-700/30 rounded-xl">
-                        <p className="text-sm text-white">{item.method} {item.path}</p>
-                        <p className="text-xs text-gray-400">
-                          {tr('Requests', 'Requests')}: {item.requests.toLocaleString()} | AVG: {item.avgDurationMs}ms | P95: {item.p95DurationMs}ms
-                        </p>
-                      </div>
-                    ))}
-                    {(systemInfo.requestStats || []).length === 0 && (
-                      <p className="text-sm text-gray-500">{tr('Chưa có dữ liệu request monitor', 'No request monitoring data yet')}</p>
-                    )}
-                  </div>
-                </div>
+                actionLoading={actionLoading} language={language}
 
-                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-                  <h3 className="font-semibold mb-4">{tr('Error severity phân bố', 'Error severity distribution')}</h3>
-                  <div className="space-y-2">
-                    {(systemInfo.errorStats || []).map((item) => (
-                      <div key={item.severity} className="flex items-center justify-between p-3 bg-gray-700/30 rounded-xl">
-                        <span className="text-sm text-gray-200 uppercase">{item.severity}</span>
-                        <span className="text-sm font-semibold text-red-400">{item.count.toLocaleString()}</span>
-                      </div>
-                    ))}
-                    {(systemInfo.errorStats || []).length === 0 && (
-                      <p className="text-sm text-gray-500">{tr('Không có lỗi trong window', 'No errors in current window')}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+              />
+
             </motion.div>
+
           )}
 
-          {/* TIER CONFIGS */}
           {activeTab === 'tier-configs' && (
+
             <motion.div key="tier-configs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+
               <TierConfigTab apiCall={apiCall} showToast={showToast} />
+
             </motion.div>
+
           )}
+
         </AnimatePresence>
+
       </main>
-
-      {/* Modals */}
-      <AnimatePresence>
-        {showModal === 'editUser' && selectedItem && (
-          <Modal title={tr('Chỉnh sửa người dùng', 'Edit User')} onClose={() => setShowModal(null)}>
-            <p className="text-gray-400 mb-4">{selectedItem.email}</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">{tr('Xu', 'Coins')}</label>
-                <input
-                  type="number"
-                  value={formData.coins as number || 0}
-                  onChange={(e) => setFormData({ ...formData, coins: Number(e.target.value) })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">{tr('Ngọc', 'Gems')}</label>
-                <input
-                  type="number"
-                  value={formData.gems as number || 0}
-                  onChange={(e) => setFormData({ ...formData, gems: Number(e.target.value) })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="isPremium"
-                  checked={formData.isPremium as boolean || false}
-                  onChange={(e) => setFormData({ ...formData, isPremium: e.target.checked })}
-                  className="w-5 h-5 rounded bg-gray-700 border-gray-600"
-                />
-                <label htmlFor="isPremium" className="text-gray-300">{tr('Trạng thái Premium', 'Premium Status')}</label>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowModal(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
-                {tr('Hủy', 'Cancel')}
-              </button>
-              <button onClick={handleUpdateUser} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? tr('Đang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
-              </button>
-            </div>
-          </Modal>
-        )}
-
-        {showModal === 'createQuest' && (
-          <Modal title={tr('Tạo nhiệm vụ', 'Create Quest')} onClose={() => setShowModal(null)}>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">{tr('Tiêu đề', 'Title')} *</label>
-                <input
-                  type="text"
-                  value={formData.title as string || ''}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  placeholder={tr('Tiêu đề nhiệm vụ', 'Quest title')}
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">{tr('Mô tả', 'Description')} *</label>
-                <textarea
-                  value={formData.description as string || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  rows={2}
-                  placeholder={tr('Mô tả nhiệm vụ', 'Quest description')}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">{tr('Loại', 'Type')}</label>
-                  <select
-                    value={formData.type as string || 'DAILY'}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  >
-                    <option value="DAILY">{tr('Hằng ngày', 'Daily')}</option>
-                    <option value="WEEKLY">{tr('Hằng tuần', 'Weekly')}</option>
-                    <option value="ACHIEVEMENT">{tr('Thành tựu', 'Achievement')}</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">{tr('Danh mục', 'Category')}</label>
-                  <select
-                    value={formData.category as string || 'chat'}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  >
-                    <option value="chat">{tr('Trò chuyện', 'Chat')}</option>
-                    <option value="gift">{tr('Quà tặng', 'Gift')}</option>
-                    <option value="social">{tr('Xã hội', 'Social')}</option>
-                    <option value="explore">{tr('Khám phá', 'Explore')}</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">{tr('Xu', 'Coins')}</label>
-                  <input
-                    type="number"
-                    value={formData.rewardCoins as number || 0}
-                    onChange={(e) => setFormData({ ...formData, rewardCoins: Number(e.target.value) })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">{tr('Ngọc', 'Gems')}</label>
-                  <input
-                    type="number"
-                    value={formData.rewardGems as number || 0}
-                    onChange={(e) => setFormData({ ...formData, rewardGems: Number(e.target.value) })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">XP</label>
-                  <input
-                    type="number"
-                    value={formData.rewardXp as number || 0}
-                    onChange={(e) => setFormData({ ...formData, rewardXp: Number(e.target.value) })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowModal(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
-                {tr('Hủy', 'Cancel')}
-              </button>
-              <button onClick={handleCreateQuest} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? tr('Đang tạo...', 'Creating...') : tr('Tạo nhiệm vụ', 'Create Quest')}
-              </button>
-            </div>
-          </Modal>
-        )}
-
-        {showModal === 'createTemplate' && (
-          <Modal title={tr('Thêm mẫu nhân vật', 'Create Template')} onClose={() => setShowModal(null)}>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">{tr('Tên mẫu', 'Name')} *</label>
-                <input
-                  type="text"
-                  value={formData.name as string || ''}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">{tr('Mô tả', 'Description')} *</label>
-                <textarea
-                  value={formData.description as string || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Avatar URL *</label>
-                <input
-                  type="url"
-                  value={formData.avatarUrl as string || ''}
-                  onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  placeholder="https://..."
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">{tr('Giới tính', 'Gender')}</label>
-                  <select
-                    value={formData.gender as string || 'FEMALE'}
-                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  >
-                    <option value="FEMALE">FEMALE</option>
-                    <option value="MALE">MALE</option>
-                    <option value="NON_BINARY">NON_BINARY</option>
-                    <option value="OTHER">OTHER</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">{tr('Tính cách', 'Personality')}</label>
-                  <input
-                    type="text"
-                    value={formData.personality as string || ''}
-                    onChange={(e) => setFormData({ ...formData, personality: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Style</label>
-                  <input
-                    type="text"
-                    value={formData.style as string || 'anime'}
-                    onChange={(e) => setFormData({ ...formData, style: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">{tr('Thứ tự', 'Sort order')}</label>
-                  <input
-                    type="number"
-                    value={formData.sortOrder as number || 0}
-                    onChange={(e) => setFormData({ ...formData, sortOrder: Number(e.target.value) })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="flex items-center gap-2 text-sm text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(formData.isActive ?? true)}
-                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  {tr('Đang hoạt động', 'Active')}
-                </label>
-                <label className="flex items-center gap-2 text-sm text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(formData.isDefault)}
-                    onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  {tr('Mặc định', 'Default')}
-                </label>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowModal(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
-                {tr('Hủy', 'Cancel')}
-              </button>
-              <button onClick={handleCreateTemplate} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? tr('Đang tạo...', 'Creating...') : tr('Tạo mẫu', 'Create Template')}
-              </button>
-            </div>
-          </Modal>
-        )}
-
-        {showModal === 'editTemplate' && selectedTemplate && (
-          <Modal title={tr('Sửa mẫu nhân vật', 'Edit Template')} onClose={() => setShowModal(null)}>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">{tr('Tên mẫu', 'Name')} *</label>
-                <input
-                  type="text"
-                  value={formData.name as string || ''}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">{tr('Mô tả', 'Description')} *</label>
-                <textarea
-                  value={formData.description as string || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Avatar URL *</label>
-                <input
-                  type="url"
-                  value={formData.avatarUrl as string || ''}
-                  onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">{tr('Giới tính', 'Gender')}</label>
-                  <select
-                    value={formData.gender as string || 'FEMALE'}
-                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  >
-                    <option value="FEMALE">FEMALE</option>
-                    <option value="MALE">MALE</option>
-                    <option value="NON_BINARY">NON_BINARY</option>
-                    <option value="OTHER">OTHER</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">{tr('Tính cách', 'Personality')}</label>
-                  <input
-                    type="text"
-                    value={formData.personality as string || ''}
-                    onChange={(e) => setFormData({ ...formData, personality: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Style</label>
-                  <input
-                    type="text"
-                    value={formData.style as string || 'anime'}
-                    onChange={(e) => setFormData({ ...formData, style: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">{tr('Thứ tự', 'Sort order')}</label>
-                  <input
-                    type="number"
-                    value={formData.sortOrder as number || 0}
-                    onChange={(e) => setFormData({ ...formData, sortOrder: Number(e.target.value) })}
-                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="flex items-center gap-2 text-sm text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(formData.isActive ?? true)}
-                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  {tr('Đang hoạt động', 'Active')}
-                </label>
-                <label className="flex items-center gap-2 text-sm text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(formData.isDefault)}
-                    onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  {tr('Mặc định', 'Default')}
-                </label>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowModal(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
-                {tr('Hủy', 'Cancel')}
-              </button>
-              <button onClick={handleUpdateTemplate} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? tr('Đang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
-              </button>
-            </div>
-          </Modal>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

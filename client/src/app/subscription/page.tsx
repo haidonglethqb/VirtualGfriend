@@ -7,7 +7,7 @@ import {
   Check, X, Mail, ExternalLink, Loader2, Mic, Paperclip
 } from 'lucide-react';
 import AppLayout from '@/components/layout/app-layout';
-import { PremiumBadge } from '@/components/PremiumGate';
+import { PremiumBadge } from '@/components/premium-gate';
 import { useLanguageStore } from '@/store/language-store';
 import { usePremiumStore } from '@/store/premium-store';
 import { type PremiumTier, type PremiumFeatures } from '@/lib/premium';

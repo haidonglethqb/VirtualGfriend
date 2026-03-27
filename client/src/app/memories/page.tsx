@@ -121,7 +121,7 @@ export default function MemoriesPage() {
         setStats({
           totalMemories: mems.length,
           totalDays: daysDiff || 1,
-          totalMessages: conversationCount * 10,
+          totalMessages: conversationCount,
           totalGifts: giftCount,
         });
       }

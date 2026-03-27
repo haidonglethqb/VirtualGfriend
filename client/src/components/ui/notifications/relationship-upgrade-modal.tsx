@@ -47,8 +47,8 @@ export function RelationshipUpgradeModal({
               <motion.div
                 key={i}
                 initial={{ 
-                  y: window.innerHeight + 20,
-                  x: Math.random() * window.innerWidth,
+                  y: (typeof window !== 'undefined' ? window.innerHeight : 600) + 20,
+                  x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 800),
                   opacity: 0.8
                 }}
                 animate={{ 

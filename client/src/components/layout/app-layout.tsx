@@ -14,7 +14,7 @@ import { useNotificationStore } from '@/store/notification-store';
 import { formatNumber } from '@/lib/utils';
 import api from '@/services/api';
 import { socketService } from '@/services/socket';
-import { PremiumBadge } from '@/components/PremiumGate';
+import { PremiumBadge } from '@/components/premium-gate';
 import { PremiumTier } from '@/lib/premium';
 
 interface AppLayoutProps {

@@ -101,7 +101,8 @@ export default function OnboardingPage() {
             }
         };
         fetchTemplates();
-    }, [toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const [formData, setFormData] = useState({
         userGender: 'NOT_SPECIFIED',

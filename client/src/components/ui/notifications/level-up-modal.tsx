@@ -53,12 +53,12 @@ export function LevelUpModal({
                   key={i}
                   initial={{ 
                     y: -20, 
-                    x: Math.random() * window.innerWidth,
+                    x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 800),
                     rotate: 0,
                     opacity: 1 
                   }}
                   animate={{ 
-                    y: window.innerHeight + 20,
+                    y: (typeof window !== 'undefined' ? window.innerHeight : 600) + 20,
                     rotate: Math.random() * 360,
                     opacity: 0
                   }}

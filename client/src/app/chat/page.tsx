@@ -20,7 +20,7 @@ import Image from 'next/image'
 import api from '@/services/api'
 import { AffectionPopup, LevelUpModal, RelationshipUpgradeModal, ProactiveNotification } from '@/components/ui/notifications'
 import { SceneSelector } from '@/components/ui/scene-selector'
-import { usePremiumAccess } from '@/components/PremiumGate'
+import { usePremiumAccess } from '@/components/premium-gate'
 import { useSceneStore } from '@/store/scene-store'
 import { useLanguageStore } from '@/store/language-store'
 
@@ -117,7 +117,7 @@ export default function ChatPage() {
   const { language } = useLanguageStore();
   const t = CHAT_I18N[language];
   const { isAuthenticated, accessToken } = useAuthStore();
-  const { character, fetchCharacter, updateAffection, isLoading: characterLoading, needsCreation } = useCharacterStore();
+  const { character, fetchCharacter, setAffection, isLoading: characterLoading, needsCreation } = useCharacterStore();
   const { 
     messages, 
     isTyping,
@@ -201,10 +201,6 @@ export default function ChatPage() {
       router.push('/dashboard')
       return
     }
-
-    if (!character && !characterLoading) {
-      fetchCharacter()
-    }
     
     fetchMessages()
     fetchScenes() // Load scenes for background selector
@@ -219,7 +215,14 @@ export default function ChatPage() {
     return () => {
       // Cleanup not needed - socketService handles its own events
     }
-  }, [isAuthenticated, router, fetchMessages, needsCreation, character, characterLoading, fetchCharacter, accessToken])
+  }, [isAuthenticated, router, fetchMessages, needsCreation, accessToken])
+
+  // Separate effect for character fetch — keeps it from re-triggering socket/messages
+  useEffect(() => {
+    if (!character && !characterLoading) {
+      fetchCharacter()
+    }
+  }, [character, characterLoading, fetchCharacter])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -300,7 +303,7 @@ export default function ChatPage() {
       });
 
       if (response.success) {
-        updateAffection(response.data.newAffection - character.affection);
+        setAffection(response.data.newAffection);
         await fetchMessages();
         setGiftSuccess(true);
         

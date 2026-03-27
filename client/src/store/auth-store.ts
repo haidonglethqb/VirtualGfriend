@@ -237,4 +237,12 @@ if (typeof window !== 'undefined') {
       }
     }
   });
+
+  // Register callback so api.ts can update Zustand in-memory state after token refresh
+  // (localStorage-only update does not trigger the storage event in the same tab)
+  api.onTokenRefreshed = (token, user) => {
+    const store = useAuthStore.getState();
+    store.setAccessToken(token as string);
+    if (user) store.setUser(user as Parameters<typeof store.setUser>[0]);
+  };
 }

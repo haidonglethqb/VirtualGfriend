@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Crown, Sparkles } from 'lucide-react';
-import { usePremiumAccess } from '@/components/PremiumGate';
+import { usePremiumAccess } from '@/components/premium-gate';
 import { useLanguageStore } from '@/store/language-store';
 
 interface AdBannerProps {

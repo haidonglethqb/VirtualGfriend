@@ -1,3 +1,5 @@
+'use client'
+
 import { useChatStore, Message } from '@/store/chat-store'
 
 /**

@@ -42,7 +42,7 @@ export const useSceneStore = create<SceneState>()(
         try {
           const response = await api.get<Scene[]>('/scenes');
           set({
-            scenes: response.data,
+            scenes: response.data ?? [],
             isLoading: false,
           });
         } catch (error) {

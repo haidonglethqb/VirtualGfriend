@@ -1,3 +1,5 @@
+'use client'
+
 import { io, Socket } from 'socket.io-client'
 import { useChatStore, Message } from '@/store/chat-store'
 import { useCharacterStore } from '@/store/character-store'
@@ -23,8 +25,8 @@ class SocketService {
   private typingTimeoutId: number | null = null
 
   connect(token: string) {
-    // If already connected with the same token, do nothing
-    if (this.socket?.connected && this.currentToken === token) {
+    // If socket exists (connected OR in-progress reconnection) with same token, do nothing
+    if (this.socket && this.currentToken === token) {
       return
     }
 
