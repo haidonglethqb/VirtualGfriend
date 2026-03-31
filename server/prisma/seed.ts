@@ -447,7 +447,7 @@ async function main() {
     {
       name: 'Mai',
       description: 'Cô gái dịu dàng, luôn quan tâm và chăm sóc bạn',
-      avatarUrl: '/characters/female/female-caring.png',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/female/female-caring.png',
       gender: 'FEMALE' as const,
       personality: 'caring',
       style: 'anime',
@@ -457,7 +457,7 @@ async function main() {
     {
       name: 'Linh',
       description: 'Cô nàng năng động, vui vẻ và hay đùa',
-      avatarUrl: '/characters/female/female-playful.png',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/female/female-playful.png',
       gender: 'FEMALE' as const,
       personality: 'playful',
       style: 'anime',
@@ -466,7 +466,7 @@ async function main() {
     {
       name: 'Hương',
       description: 'Cô gái nhút nhát, dễ thương và dễ xấu hổ',
-      avatarUrl: '/characters/female/female-shy.png',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/female/female-shy.png',
       gender: 'FEMALE' as const,
       personality: 'shy',
       style: 'anime',
@@ -475,7 +475,7 @@ async function main() {
     {
       name: 'Trang',
       description: 'Cô nàng mạnh mẽ, quyết đoán và đầy đam mê',
-      avatarUrl: '/characters/female/female-passionate.png',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/female/female-passionate.png',
       gender: 'FEMALE' as const,
       personality: 'passionate',
       style: 'anime',
@@ -484,7 +484,7 @@ async function main() {
     {
       name: 'An',
       description: 'Cô gái thông minh, sâu sắc và triết lý',
-      avatarUrl: '/characters/female/female-intellectual.png',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/female/female-intellectual.png',
       gender: 'FEMALE' as const,
       personality: 'intellectual',
       style: 'anime',
@@ -494,7 +494,7 @@ async function main() {
     {
       name: 'Minh',
       description: 'Chàng trai ấm áp, luôn quan tâm và bảo vệ bạn',
-      avatarUrl: '/characters/male/male-caring.png',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/male/male-caring.png',
       gender: 'MALE' as const,
       personality: 'caring',
       style: 'anime',
@@ -503,7 +503,7 @@ async function main() {
     {
       name: 'Hùng',
       description: 'Anh chàng vui vẻ, hài hước và thích đùa',
-      avatarUrl: '/characters/male/male-playful.png',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/male/male-playful.png',
       gender: 'MALE' as const,
       personality: 'playful',
       style: 'anime',
@@ -512,7 +512,7 @@ async function main() {
     {
       name: 'Khoa',
       description: 'Chàng trai rụt rè, hiền lành và dễ thương',
-      avatarUrl: '/characters/male/male-shy.png',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/male/male-shy.png',
       gender: 'MALE' as const,
       personality: 'shy',
       style: 'anime',
@@ -521,7 +521,7 @@ async function main() {
     {
       name: 'Đức',
       description: 'Anh chàng mạnh mẽ, quyết đoán và đam mê',
-      avatarUrl: '/characters/male/male-passionate.png',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/male/male-passionate.png',
       gender: 'MALE' as const,
       personality: 'passionate',
       style: 'anime',
@@ -530,7 +530,7 @@ async function main() {
     {
       name: 'Tuấn',
       description: 'Chàng trai thông minh, sâu sắc và hay suy nghĩ',
-      avatarUrl: '/characters/male/male-intellectual.jpg',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/male/male-intellectual.jpg',
       gender: 'MALE' as const,
       personality: 'intellectual',
       style: 'anime',
@@ -540,7 +540,7 @@ async function main() {
     {
       name: 'Alex',
       description: 'Người bạn thân thiện, quan tâm và thoải mái',
-      avatarUrl: '/characters/lgbt/nb-caring.jpg',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/lgbt/nb-caring.jpg',
       gender: 'NON_BINARY' as const,
       personality: 'caring',
       style: 'anime',
@@ -549,7 +549,7 @@ async function main() {
     {
       name: 'Sam',
       description: 'Tính cách vui vẻ, cởi mở và yêu cuộc sống',
-      avatarUrl: '/characters/lgbt/nb-playful.jpg',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/lgbt/nb-playful.jpg',
       gender: 'NON_BINARY' as const,
       personality: 'playful',
       style: 'anime',
@@ -558,7 +558,7 @@ async function main() {
     {
       name: 'River',
       description: 'Người nhẹ nhàng, thích sự yên bình và tự nhiên',
-      avatarUrl: '/characters/lgbt/nb-shy.jpg',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/lgbt/nb-shy.jpg',
       gender: 'NON_BINARY' as const,
       personality: 'shy',
       style: 'anime',
@@ -567,7 +567,7 @@ async function main() {
     {
       name: 'Phoenix',
       description: 'Tính cách mạnh mẽ, đầy năng lượng và quyết đoán',
-      avatarUrl: '/characters/lgbt/nb-passionate.jpg',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/lgbt/nb-passionate.jpg',
       gender: 'NON_BINARY' as const,
       personality: 'passionate',
       style: 'anime',
@@ -576,7 +576,7 @@ async function main() {
     {
       name: 'Sage',
       description: 'Người thông thái, hiểu biết và hướng nội',
-      avatarUrl: '/characters/lgbt/nb-intellectual.jpg',
+      avatarUrl: 'https://haichu.sgp1.digitaloceanspaces.com/AI_Template/lgbt/nb-intellectual.jpg',
       gender: 'NON_BINARY' as const,
       personality: 'intellectual',
       style: 'anime',
