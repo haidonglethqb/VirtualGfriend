@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle, Sparkles, Loader2, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
@@ -9,6 +9,18 @@ import { useLanguageStore } from '@/store/language-store'
 import api from '@/services/api'
 
 export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#0a0a0f] to-[#1a0a1f]">
+        <Loader2 className="w-12 h-12 animate-spin text-love" />
+      </div>
+    }>
+      <PaymentSuccessContent />
+    </Suspense>
+  )
+}
+
+function PaymentSuccessContent() {
   const { language } = useLanguageStore()
   const isVi = language === 'vi'
   const searchParams = useSearchParams()
