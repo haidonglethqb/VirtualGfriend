@@ -351,6 +351,8 @@ export default function ChatPage() {
                     width={128}
                     height={128}
                     className="w-full h-full object-cover"
+                    priority
+                    sizes="128px"
                   />
                 ) : (
                   <span className="text-6xl">{character?.name?.[0]?.toUpperCase() || '💕'}</span>
@@ -419,6 +421,7 @@ export default function ChatPage() {
                       width={44}
                       height={44}
                       className="w-full h-full object-cover"
+                      sizes="44px"
                     />
                   ) : (
                     <span>{character?.name?.[0]?.toUpperCase() || '💕'}</span>
@@ -536,6 +539,7 @@ export default function ChatPage() {
                             width={32}
                             height={32}
                             className="w-full h-full object-cover"
+                            sizes="32px"
                           />
                         ) : (
                           <span>{character?.name?.[0]?.toUpperCase() || '💕'}</span>
@@ -580,6 +584,7 @@ export default function ChatPage() {
                     width={32}
                     height={32}
                     className="w-full h-full object-cover"
+                    sizes="32px"
                   />
                 ) : (
                   <span>{character?.name?.[0]?.toUpperCase() || '💕'}</span>

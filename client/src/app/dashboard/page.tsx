@@ -271,6 +271,8 @@ export default function DashboardPage() {
                         width={112}
                         height={112}
                         className="w-full h-full rounded-full object-cover"
+                        priority
+                        sizes="112px"
                       />
                     ) : (
                       <div className="w-full h-full rounded-full bg-[#271b21] flex items-center justify-center text-5xl">

@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, MessageSquare, Heart, Coins, Shield, LogOut, Search,
   ChevronLeft, ChevronRight, Edit2, Trash2, Key, RefreshCw,
   TrendingUp, Crown, Sparkles, LayoutDashboard, Settings,
-  Target, Image, Gift, Brain, Bell, Database, BarChart3,
+  Target, Image as ImageIcon, Gift, Brain, Bell, Database, BarChart3,
   Plus, X, Check, AlertTriangle, Megaphone, Server, HardDrive,
   Zap, Clock, Activity, Languages, Upload,
 } from 'lucide-react';
@@ -961,7 +962,7 @@ export default function AdminPage() {
     { id: 'characters', icon: Heart, label: t.tabs.characters },
     { id: 'messages', icon: MessageSquare, label: t.tabs.messages },
     { id: 'quests', icon: Target, label: t.tabs.quests },
-    { id: 'templates', icon: Image, label: t.tabs.templates },
+    { id: 'templates', icon: ImageIcon, label: t.tabs.templates },
     { id: 'analytics', icon: BarChart3, label: t.tabs.analytics },
     { id: 'system', icon: Server, label: t.tabs.system },
     { id: 'tier-configs', icon: Settings, label: t.tabs.tierConfigs },
@@ -1394,8 +1395,8 @@ export default function AdminPage() {
                 {templates.map((template) => (
                   <div key={template.id} className="bg-gray-800/50 rounded-2xl border border-gray-700/50 overflow-hidden">
                     {template.avatarUrl && (
-                      <div className="h-48 bg-gray-700">
-                        <img src={template.avatarUrl} alt={template.name} className="w-full h-full object-cover" />
+                      <div className="h-48 bg-gray-700 relative">
+                        <Image src={template.avatarUrl} alt={template.name} fill className="object-cover" loading="lazy" sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw" />
                       </div>
                     )}
                     <div className="p-4">
@@ -1992,7 +1993,9 @@ export default function AdminPage() {
                 <label className="block text-sm text-gray-400 mb-2">Avatar *</label>
                 {(formData.avatarUrl as string) && (
                   <div className="mb-2 flex justify-center">
-                    <img src={formData.avatarUrl as string} alt="Preview" className="w-20 h-20 rounded-xl object-cover border border-gray-600" />
+                    <div className="w-20 h-20 rounded-xl border border-gray-600 relative overflow-hidden">
+                      <Image src={formData.avatarUrl as string} alt="Preview" fill className="object-cover" sizes="80px" />
+                    </div>
                   </div>
                 )}
                 <div className="flex gap-2">
@@ -2122,7 +2125,9 @@ export default function AdminPage() {
                 <label className="block text-sm text-gray-400 mb-2">Avatar *</label>
                 {(formData.avatarUrl as string) && (
                   <div className="mb-2 flex justify-center">
-                    <img src={formData.avatarUrl as string} alt="Preview" className="w-20 h-20 rounded-xl object-cover border border-gray-600" />
+                    <div className="w-20 h-20 rounded-xl border border-gray-600 relative overflow-hidden">
+                      <Image src={formData.avatarUrl as string} alt="Preview" fill className="object-cover" sizes="80px" />
+                    </div>
                   </div>
                 )}
                 <div className="flex gap-2">

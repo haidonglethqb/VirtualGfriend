@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock, Gem, Check, ChevronDown } from 'lucide-react';
 import { Button } from './button';
@@ -200,11 +201,16 @@ export function SceneSelector({ isOpen, onClose, onSceneSelect }: SceneSelectorP
                               CATEGORY_COLORS[category] || 'from-gray-700 to-gray-800'
                             )}>
                               {scene.imageUrl && (
-                                <img
-                                  src={scene.imageUrl}
-                                  alt={scene.name}
-                                  className="w-full h-full object-cover"
-                                />
+                                <div className="absolute inset-0">
+                                  <Image
+                                    src={scene.imageUrl}
+                                    alt={scene.name}
+                                    fill
+                                    className="object-cover"
+                                    loading="lazy"
+                                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                  />
+                                </div>
                               )}
                             </div>
 
