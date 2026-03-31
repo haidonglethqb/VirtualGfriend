@@ -83,7 +83,9 @@ export async function createCheckoutSession(
     : tierPricing.stripePriceIdYearly
 
   if (!priceId) {
-    throw new Error(`Stripe Price ID not configured for ${tier} ${billingCycle}`)
+    const err = new Error(`Payment not available: Stripe Price ID not configured for ${tier} ${billingCycle}. Please contact support.`) as Error & { statusCode?: number }
+    err.statusCode = 503
+    throw err
   }
 
   // Get or create Stripe customer

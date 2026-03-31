@@ -32,6 +32,10 @@ for (const envVar of requiredEnvVars) {
 const app = express();
 const httpServer = createServer(app);
 
+// Trust proxy — required when running behind Nginx/Cloudflare
+// Allows express-rate-limit and req.ip to work correctly with X-Forwarded-For
+app.set('trust proxy', 1);
+
 // Socket.IO setup — optimized for high concurrency
 const io = new Server(httpServer, {
   cors: {
