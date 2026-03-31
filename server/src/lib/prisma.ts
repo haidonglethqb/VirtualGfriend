@@ -1,8 +1,8 @@
-import { PrismaClient, UserGender, DatingPreference, PremiumTier, RelationshipStage, RelationshipEventType } from '@prisma/client';
+import { PrismaClient, Prisma, UserGender, DatingPreference, PremiumTier, RelationshipStage, RelationshipEventType, BillingCycle, SubscriptionStatus, MonitoringEventType } from '@prisma/client';
 import { createModuleLogger } from './logger';
 
-// Re-export enums for use in services
-export { UserGender, DatingPreference, PremiumTier, RelationshipStage, RelationshipEventType };
+// Re-export enums and types for use in services
+export { Prisma, UserGender, DatingPreference, PremiumTier, RelationshipStage, RelationshipEventType, BillingCycle, SubscriptionStatus, MonitoringEventType };
 
 const log = createModuleLogger('Prisma');
 

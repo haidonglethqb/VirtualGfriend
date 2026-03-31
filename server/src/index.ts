@@ -10,6 +10,7 @@ import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 
 import { router } from './routes';
+import { handleWebhook } from './modules/payment/payment.controller';
 import { errorHandler } from './middlewares/error.middleware';
 import { requestIdMiddleware } from './middlewares/request-id.middleware';
 import { setupSocketHandlers } from './sockets';
@@ -58,6 +59,10 @@ export { io };
 app.use(requestIdMiddleware);
 app.use(helmet());
 app.use(compression());
+
+// Stripe webhook — must be BEFORE express.json() to receive raw body
+app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), handleWebhook);
+
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true,

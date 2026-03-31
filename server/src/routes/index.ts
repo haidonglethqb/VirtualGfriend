@@ -12,6 +12,7 @@ import analyticsRouter from '../modules/analytics/analytics.routes';
 import { dmRouter } from '../modules/dm/dm.routes';
 import { leaderboardRouter } from '../modules/leaderboard/leaderboard.routes';
 import { adminRouter } from '../modules/admin';
+import { paymentRouter } from '../modules/payment/payment.routes';
 import { getAllTierConfigs } from '../modules/admin/tier-config.service';
 
 export const router = Router();
@@ -31,6 +32,7 @@ router.use('/analytics', analyticsRouter);
 router.use('/dm', dmRouter);
 router.use('/leaderboard', leaderboardRouter);
 router.use('/admin', adminRouter);
+router.use('/payment', paymentRouter);
 
 // Public config endpoint for frontend dynamic premium plans
 router.get('/config/tier-plans', async (_: Request, res: Response) => {

@@ -39,6 +39,7 @@ import {
   fixMissingAvatars,
 } from './admin.controller';
 import { getTierConfigs, updateTierConfigHandler } from './admin-tier-config.controller';
+import { getAdminPricing, updateAdminPricing } from './admin-pricing.controller';
 
 const router = Router();
 
@@ -108,5 +109,9 @@ router.get('/cleanup/check-avatars', fixMissingAvatars);
 // Tier config management
 router.get('/tier-configs', getTierConfigs);
 router.put('/tier-configs/:tier', updateTierConfigHandler);
+
+// Pricing management (Stripe)
+router.get('/pricing', getAdminPricing);
+router.put('/pricing/:tier', updateAdminPricing);
 
 export { router as adminRouter };

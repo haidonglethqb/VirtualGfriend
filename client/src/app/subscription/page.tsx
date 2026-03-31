@@ -13,6 +13,15 @@ import { usePremiumStore } from '@/store/premium-store';
 import { type PremiumTier, type PremiumFeatures } from '@/lib/premium';
 import api from '@/services/api';
 
+interface PricingTier {
+  monthlyPrice: number;
+  yearlyPrice: number;
+  displayName: string;
+  description: string;
+}
+
+type PricingConfig = Record<string, PricingTier>;
+
 interface PremiumStatus {
   tier: PremiumTier;
   tierDisplay: string;
@@ -135,9 +144,14 @@ export default function SubscriptionPage() {
   const planFeatures = getPlanFeatures(isVi, freeConfig, vipConfig);
   const [status, setStatus] = useState<PremiumStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   useEffect(() => {
     fetchPremiumStatus();
+    fetchPricing();
   }, []);
 
   useEffect(() => {
@@ -157,6 +171,52 @@ export default function SubscriptionPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function fetchPricing() {
+    try {
+      const response = await api.get<PricingConfig>('/payment/pricing');
+      if (response.success && response.data) {
+        setPricingConfig(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pricing:', error);
+    }
+  }
+
+  async function handleCheckout(tier: string) {
+    setCheckoutLoading(true);
+    try {
+      const response = await api.post<{ url: string }>('/payment/create-checkout', {
+        tier,
+        billingCycle,
+      });
+      if (response.data?.url) {
+        window.location.href = response.data.url;
+      }
+    } catch (error) {
+      console.error('Checkout failed:', error);
+      alert(isVi ? 'Không thể tạo phiên thanh toán. Vui lòng thử lại.' : 'Failed to create checkout session. Please try again.');
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
+  async function handleCancelSubscription() {
+    if (!confirm(isVi ? 'Bạn chắc chắn muốn hủy gói? Bạn vẫn sử dụng được đến hết kỳ hiện tại.' : 'Are you sure you want to cancel? You can still use it until the end of the current period.')) return;
+    setCancelLoading(true);
+    try {
+      await api.post('/payment/cancel');
+      await fetchPremiumStatus();
+    } catch (error) {
+      console.error('Cancel failed:', error);
+    } finally {
+      setCancelLoading(false);
+    }
+  }
+
+  function formatVND(amount: number) {
+    return new Intl.NumberFormat('vi-VN').format(amount) + '₫';
   }
 
   const formatDate = (dateStr: string) => {
@@ -268,147 +328,142 @@ export default function SubscriptionPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
             >
-              {/* FREE Plan */}
-              <div className="glass rounded-2xl p-6 border border-[#3a2832]">
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-bold mb-2">{isVi ? 'Miễn Phí' : 'Free'}</h3>
-                  <p className="text-3xl font-bold">0đ</p>
-                  <p className="text-sm text-[#ba9cab]">{isVi ? 'Mãi mãi' : 'Forever'}</p>
-                </div>
-
-                <ul className="space-y-3 mb-6">
-                  {planFeatures.map((feature) => (
-                    <li key={feature.key} className="flex items-center gap-3">
-                      {feature.freeHasX ? (
-                        <X className="w-5 h-5 text-red-400 flex-shrink-0" />
-                      ) : (
-                        <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                      )}
-                      <span className="text-sm">
-                        {feature.label}: <span className="text-[#ba9cab]">{feature.free}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                {!status?.isVip && (
+              {/* Billing Cycle Toggle */}
+              {!status?.isVip && (
+                <div className="flex items-center justify-center gap-3 mb-6">
                   <button
-                    disabled
-                    className="w-full py-3 rounded-xl bg-[#3a2832] text-[#ba9cab] font-medium cursor-not-allowed"
+                    onClick={() => setBillingCycle('MONTHLY')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      billingCycle === 'MONTHLY'
+                        ? 'bg-love text-white'
+                        : 'bg-[#251820]/50 text-[#ba9cab] hover:bg-[#2a1d24]'
+                    }`}
                   >
-                    {isVi ? 'Gói hiện tại' : 'Current plan'}
+                    {isVi ? 'Hàng tháng' : 'Monthly'}
                   </button>
-                )}
-              </div>
-
-              {/* VIP Plan */}
-              <div className="glass rounded-2xl p-6 border-2 border-love relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-love text-white text-xs px-3 py-1 rounded-bl-lg font-medium">
-                  {isVi ? 'Khuyên dùng' : 'Recommended'}
-                </div>
-
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-bold mb-2 flex items-center justify-center gap-2">
-                    <Crown className="w-5 h-5 text-love" />
-                    VIP Premium
-                  </h3>
-                  <p className="text-3xl font-bold text-love">99.000đ</p>
-                  <p className="text-sm text-[#ba9cab]">{isVi ? '/thang' : '/month'}</p>
-                </div>
-
-                <ul className="space-y-3 mb-6">
-                  {planFeatures.map((feature) => (
-                    <li key={feature.key} className="flex items-center gap-3">
-                      {feature.vipHasX ? (
-                        <X className="w-5 h-5 text-red-400 flex-shrink-0" />
-                      ) : (
-                        <Check className="w-5 h-5 text-love flex-shrink-0" />
-                      )}
-                      <span className="text-sm">
-                        {feature.label}: <span className="text-love font-medium">{feature.vip}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                {status?.isVip ? (
                   <button
-                    disabled
-                    className="w-full py-3 rounded-xl bg-love/20 text-love font-medium cursor-not-allowed flex items-center justify-center gap-2"
+                    onClick={() => setBillingCycle('YEARLY')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                      billingCycle === 'YEARLY'
+                        ? 'bg-love text-white'
+                        : 'bg-[#251820]/50 text-[#ba9cab] hover:bg-[#2a1d24]'
+                    }`}
                   >
-                    <Crown className="w-4 h-4" />
-                    {isVi ? 'Đang sử dụng' : 'Active plan'}
+                    {isVi ? 'Hàng năm' : 'Yearly'}
+                    <span className="ml-1 text-xs text-green-400">{isVi ? '(Tiết kiệm ~17%)' : '(Save ~17%)'}</span>
                   </button>
-                ) : (
-                  <a
-                    href="#contact"
-                    className="w-full py-3 rounded-xl bg-love hover:bg-love/90 text-white font-medium transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Crown className="w-4 h-4" />
-                    {isVi ? 'Liên hệ nâng cấp' : 'Contact for upgrade'}
-                  </a>
-                )}
-              </div>
-            </motion.div>
+                </div>
+              )}
 
-            {/* Contact Section */}
-            <motion.div
-              id="contact"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="glass rounded-2xl p-6"
-            >
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Mail className="w-5 h-5 text-love" />
-                {isVi ? 'Liên hệ nâng cấp VIP' : 'Contact for VIP upgrade'}
-              </h2>
-
-              <p className="text-[#ba9cab] mb-4">
-                {isVi
-                  ? 'Để nâng cấp lên VIP Premium, vui lòng liên hệ qua các kênh sau:'
-                  : 'To upgrade to VIP Premium, please contact us via these channels:'}
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <a
-                  href="mailto:support@vgfriend.io.vn"
-                  className="flex items-center gap-3 p-4 bg-[#251820]/50 rounded-xl hover:bg-[#2a1d24] transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-love/20 flex items-center justify-center">
-                    <Mail className="w-5 h-5 text-love" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                {/* FREE Plan */}
+                <div className="glass rounded-2xl p-6 border border-[#3a2832]">
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold mb-2">{isVi ? 'Miễn Phí' : 'Free'}</h3>
+                    <p className="text-3xl font-bold">0₫</p>
+                    <p className="text-sm text-[#ba9cab]">{isVi ? 'Mãi mãi' : 'Forever'}</p>
                   </div>
-                  <div>
-                    <p className="font-medium">Email</p>
-                    <p className="text-sm text-[#ba9cab]">support@vgfriend.io.vn</p>
-                  </div>
-                </a>
 
-                <a
-                  href="https://zalo.me/0123456789"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-4 bg-[#251820]/50 rounded-xl hover:bg-[#2a1d24] transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                    <ExternalLink className="w-5 h-5 text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Zalo</p>
-                    <p className="text-sm text-[#ba9cab]">0123-456-789</p>
-                  </div>
-                </a>
-              </div>
+                  <ul className="space-y-3 mb-6">
+                    {planFeatures.map((feature) => (
+                      <li key={feature.key} className="flex items-center gap-3">
+                        {feature.freeHasX ? (
+                          <X className="w-5 h-5 text-red-400 flex-shrink-0" />
+                        ) : (
+                          <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+                        )}
+                        <span className="text-sm">
+                          {feature.label}: <span className="text-[#ba9cab]">{feature.free}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
 
-              <div className="mt-6 p-4 bg-love/10 rounded-xl border border-love/30">
-                <p className="text-sm">
-                  <strong className="text-love">{isVi ? 'Lưu ý:' : 'Note:'}</strong>{' '}
-                  {isVi
-                    ? 'Sau khi thanh toán, gửi ảnh chụp màn hình kèm email đăng ký của bạn. Chúng tôi sẽ kích hoạt VIP trong 24 giờ.'
-                    : 'After payment, send your receipt screenshot with the registered email. We will activate VIP within 24 hours.'}
-                </p>
+                  {!status?.isVip && (
+                    <button
+                      disabled
+                      className="w-full py-3 rounded-xl bg-[#3a2832] text-[#ba9cab] font-medium cursor-not-allowed"
+                    >
+                      {isVi ? 'Gói hiện tại' : 'Current plan'}
+                    </button>
+                  )}
+                </div>
+
+                {/* VIP Plan */}
+                <div className="glass rounded-2xl p-6 border-2 border-love relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-love text-white text-xs px-3 py-1 rounded-bl-lg font-medium">
+                    {isVi ? 'Khuyên dùng' : 'Recommended'}
+                  </div>
+
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold mb-2 flex items-center justify-center gap-2">
+                      <Crown className="w-5 h-5 text-love" />
+                      VIP Premium
+                    </h3>
+                    <p className="text-3xl font-bold text-love">
+                      {pricingConfig?.BASIC
+                        ? formatVND(billingCycle === 'MONTHLY' ? pricingConfig.BASIC.monthlyPrice : pricingConfig.BASIC.yearlyPrice)
+                        : '99.000₫'}
+                    </p>
+                    <p className="text-sm text-[#ba9cab]">
+                      {billingCycle === 'MONTHLY' ? (isVi ? '/tháng' : '/month') : (isVi ? '/năm' : '/year')}
+                    </p>
+                  </div>
+
+                  <ul className="space-y-3 mb-6">
+                    {planFeatures.map((feature) => (
+                      <li key={feature.key} className="flex items-center gap-3">
+                        {feature.vipHasX ? (
+                          <X className="w-5 h-5 text-red-400 flex-shrink-0" />
+                        ) : (
+                          <Check className="w-5 h-5 text-love flex-shrink-0" />
+                        )}
+                        <span className="text-sm">
+                          {feature.label}: <span className="text-love font-medium">{feature.vip}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {status?.isVip ? (
+                    <div className="space-y-2">
+                      <button
+                        disabled
+                        className="w-full py-3 rounded-xl bg-love/20 text-love font-medium cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <Crown className="w-4 h-4" />
+                        {isVi ? 'Đang sử dụng' : 'Active plan'}
+                      </button>
+                      <button
+                        onClick={handleCancelSubscription}
+                        disabled={cancelLoading}
+                        className="w-full py-2 rounded-xl text-sm text-[#ba9cab] hover:text-red-400 transition-colors"
+                      >
+                        {cancelLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                        ) : (
+                          isVi ? 'Hủy gói' : 'Cancel subscription'
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleCheckout('BASIC')}
+                      disabled={checkoutLoading}
+                      className="w-full py-3 rounded-xl bg-love hover:bg-love/90 text-white font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      {checkoutLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Crown className="w-4 h-4" />
+                          {isVi ? 'Nâng cấp ngay' : 'Upgrade now'}
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             </motion.div>
           </>
