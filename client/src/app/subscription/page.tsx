@@ -12,6 +12,7 @@ import { useLanguageStore } from '@/store/language-store';
 import { usePremiumStore } from '@/store/premium-store';
 import { type PremiumTier, type PremiumFeatures } from '@/lib/premium';
 import api from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface PricingTier {
   monthlyPrice: number;
@@ -30,6 +31,8 @@ interface PremiumStatus {
   expiresAt: string | null;
   daysRemaining: number | null;
   expired: boolean;
+  cancelAtPeriodEnd: boolean;
+  cancelAt: string | null;
   features: {
     maxCharacters: number;
     maxMessagesPerDay: number;
@@ -148,6 +151,7 @@ export default function SubscriptionPage() {
   const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchPremiumStatus();
@@ -196,7 +200,7 @@ export default function SubscriptionPage() {
       }
     } catch (error) {
       console.error('Checkout failed:', error);
-      alert(isVi ? 'Không thể tạo phiên thanh toán. Vui lòng thử lại.' : 'Failed to create checkout session. Please try again.');
+      toast({ title: isVi ? 'Lỗi thanh toán' : 'Checkout error', description: isVi ? 'Không thể tạo phiên thanh toán. Vui lòng thử lại.' : 'Failed to create checkout session. Please try again.', variant: 'destructive' });
     } finally {
       setCheckoutLoading(false);
     }
@@ -208,8 +212,11 @@ export default function SubscriptionPage() {
     try {
       await api.post('/payment/cancel');
       await fetchPremiumStatus();
-    } catch (error) {
+      toast({ title: isVi ? 'Đã hủy đăng ký' : 'Subscription cancelled', description: isVi ? 'Bạn vẫn sử dụng được đến hết kỳ hiện tại.' : 'You can still use premium until the end of the current period.' });
+    } catch (error: any) {
       console.error('Cancel failed:', error);
+      const msg = error?.response?.data?.error?.message || error?.message || (isVi ? 'Hủy gói thất bại. Vui lòng thử lại.' : 'Failed to cancel subscription. Please try again.');
+      toast({ title: isVi ? 'Hủy thất bại' : 'Cancel failed', description: msg, variant: 'destructive' });
     } finally {
       setCancelLoading(false);
     }
@@ -435,17 +442,24 @@ export default function SubscriptionPage() {
                         <Crown className="w-4 h-4" />
                         {isVi ? 'Đang sử dụng' : 'Active plan'}
                       </button>
-                      <button
-                        onClick={handleCancelSubscription}
-                        disabled={cancelLoading}
-                        className="w-full py-2 rounded-xl text-sm text-[#ba9cab] hover:text-red-400 transition-colors"
-                      >
-                        {cancelLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                        ) : (
-                          isVi ? 'Hủy gói' : 'Cancel subscription'
-                        )}
-                      </button>
+                      {status?.cancelAtPeriodEnd ? (
+                        <p className="text-center text-xs text-amber-400">
+                          {isVi ? 'Sẽ hủy vào' : 'Cancels on'}{' '}
+                          {status.cancelAt ? formatDate(status.cancelAt) : ''}
+                        </p>
+                      ) : (
+                        <button
+                          onClick={handleCancelSubscription}
+                          disabled={cancelLoading}
+                          className="w-full py-2 rounded-xl text-sm text-[#ba9cab] hover:text-red-400 transition-colors"
+                        >
+                          {cancelLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                          ) : (
+                            isVi ? 'Hủy gói' : 'Cancel subscription'
+                          )}
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <button

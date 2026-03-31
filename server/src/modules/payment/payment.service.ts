@@ -167,8 +167,16 @@ export async function cancelSubscription(userId: string): Promise<void> {
   const stripe = getStripeOrThrow()
 
   const sub = await prisma.subscription.findUnique({ where: { userId } })
-  if (!sub) {
-    throw new Error('No active subscription found')
+  if (!sub || sub.status === 'CANCELED') {
+    const err = new Error('No active subscription found') as Error & { statusCode?: number }
+    err.statusCode = 404
+    throw err
+  }
+
+  if (sub.cancelAtPeriodEnd) {
+    const err = new Error('Subscription is already set to cancel at period end') as Error & { statusCode?: number }
+    err.statusCode = 409
+    throw err
   }
 
   await stripe.subscriptions.update(sub.stripeSubscriptionId, {

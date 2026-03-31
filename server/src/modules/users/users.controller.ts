@@ -153,6 +153,12 @@ export const userController = {
         daysRemaining = Math.max(0, Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
       }
 
+      // Get cancellation status from subscription table
+      const subscription = await prisma.subscription.findUnique({
+        where: { userId: req.user!.id },
+        select: { cancelAtPeriodEnd: true, currentPeriodEnd: true },
+      });
+
       res.json({
         success: true,
         data: {
@@ -164,6 +170,8 @@ export const userController = {
           expiresAt: req.premiumInfo?.expiresAt || null,
           daysRemaining,
           expired: req.premiumInfo?.expired || false,
+          cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd || false,
+          cancelAt: subscription?.cancelAtPeriodEnd ? subscription.currentPeriodEnd : null,
 
           // Full dynamic feature config for this tier
           features: {
