@@ -99,9 +99,9 @@ export function isVipTier(tier: PremiumTier): boolean {
 // Premium tier display info
 export const TIER_INFO: Record<PremiumTier, { name: string; displayName: string; color: string; icon: string }> = {
   FREE: { name: 'FREE', displayName: 'Miễn phí', color: 'text-gray-400', icon: '🆓' },
-  BASIC: { name: 'VIP', displayName: 'VIP Premium', color: 'text-love', icon: '👑' },
-  PRO: { name: 'VIP', displayName: 'VIP Premium', color: 'text-love', icon: '👑' },
-  ULTIMATE: { name: 'VIP', displayName: 'VIP Premium', color: 'text-love', icon: '👑' },
+  BASIC: { name: 'VIP', displayName: 'VIP Basic', color: 'text-love', icon: '👑' },
+  PRO: { name: 'VIP', displayName: 'VIP Pro', color: 'text-purple-400', icon: '⚡' },
+  ULTIMATE: { name: 'VIP', displayName: 'VIP Ultimate', color: 'text-amber-400', icon: '💎' },
 };
 
 /**

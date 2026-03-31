@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Crown, MessageCircle, Users, Image, Sparkles,
-  Check, X, Mail, ExternalLink, Loader2, Mic, Paperclip
+  Crown, Check, X, Loader2, Zap, Gem, Sparkles
 } from 'lucide-react';
 import AppLayout from '@/components/layout/app-layout';
 import { PremiumBadge } from '@/components/PremiumGate';
@@ -51,90 +50,33 @@ interface PremiumStatus {
   };
 }
 
-function formatFeatureValue(value: boolean | number, isVi: boolean): string {
-  if (typeof value === 'boolean') {
-    return value ? (isVi ? 'Có' : 'Yes') : (isVi ? 'Không' : 'No');
-  }
-  if (value === -1) {
-    return isVi ? 'Không giới hạn' : 'Unlimited';
-  }
-  return String(value);
-}
+const TIER_CARDS: {
+  tier: PremiumTier;
+  icon: typeof Crown;
+  borderClass: string;
+  accentClass: string;
+  checkClass: string;
+  btnClass: string;
+  badge?: string;
+}[] = [
+  { tier: 'FREE', icon: Sparkles, borderClass: 'border-[#3a2832]', accentClass: 'text-gray-400', checkClass: 'text-green-400', btnClass: '' },
+  { tier: 'BASIC', icon: Crown, borderClass: 'border-love/40', accentClass: 'text-love', checkClass: 'text-love', btnClass: 'bg-love hover:bg-love/90' },
+  { tier: 'PRO', icon: Zap, borderClass: 'border-purple-400/50', accentClass: 'text-purple-400', checkClass: 'text-purple-400', btnClass: 'bg-purple-500 hover:bg-purple-500/90', badge: 'recommended' },
+  { tier: 'ULTIMATE', icon: Gem, borderClass: 'border-amber-400/50', accentClass: 'text-amber-400', checkClass: 'text-amber-400', btnClass: 'bg-amber-500 hover:bg-amber-500/90' },
+];
 
-function getPlanFeatures(isVi: boolean, freeConfig: PremiumFeatures, vipConfig: PremiumFeatures) {
+function getFeatureList(config: PremiumFeatures, isVi: boolean) {
+  const fmtNum = (v: number) => v === -1 ? (isVi ? 'Không giới hạn' : 'Unlimited') : String(v);
   return [
-    {
-      key: 'messages',
-      label: isVi ? 'Tin nhắn/ngày' : 'Messages/day',
-      free: formatFeatureValue(freeConfig.maxMessagesPerDay, isVi),
-      vip: formatFeatureValue(vipConfig.maxMessagesPerDay, isVi),
-      icon: MessageCircle,
-      freeHasX: false,
-      vipHasX: false,
-    },
-    {
-      key: 'characters',
-      label: isVi ? 'Số nhân vật' : 'Character slots',
-      free: formatFeatureValue(freeConfig.maxCharacters, isVi),
-      vip: formatFeatureValue(vipConfig.maxCharacters, isVi),
-      icon: Users,
-      freeHasX: false,
-      vipHasX: false,
-    },
-    {
-      key: 'voice',
-      label: isVi ? 'Gửi giọng nói' : 'Voice messages',
-      free: formatFeatureValue(freeConfig.voiceMessages, isVi),
-      vip: formatFeatureValue(vipConfig.voiceMessages, isVi),
-      icon: Mic,
-      freeHasX: !freeConfig.voiceMessages,
-      vipHasX: !vipConfig.voiceMessages,
-    },
-    {
-      key: 'images',
-      label: isVi ? 'Gửi ảnh & video' : 'Send images & videos',
-      free: formatFeatureValue(freeConfig.sendImages && freeConfig.sendVideos, isVi),
-      vip: formatFeatureValue(vipConfig.sendImages && vipConfig.sendVideos, isVi),
-      icon: Paperclip,
-      freeHasX: !(freeConfig.sendImages && freeConfig.sendVideos),
-      vipHasX: !(vipConfig.sendImages && vipConfig.sendVideos),
-    },
-    {
-      key: 'stickers',
-      label: isVi ? 'Sticker độc quyền' : 'Premium stickers',
-      free: formatFeatureValue(freeConfig.sendStickers, isVi),
-      vip: formatFeatureValue(vipConfig.sendStickers, isVi),
-      icon: Sparkles,
-      freeHasX: !freeConfig.sendStickers,
-      vipHasX: !vipConfig.sendStickers,
-    },
-    {
-      key: 'ads',
-      label: isVi ? 'Quảng cáo' : 'Ads',
-      free: freeConfig.adFree ? (isVi ? 'Ẩn' : 'Hidden') : (isVi ? 'Hiện' : 'Shown'),
-      vip: vipConfig.adFree ? (isVi ? 'Ẩn' : 'Hidden') : (isVi ? 'Hiện' : 'Shown'),
-      icon: Image,
-      freeHasX: !freeConfig.adFree,
-      vipHasX: !vipConfig.adFree,
-    },
-    {
-      key: 'gifts',
-      label: isVi ? 'Quà tặng Premium' : 'Premium gifts',
-      free: formatFeatureValue(freeConfig.canAccessPremiumGifts, isVi),
-      vip: formatFeatureValue(vipConfig.canAccessPremiumGifts, isVi),
-      icon: Crown,
-      freeHasX: !freeConfig.canAccessPremiumGifts,
-      vipHasX: !vipConfig.canAccessPremiumGifts,
-    },
-    {
-      key: 'scenes',
-      label: isVi ? 'Khung cảnh độc quyền' : 'Premium scenes',
-      free: formatFeatureValue(freeConfig.canAccessPremiumScenes, isVi),
-      vip: formatFeatureValue(vipConfig.canAccessPremiumScenes, isVi),
-      icon: Image,
-      freeHasX: !freeConfig.canAccessPremiumScenes,
-      vipHasX: !vipConfig.canAccessPremiumScenes,
-    },
+    { label: isVi ? 'Tin nhắn/ngày' : 'Messages/day', value: fmtNum(config.maxMessagesPerDay), has: true },
+    { label: isVi ? 'Số nhân vật' : 'Characters', value: fmtNum(config.maxCharacters), has: true },
+    { label: isVi ? 'Giọng nói' : 'Voice messages', value: null, has: config.voiceMessages },
+    { label: isVi ? 'Ảnh & video' : 'Images & videos', value: null, has: config.sendImages && config.sendVideos },
+    { label: isVi ? 'Sticker premium' : 'Premium stickers', value: null, has: config.sendStickers },
+    { label: isVi ? 'Không quảng cáo' : 'Ad-free', value: null, has: config.adFree },
+    { label: isVi ? 'Quà & cảnh premium' : 'Premium gifts & scenes', value: null, has: config.canAccessPremiumGifts },
+    { label: isVi ? 'Hỗ trợ ưu tiên' : 'Priority support', value: null, has: config.prioritySupport },
+    { label: isVi ? 'Truy cập sớm' : 'Early access', value: null, has: config.earlyAccess },
   ];
 }
 
@@ -142,16 +84,20 @@ export default function SubscriptionPage() {
   const { language } = useLanguageStore();
   const isVi = language === 'vi';
   const { allTierConfigs, fetchTierConfigs, lastFetchedAt } = usePremiumStore();
-  const freeConfig = allTierConfigs.FREE;
-  const vipConfig = allTierConfigs.BASIC;
-  const planFeatures = getPlanFeatures(isVi, freeConfig, vipConfig);
   const [status, setStatus] = useState<PremiumStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
   const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
   const { toast } = useToast();
+
+  const tierNames: Record<PremiumTier, string> = {
+    FREE: isVi ? 'Miễn Phí' : 'Free',
+    BASIC: 'VIP Basic',
+    PRO: 'VIP Pro',
+    ULTIMATE: 'VIP Ultimate',
+  };
 
   useEffect(() => {
     fetchPremiumStatus();
@@ -189,20 +135,17 @@ export default function SubscriptionPage() {
   }
 
   async function handleCheckout(tier: string) {
-    setCheckoutLoading(true);
+    setCheckoutLoading(tier);
     try {
-      const response = await api.post<{ url: string }>('/payment/create-checkout', {
-        tier,
-        billingCycle,
-      });
+      const response = await api.post<{ url: string }>('/payment/create-checkout', { tier, billingCycle });
       if (response.data?.url) {
         window.location.href = response.data.url;
       }
     } catch (error) {
       console.error('Checkout failed:', error);
-      toast({ title: isVi ? 'Lỗi thanh toán' : 'Checkout error', description: isVi ? 'Không thể tạo phiên thanh toán. Vui lòng thử lại.' : 'Failed to create checkout session. Please try again.', variant: 'destructive' });
+      toast({ title: isVi ? 'Lỗi thanh toán' : 'Checkout error', description: isVi ? 'Không thể tạo phiên thanh toán. Vui lòng thử lại.' : 'Failed to create checkout session.', variant: 'destructive' });
     } finally {
-      setCheckoutLoading(false);
+      setCheckoutLoading(null);
     }
   }
 
@@ -226,25 +169,23 @@ export default function SubscriptionPage() {
     return new Intl.NumberFormat('vi-VN').format(amount) + '₫';
   }
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  };
+  function getPrice(tier: PremiumTier) {
+    if (tier === 'FREE') return '0₫';
+    const cfg = pricingConfig?.[tier];
+    if (!cfg) return '—';
+    return formatVND(billingCycle === 'MONTHLY' ? cfg.monthlyPrice : cfg.yearlyPrice);
+  }
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
           <h1 className="text-2xl font-bold mb-2">{isVi ? 'Gói Đăng Ký' : 'Subscription Plans'}</h1>
-          <p className="text-[#ba9cab]">{isVi ? 'Nâng cấp để mở khóa đầy đủ tính năng' : 'Upgrade to unlock the full experience'}</p>
+          <p className="text-[#ba9cab]">{isVi ? 'Chọn gói phù hợp với bạn' : 'Choose the plan that fits you'}</p>
         </motion.div>
 
         {loading ? (
@@ -254,232 +195,156 @@ export default function SubscriptionPage() {
         ) : (
           <>
             {/* Current Status Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="glass rounded-2xl p-6 mb-8"
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass rounded-2xl p-6 mb-8">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Crown className="w-5 h-5 text-love" />
                 {isVi ? 'Trạng thái hiện tại' : 'Current status'}
               </h2>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Tier Info */}
                 <div className="bg-[#251820]/50 rounded-xl p-4">
                   <p className="text-sm text-[#ba9cab] mb-1">{isVi ? 'Gói của bạn' : 'Your plan'}</p>
-                  <div className="flex items-center gap-2">
-                    <PremiumBadge tier={status?.tier} showFree />
-                  </div>
+                  <div className="flex items-center gap-2"><PremiumBadge tier={status?.tier} showFree /></div>
                   {status?.expiresAt && (
                     <p className="text-xs text-[#ba9cab] mt-2">
-                      {status.expired ? (
-                        <span className="text-red-400">{isVi ? 'Đã hết hạn' : 'Expired'}</span>
-                      ) : (
-                        <>{isVi ? 'Hết hạn' : 'Expires'}: {formatDate(status.expiresAt)} ({status.daysRemaining} {isVi ? 'ngày' : 'days'})</>
-                      )}
+                      {status.expired
+                        ? <span className="text-red-400">{isVi ? 'Đã hết hạn' : 'Expired'}</span>
+                        : <>{isVi ? 'Hết hạn' : 'Expires'}: {formatDate(status.expiresAt)} ({status.daysRemaining} {isVi ? 'ngày' : 'days'})</>}
                     </p>
                   )}
-                  {status?.isVip && !status?.expiresAt && (
-                    <p className="text-xs text-green-400 mt-2">{isVi ? 'Vĩnh viễn' : 'Lifetime'}</p>
-                  )}
                 </div>
-
-                {/* Message Usage */}
                 <div className="bg-[#251820]/50 rounded-xl p-4">
                   <p className="text-sm text-[#ba9cab] mb-1">{isVi ? 'Tin nhắn hôm nay' : 'Messages today'}</p>
                   {status?.usage.isUnlimitedMessages ? (
                     <p className="text-xl font-bold text-love">{isVi ? 'Không giới hạn' : 'Unlimited'}</p>
                   ) : (
-                    <>
-                      <p className="text-xl font-bold">
-                        {status?.usage.messagesUsedToday}/{status?.usage.messagesLimit}
-                      </p>
-                      <div className="mt-2 h-2 bg-[#3a2832] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-love rounded-full transition-all"
-                          style={{
-                            width: `${Math.min(100, ((status?.usage.messagesUsedToday || 0) / (status?.usage.messagesLimit || 1)) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <p className="text-xs text-[#ba9cab] mt-1">
-                        {isVi ? 'Còn lại' : 'Remaining'}: {status?.usage.messagesRemaining} {isVi ? 'tin' : 'messages'}
-                      </p>
-                    </>
+                    <p className="text-xl font-bold">{status?.usage.messagesUsedToday}/{status?.usage.messagesLimit}</p>
                   )}
                 </div>
-
-                {/* Character Usage */}
                 <div className="bg-[#251820]/50 rounded-xl p-4">
                   <p className="text-sm text-[#ba9cab] mb-1">{isVi ? 'Nhân vật' : 'Characters'}</p>
                   {status?.usage.charactersLimit === -1 ? (
                     <p className="text-xl font-bold text-love">{isVi ? 'Không giới hạn' : 'Unlimited'}</p>
                   ) : (
-                    <>
-                      <p className="text-xl font-bold">
-                        {status?.usage.charactersUsed}/{status?.usage.charactersLimit}
-                      </p>
-                      <p className="text-xs text-[#ba9cab] mt-1">
-                        {isVi ? 'Còn lại' : 'Remaining'}: {status?.usage.charactersRemaining} {isVi ? 'slot' : 'slots'}
-                      </p>
-                    </>
+                    <p className="text-xl font-bold">{status?.usage.charactersUsed}/{status?.usage.charactersLimit}</p>
                   )}
                 </div>
               </div>
             </motion.div>
 
-            {/* Plan Comparison */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              {/* Billing Cycle Toggle */}
-              {!status?.isVip && (
-                <div className="flex items-center justify-center gap-3 mb-6">
-                  <button
-                    onClick={() => setBillingCycle('MONTHLY')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                      billingCycle === 'MONTHLY'
-                        ? 'bg-love text-white'
-                        : 'bg-[#251820]/50 text-[#ba9cab] hover:bg-[#2a1d24]'
-                    }`}
+            {/* Billing Cycle Toggle */}
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <button
+                onClick={() => setBillingCycle('MONTHLY')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${billingCycle === 'MONTHLY' ? 'bg-love text-white' : 'bg-[#251820]/50 text-[#ba9cab] hover:bg-[#2a1d24]'}`}
+              >
+                {isVi ? 'Hàng tháng' : 'Monthly'}
+              </button>
+              <button
+                onClick={() => setBillingCycle('YEARLY')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${billingCycle === 'YEARLY' ? 'bg-love text-white' : 'bg-[#251820]/50 text-[#ba9cab] hover:bg-[#2a1d24]'}`}
+              >
+                {isVi ? 'Hàng năm' : 'Yearly'}
+                <span className="ml-1 text-xs text-green-400">(-17%)</span>
+              </button>
+            </div>
+
+            {/* 4-Tier Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              {TIER_CARDS.map(({ tier, icon: Icon, borderClass, accentClass, checkClass, btnClass, badge }, idx) => {
+                const features = getFeatureList(allTierConfigs[tier], isVi);
+                const isCurrentTier = status?.tier === tier;
+                const isActiveSub = isCurrentTier && status?.isVip;
+
+                return (
+                  <motion.div
+                    key={tier}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 + idx * 0.05 }}
+                    className={`glass rounded-2xl p-5 border-2 ${borderClass} relative overflow-hidden flex flex-col ${badge ? 'ring-1 ring-purple-400/30' : ''}`}
                   >
-                    {isVi ? 'Hàng tháng' : 'Monthly'}
-                  </button>
-                  <button
-                    onClick={() => setBillingCycle('YEARLY')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                      billingCycle === 'YEARLY'
-                        ? 'bg-love text-white'
-                        : 'bg-[#251820]/50 text-[#ba9cab] hover:bg-[#2a1d24]'
-                    }`}
-                  >
-                    {isVi ? 'Hàng năm' : 'Yearly'}
-                    <span className="ml-1 text-xs text-green-400">{isVi ? '(Tiết kiệm ~17%)' : '(Save ~17%)'}</span>
-                  </button>
-                </div>
-              )}
+                    {badge && (
+                      <div className="absolute top-0 right-0 bg-purple-500 text-white text-xs px-3 py-1 rounded-bl-lg font-medium">
+                        {isVi ? 'Khuyên dùng' : 'Recommended'}
+                      </div>
+                    )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {/* FREE Plan */}
-                <div className="glass rounded-2xl p-6 border border-[#3a2832]">
-                  <div className="text-center mb-6">
-                    <h3 className="text-xl font-bold mb-2">{isVi ? 'Miễn Phí' : 'Free'}</h3>
-                    <p className="text-3xl font-bold">0₫</p>
-                    <p className="text-sm text-[#ba9cab]">{isVi ? 'Mãi mãi' : 'Forever'}</p>
-                  </div>
-
-                  <ul className="space-y-3 mb-6">
-                    {planFeatures.map((feature) => (
-                      <li key={feature.key} className="flex items-center gap-3">
-                        {feature.freeHasX ? (
-                          <X className="w-5 h-5 text-red-400 flex-shrink-0" />
-                        ) : (
-                          <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                        )}
-                        <span className="text-sm">
-                          {feature.label}: <span className="text-[#ba9cab]">{feature.free}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {!status?.isVip && (
-                    <button
-                      disabled
-                      className="w-full py-3 rounded-xl bg-[#3a2832] text-[#ba9cab] font-medium cursor-not-allowed"
-                    >
-                      {isVi ? 'Gói hiện tại' : 'Current plan'}
-                    </button>
-                  )}
-                </div>
-
-                {/* VIP Plan */}
-                <div className="glass rounded-2xl p-6 border-2 border-love relative overflow-hidden">
-                  <div className="absolute top-0 right-0 bg-love text-white text-xs px-3 py-1 rounded-bl-lg font-medium">
-                    {isVi ? 'Khuyên dùng' : 'Recommended'}
-                  </div>
-
-                  <div className="text-center mb-6">
-                    <h3 className="text-xl font-bold mb-2 flex items-center justify-center gap-2">
-                      <Crown className="w-5 h-5 text-love" />
-                      VIP Premium
-                    </h3>
-                    <p className="text-3xl font-bold text-love">
-                      {pricingConfig?.BASIC
-                        ? formatVND(billingCycle === 'MONTHLY' ? pricingConfig.BASIC.monthlyPrice : pricingConfig.BASIC.yearlyPrice)
-                        : '99.000₫'}
-                    </p>
-                    <p className="text-sm text-[#ba9cab]">
-                      {billingCycle === 'MONTHLY' ? (isVi ? '/tháng' : '/month') : (isVi ? '/năm' : '/year')}
-                    </p>
-                  </div>
-
-                  <ul className="space-y-3 mb-6">
-                    {planFeatures.map((feature) => (
-                      <li key={feature.key} className="flex items-center gap-3">
-                        {feature.vipHasX ? (
-                          <X className="w-5 h-5 text-red-400 flex-shrink-0" />
-                        ) : (
-                          <Check className="w-5 h-5 text-love flex-shrink-0" />
-                        )}
-                        <span className="text-sm">
-                          {feature.label}: <span className="text-love font-medium">{feature.vip}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {status?.isVip ? (
-                    <div className="space-y-2">
-                      <button
-                        disabled
-                        className="w-full py-3 rounded-xl bg-love/20 text-love font-medium cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                        <Crown className="w-4 h-4" />
-                        {isVi ? 'Đang sử dụng' : 'Active plan'}
-                      </button>
-                      {status?.cancelAtPeriodEnd ? (
-                        <p className="text-center text-xs text-amber-400">
-                          {isVi ? 'Sẽ hủy vào' : 'Cancels on'}{' '}
-                          {status.cancelAt ? formatDate(status.cancelAt) : ''}
-                        </p>
-                      ) : (
-                        <button
-                          onClick={handleCancelSubscription}
-                          disabled={cancelLoading}
-                          className="w-full py-2 rounded-xl text-sm text-[#ba9cab] hover:text-red-400 transition-colors"
-                        >
-                          {cancelLoading ? (
-                            <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                          ) : (
-                            isVi ? 'Hủy gói' : 'Cancel subscription'
-                          )}
-                        </button>
-                      )}
+                    {/* Header */}
+                    <div className="text-center mb-4">
+                      <div className={`inline-flex items-center gap-2 mb-2 ${accentClass}`}>
+                        <Icon className="w-5 h-5" />
+                        <h3 className="text-lg font-bold">{tierNames[tier]}</h3>
+                      </div>
+                      <p className={`text-2xl font-bold ${tier === 'FREE' ? '' : accentClass}`}>
+                        {getPrice(tier)}
+                      </p>
+                      <p className="text-xs text-[#ba9cab]">
+                        {tier === 'FREE'
+                          ? (isVi ? 'Mãi mãi' : 'Forever')
+                          : billingCycle === 'MONTHLY' ? (isVi ? '/tháng' : '/month') : (isVi ? '/năm' : '/year')}
+                      </p>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => handleCheckout('BASIC')}
-                      disabled={checkoutLoading}
-                      className="w-full py-3 rounded-xl bg-love hover:bg-love/90 text-white font-medium transition-colors flex items-center justify-center gap-2"
-                    >
-                      {checkoutLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
+
+                    {/* Features */}
+                    <ul className="space-y-2 mb-5 flex-1">
+                      {features.map((f) => (
+                        <li key={f.label} className="flex items-center gap-2 text-xs">
+                          {f.has ? (
+                            <Check className={`w-4 h-4 flex-shrink-0 ${checkClass}`} />
+                          ) : (
+                            <X className="w-4 h-4 flex-shrink-0 text-red-400/60" />
+                          )}
+                          <span className={f.has ? '' : 'text-[#ba9cab]/60'}>
+                            {f.label}{f.value ? `: ${f.value}` : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* Action Button */}
+                    {tier === 'FREE' ? (
+                      !status?.isVip ? (
+                        <button disabled className="w-full py-2.5 rounded-xl bg-[#3a2832] text-[#ba9cab] text-sm font-medium cursor-not-allowed">
+                          {isVi ? 'Gói hiện tại' : 'Current plan'}
+                        </button>
+                      ) : null
+                    ) : isActiveSub ? (
+                      <div className="space-y-2">
+                        <button disabled className={`w-full py-2.5 rounded-xl ${accentClass} bg-white/5 font-medium cursor-not-allowed flex items-center justify-center gap-2 text-sm`}>
                           <Crown className="w-4 h-4" />
-                          {isVi ? 'Nâng cấp ngay' : 'Upgrade now'}
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
+                          {isVi ? 'Đang sử dụng' : 'Active plan'}
+                        </button>
+                        {status?.cancelAtPeriodEnd ? (
+                          <p className="text-center text-xs text-amber-400">
+                            {isVi ? 'Sẽ hủy vào' : 'Cancels on'} {status.cancelAt ? formatDate(status.cancelAt) : ''}
+                          </p>
+                        ) : (
+                          <button
+                            onClick={handleCancelSubscription}
+                            disabled={cancelLoading}
+                            className="w-full py-2 rounded-xl text-xs text-[#ba9cab] hover:text-red-400 transition-colors"
+                          >
+                            {cancelLoading ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : (isVi ? 'Hủy gói' : 'Cancel')}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleCheckout(tier)}
+                        disabled={checkoutLoading !== null}
+                        className={`w-full py-2.5 rounded-xl text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 ${btnClass}`}
+                      >
+                        {checkoutLoading === tier ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>{isVi ? 'Nâng cấp' : 'Upgrade'}</>
+                        )}
+                      </button>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
           </>
         )}
       </div>

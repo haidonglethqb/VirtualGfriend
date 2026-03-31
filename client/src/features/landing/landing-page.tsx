@@ -1051,21 +1051,65 @@ function TrustBanner() {
 
 /* ──────────────────── PRICING ──────────────────── */
 function PricingSection() {
-  const freeFeatures = [
-    'Chat không giới hạn',
-    '100 xu khởi đầu',
-    'Tùy chỉnh nhân vật',
-    'Nhiệm vụ hàng ngày',
-    'Kỷ niệm & thống kê',
-  ];
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
 
-  const premiumFeatures = [
-    'Tất cả tính năng Free',
-    'AI nâng cao (GPT-4)',
-    'Không quảng cáo',
-    'Xu & sao x2 hàng ngày',
-    'Mở khóa tất cả quà',
-    'Hỗ trợ ưu tiên',
+  const tiers = [
+    {
+      name: 'Miễn Phí',
+      price: '0đ',
+      period: '/mãi mãi',
+      features: ['20 tin nhắn/ngày', '2 nhân vật', 'Chat cơ bản', 'Tùy chỉnh nhân vật', 'Nhiệm vụ hàng ngày'],
+      cta: 'Bắt đầu ngay',
+      highlight: false,
+      badge: null,
+      glowColor: '#ffffff',
+      borderClass: 'border-white/[0.08] group-hover:border-white/15',
+      bgClass: 'bg-gradient-to-b from-white/[0.04] to-transparent',
+      checkClass: 'bg-green-500/15 text-green-400',
+      btnClass: 'bg-white/[0.06] border border-white/10 text-white hover:bg-white/[0.12] hover:border-white/20',
+    },
+    {
+      name: 'VIP Basic',
+      price: billingCycle === 'monthly' ? '99K' : '999K',
+      period: billingCycle === 'monthly' ? '/tháng' : '/năm',
+      features: ['Không giới hạn tin nhắn', '5 nhân vật', 'Giọng nói & ảnh', 'Sticker premium', 'Không quảng cáo', 'Quà & cảnh premium'],
+      cta: 'Nâng cấp Basic',
+      highlight: false,
+      badge: null,
+      glowColor: '#f4258c',
+      borderClass: 'border-love/30 group-hover:border-love/50',
+      bgClass: 'bg-gradient-to-b from-love/[0.06] to-transparent',
+      checkClass: 'bg-love/15 text-love',
+      btnClass: 'bg-gradient-to-r from-love to-love/80 text-white hover:brightness-110 shadow-lg shadow-love/20',
+    },
+    {
+      name: 'VIP Pro',
+      price: billingCycle === 'monthly' ? '199K' : '1.999K',
+      period: billingCycle === 'monthly' ? '/tháng' : '/năm',
+      features: ['Tất cả Basic', '5 nhân vật', 'AI nâng cao', 'Hỗ trợ ưu tiên', 'Truy cập sớm', 'Xu & sao x2'],
+      cta: 'Nâng cấp Pro',
+      highlight: true,
+      badge: 'Phổ biến',
+      glowColor: '#a855f7',
+      borderClass: 'border-purple-400/40 group-hover:border-purple-400/60',
+      bgClass: 'bg-gradient-to-b from-purple-500/[0.08] to-love/[0.03]',
+      checkClass: 'bg-purple-500/15 text-purple-400',
+      btnClass: 'bg-gradient-to-r from-purple-500 to-love text-white hover:brightness-110 shadow-lg shadow-purple-500/25',
+    },
+    {
+      name: 'VIP Ultimate',
+      price: billingCycle === 'monthly' ? '299K' : '2.999K',
+      period: billingCycle === 'monthly' ? '/tháng' : '/năm',
+      features: ['Tất cả Pro', 'Nhân vật không giới hạn', 'AI cao cấp nhất', 'Hỗ trợ ưu tiên', 'Truy cập sớm', 'Mọi tính năng'],
+      cta: 'Nâng cấp Ultimate',
+      highlight: false,
+      badge: null,
+      glowColor: '#f59e0b',
+      borderClass: 'border-amber-400/30 group-hover:border-amber-400/50',
+      bgClass: 'bg-gradient-to-b from-amber-500/[0.06] to-transparent',
+      checkClass: 'bg-amber-500/15 text-amber-400',
+      btnClass: 'bg-gradient-to-r from-amber-500 to-amber-400 text-white hover:brightness-110 shadow-lg shadow-amber-500/20',
+    },
   ];
 
   return (
@@ -1078,94 +1122,81 @@ function PricingSection() {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="text-center mb-12"
         >
           <span className="text-love font-bold text-sm uppercase tracking-widest mb-4 inline-block">Bảng Giá</span>
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-4">
             Bắt Đầu{' '}
             <span className="bg-gradient-to-r from-love to-purple-400 bg-clip-text text-transparent">Hoàn Toàn Miễn Phí</span>
           </h2>
-          <p className="text-gray-400 max-w-xl mx-auto text-lg">Chọn gói phù hợp. Nâng cấp bất cứ lúc nào.</p>
+          <p className="text-gray-400 max-w-xl mx-auto text-lg mb-8">Chọn gói phù hợp. Nâng cấp bất cứ lúc nào.</p>
+
+          {/* Billing toggle */}
+          <div className="inline-flex items-center gap-2 bg-white/[0.04] rounded-xl p-1 border border-white/[0.06]">
+            <button
+              onClick={() => setBillingCycle('monthly')}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${billingCycle === 'monthly' ? 'bg-love text-white shadow-lg shadow-love/20' : 'text-gray-400 hover:text-white'}`}
+            >
+              Hàng tháng
+            </button>
+            <button
+              onClick={() => setBillingCycle('yearly')}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${billingCycle === 'yearly' ? 'bg-love text-white shadow-lg shadow-love/20' : 'text-gray-400 hover:text-white'}`}
+            >
+              Hàng năm
+              <span className="ml-1.5 text-xs text-green-400">-17%</span>
+            </button>
+          </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          {/* Free plan */}
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            viewport={{ once: true }}
-          >
-            <TiltCard className="group h-full" glowColor="#ffffff" intensity={6}>
-              <div className="relative h-full flex flex-col p-8 rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-transparent backdrop-blur-sm transition-all duration-500 group-hover:border-white/15">
-                <h3 className="text-xl font-bold mb-2 text-white">Miễn Phí</h3>
-                <div className="flex items-baseline gap-1.5 mb-8">
-                  <span className="text-5xl font-black text-white">0đ</span>
-                  <span className="text-gray-500 text-sm">/mãi mãi</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {tiers.map((t, i) => (
+            <motion.div
+              key={t.name}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: i * 0.08 }}
+              viewport={{ once: true }}
+            >
+              <TiltCard className="group h-full" glowColor={t.glowColor} intensity={t.highlight ? 8 : 6}>
+                <div className={`relative h-full flex flex-col p-6 rounded-2xl border ${t.borderClass} ${t.bgClass} backdrop-blur-sm transition-all duration-500 overflow-hidden`}>
+                  {t.highlight && <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-[80px] pointer-events-none" />}
+
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-bold text-white">{t.name}</h3>
+                      {t.badge && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-bold border border-purple-500/20">
+                          {t.badge}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-baseline gap-1.5 mb-6">
+                      <span className={`text-4xl font-black ${t.highlight ? 'bg-gradient-to-r from-purple-400 to-love bg-clip-text text-transparent' : 'text-white'}`}>{t.price}</span>
+                      <span className="text-gray-500 text-sm">{t.period}</span>
+                    </div>
+                  </div>
+
+                  <ul className="relative z-10 flex flex-col gap-3 mb-8 flex-1">
+                    {t.features.map((f) => (
+                      <li key={f} className="flex items-center gap-3 text-sm text-gray-300">
+                        <div className={`flex items-center justify-center w-5 h-5 rounded-full ${t.checkClass} shrink-0`}>
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        </div>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Link href="/auth/register" className="relative z-10 block">
+                    <button className={`w-full h-11 rounded-xl font-bold text-sm transition-all duration-300 ${t.btnClass}`}>
+                      {t.cta}
+                    </button>
+                  </Link>
                 </div>
-
-                <ul className="flex flex-col gap-4 mb-10 flex-1">
-                  {freeFeatures.map((f, i) => (
-                    <li key={f} className="flex items-center gap-3 text-sm text-gray-300">
-                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-500/15 shrink-0">
-                        <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                      </div>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-
-                <Link href="/auth/register" className="block">
-                  <button className="w-full h-12 rounded-xl bg-white/[0.06] border border-white/10 text-white font-bold transition-all duration-300 hover:bg-white/[0.12] hover:border-white/20">
-                    Bắt đầu ngay
-                  </button>
-                </Link>
-              </div>
-            </TiltCard>
-          </motion.div>
-
-          {/* Premium plan */}
-          <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            viewport={{ once: true }}
-          >
-            <TiltCard className="group h-full" glowColor="#f4258c" intensity={8}>
-              <div className="relative h-full flex flex-col p-8 rounded-2xl border border-love/30 bg-gradient-to-b from-love/[0.08] to-purple-600/[0.03] backdrop-blur-sm overflow-hidden transition-all duration-500 group-hover:border-love/50">
-                {/* Glow */}
-                <div className="absolute -top-24 -right-24 w-48 h-48 bg-love/20 rounded-full blur-[80px] pointer-events-none" />
-
-                <div className="relative z-10 flex items-center justify-between mb-2">
-                  <h3 className="text-xl font-bold text-white">Premium</h3>
-                  <span className="px-3 py-1 rounded-full bg-love/20 text-love text-xs font-bold border border-love/20">
-                    Phổ biến
-                  </span>
-                </div>
-                <div className="relative z-10 flex items-baseline gap-1.5 mb-8">
-                  <span className="text-5xl font-black bg-gradient-to-r from-love to-purple-400 bg-clip-text text-transparent">99K</span>
-                  <span className="text-gray-500 text-sm">/tháng</span>
-                </div>
-
-                <ul className="relative z-10 flex flex-col gap-4 mb-10 flex-1">
-                  {premiumFeatures.map((f, i) => (
-                    <li key={f} className="flex items-center gap-3 text-sm text-gray-300">
-                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-love/15 shrink-0">
-                        <CheckCircle className="w-3.5 h-3.5 text-love" />
-                      </div>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-
-                <Link href="/auth/register" className="relative z-10 block">
-                  <button className="w-full h-12 rounded-xl bg-gradient-to-r from-love to-purple-500 text-white font-bold transition-all duration-300 hover:brightness-110 shadow-lg shadow-love/25">
-                    Nâng cấp Premium
-                  </button>
-                </Link>
-              </div>
-            </TiltCard>
-          </motion.div>
+              </TiltCard>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>
