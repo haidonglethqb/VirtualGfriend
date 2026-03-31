@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { adminAuth } from './admin.middleware';
+import { uploadRouter } from '../upload/upload.routes';
 import {
   adminLogin,
   getUsers,
@@ -113,5 +114,8 @@ router.put('/tier-configs/:tier', updateTierConfigHandler);
 // Pricing management (Stripe)
 router.get('/pricing', getAdminPricing);
 router.put('/pricing/:tier', updateAdminPricing);
+
+// File upload (DO Spaces)
+router.use('/upload', uploadRouter);
 
 export { router as adminRouter };

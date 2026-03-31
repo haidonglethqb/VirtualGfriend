@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, MessageSquare, Heart, Coins, Shield, LogOut, Search,
@@ -8,7 +8,7 @@ import {
   TrendingUp, Crown, Sparkles, LayoutDashboard, Settings,
   Target, Image, Gift, Brain, Bell, Database, BarChart3,
   Plus, X, Check, AlertTriangle, Megaphone, Server, HardDrive,
-  Zap, Clock, Activity, Languages,
+  Zap, Clock, Activity, Languages, Upload,
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -324,6 +324,8 @@ export default function AdminPage() {
   const [selectedItem, setSelectedItem] = useState<User | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Toast notification
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -645,6 +647,36 @@ export default function AdminPage() {
       showToast(tr('Đổi trạng thái mẫu thất bại', 'Failed to toggle template'), 'error');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('gender', String(formData.gender || 'FEMALE').toLowerCase());
+
+      const tokenToUse = token || localStorage.getItem('adminToken') || '';
+      const res = await fetch(`${API_URL}/api/admin/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenToUse}` },
+        body,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        showToast(data.error || tr('Upload thất bại', 'Upload failed'), 'error');
+        return;
+      }
+
+      const data = await res.json();
+      setFormData({ ...formData, avatarUrl: data.url });
+      showToast(tr('Upload thành công', 'Upload successful'));
+    } catch {
+      showToast(tr('Upload thất bại', 'Upload failed'), 'error');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -1957,14 +1989,37 @@ export default function AdminPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Avatar URL *</label>
-                <input
-                  type="url"
-                  value={formData.avatarUrl as string || ''}
-                  onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                  placeholder="https://..."
-                />
+                <label className="block text-sm text-gray-400 mb-2">Avatar *</label>
+                {(formData.avatarUrl as string) && (
+                  <div className="mb-2 flex justify-center">
+                    <img src={formData.avatarUrl as string} alt="Preview" className="w-20 h-20 rounded-xl object-cover border border-gray-600" />
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={formData.avatarUrl as string || ''}
+                    onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
+                    className="flex-1 px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                    placeholder="https://... hoặc upload bên dưới"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => { if (e.target.files?.[0]) handleAvatarUpload(e.target.files[0]); }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="px-4 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl flex items-center gap-2"
+                  >
+                    <Upload size={16} />
+                    {uploading ? '...' : 'Upload'}
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -2064,13 +2119,37 @@ export default function AdminPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Avatar URL *</label>
-                <input
-                  type="url"
-                  value={formData.avatarUrl as string || ''}
-                  onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                />
+                <label className="block text-sm text-gray-400 mb-2">Avatar *</label>
+                {(formData.avatarUrl as string) && (
+                  <div className="mb-2 flex justify-center">
+                    <img src={formData.avatarUrl as string} alt="Preview" className="w-20 h-20 rounded-xl object-cover border border-gray-600" />
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={formData.avatarUrl as string || ''}
+                    onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
+                    className="flex-1 px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                    placeholder="https://... hoặc upload bên dưới"
+                  />
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    id="editAvatarUpload"
+                    onChange={(e) => { if (e.target.files?.[0]) handleAvatarUpload(e.target.files[0]); }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('editAvatarUpload')?.click()}
+                    disabled={uploading}
+                    className="px-4 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl flex items-center gap-2"
+                  >
+                    <Upload size={16} />
+                    {uploading ? '...' : 'Upload'}
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

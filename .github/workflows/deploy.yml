@@ -219,6 +219,11 @@ jobs:
             STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
             STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
             NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+            DO_SPACES_KEY=${{ secrets.DO_SPACES_KEY }}
+            DO_SPACES_SECRET=${{ secrets.DO_SPACES_SECRET }}
+            DO_SPACES_ENDPOINT=https://sgp1.digitaloceanspaces.com
+            DO_SPACES_BUCKET=haichu
+            DO_SPACES_REGION=sgp1
             GITHUB_REPOSITORY=${{ needs.type-check.outputs.image_name_lower }}
             ENVEOF
             # Xóa leading whitespace và escape $ trong values
