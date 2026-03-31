@@ -84,8 +84,13 @@ ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_userId_fkey" FOREIGN K
 -- AddForeignKey
 ALTER TABLE "payment_history" ADD CONSTRAINT "payment_history_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- RenameIndex (idempotent — old name may differ on VPS due to PG auto-truncation)
+-- RenameIndex (conditional — only rename if old truncated name exists on this DB)
 DO $$ BEGIN
-  ALTER INDEX "monitoring_metric_rollups_bucketStart_bucketSize_metricKey_d_ke" RENAME TO "monitoring_metric_rollups_bucketStart_bucketSize_metricKey__key";
-EXCEPTION WHEN undefined_object THEN NULL;
+  IF EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE indexname = 'monitoring_metric_rollups_bucketStart_bucketSize_metricKey_d_ke'
+  ) THEN
+    ALTER INDEX "monitoring_metric_rollups_bucketStart_bucketSize_metricKey_d_ke"
+      RENAME TO "monitoring_metric_rollups_bucketStart_bucketSize_metricKey__key";
+  END IF;
 END $$;
