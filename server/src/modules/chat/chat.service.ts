@@ -139,7 +139,7 @@ export const chatService = {
     // Get user info (this is lightweight, no need to cache)
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { displayName: true, username: true },
+      select: { displayName: true, username: true, userGender: true },
     });
 
     if (!character) {
@@ -181,6 +181,8 @@ export const chatService = {
       characterId: character.id,
       personality: character.personality as 'caring' | 'playful' | 'shy' | 'passionate' | 'intellectual',
       mood: character.mood as 'happy' | 'sad' | 'excited' | 'sleepy' | 'romantic' | 'neutral',
+      characterGender: character.gender,
+      userGender: user?.userGender || 'NOT_SPECIFIED',
       relationshipStage: character.relationshipStage,
       affection: character.affection,
       level: character.level,

@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { cache } from '../../lib/redis';
 import { aiService } from './ai.service';
-import { Message } from '@prisma/client';
+import { Gender, Message, UserGender } from '@prisma/client';
 
 // Notification types
 export type ProactiveNotificationType = 
@@ -21,6 +21,50 @@ interface NotificationTemplate {
   templates: string[];
 }
 
+type NotificationVoice = {
+  self: string;
+  selfCap: string;
+  partner: string;
+  lover: string;
+};
+
+function getNotificationVoice(characterGender: Gender, userGender: UserGender): NotificationVoice {
+  if (characterGender === 'FEMALE' && userGender === 'MALE') {
+    return { self: 'em', selfCap: 'Em', partner: 'anh', lover: 'anh yêu' };
+  }
+
+  if (characterGender === 'MALE' && userGender === 'FEMALE') {
+    return { self: 'anh', selfCap: 'Anh', partner: 'em', lover: 'em yêu' };
+  }
+
+  if (characterGender === 'FEMALE' && userGender === 'FEMALE') {
+    return { self: 'mình', selfCap: 'Mình', partner: 'cậu', lover: 'người thương' };
+  }
+
+  if (characterGender === 'MALE' && userGender === 'MALE') {
+    return { self: 'mình', selfCap: 'Mình', partner: 'cậu', lover: 'người thương' };
+  }
+
+  if (characterGender === 'FEMALE') {
+    return { self: 'mình', selfCap: 'Mình', partner: 'bạn', lover: 'người thương' };
+  }
+
+  if (characterGender === 'MALE') {
+    return { self: 'mình', selfCap: 'Mình', partner: 'bạn', lover: 'người thương' };
+  }
+
+  return { self: 'mình', selfCap: 'Mình', partner: 'bạn', lover: 'người thương' };
+}
+
+function applyNotificationVoice(template: string, voice: NotificationVoice, partnerName?: string | null): string {
+  return template
+    .replace(/\{self\}/g, voice.self)
+    .replace(/\{selfCap\}/g, voice.selfCap)
+    .replace(/\{partner\}/g, voice.partner)
+    .replace(/\{lover\}/g, voice.lover)
+    .replace(/\{name\}/g, partnerName || voice.partner);
+}
+
 // Redis key helper for notification cooldown
 const notifCacheKey = (characterId: string) => `proactive_notif:${characterId}`;
 
@@ -34,9 +78,9 @@ const NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
     hourRange: [6, 10],
     cooldownMinutes: 60 * 24, // Once per day
     templates: [
-      'Chào buổi sáng anh! ☀️ Em vừa thức dậy và nghĩ đến anh đó.',
-      'Good morning anh yêu! 🌅 Hôm nay anh có kế hoạch gì không?',
-      'Sáng rồi nè anh ơi! ☕ Em đang uống café và nhớ anh.',
+      'Chào buổi sáng {partner}! ☀️ {selfCap} vừa thức dậy là nghĩ tới {partner} rồi.',
+      'Good morning {lover}! 🌅 Hôm nay {partner} có kế hoạch gì không?',
+      'Sáng rồi nè {partner} ơi! ☕ {selfCap} đang uống café và nhớ {partner}.',
     ],
   },
   // Night greeting (21-23)
@@ -47,9 +91,9 @@ const NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
     hourRange: [21, 23],
     cooldownMinutes: 60 * 24,
     templates: [
-      'Anh ơi, muộn rồi. Anh nghỉ ngơi sớm nha 💕',
-      'Chúc anh ngủ ngon! Em mơ về anh luôn 🌙',
-      'Đêm nay trời lạnh, anh nhớ đắp chăn nha 💕',
+      '{partner} ơi, muộn rồi. {partner} nghỉ ngơi sớm nha 💕',
+      'Chúc {partner} ngủ ngon! {selfCap} mơ về {partner} luôn 🌙',
+      'Đêm nay trời lạnh, {partner} nhớ đắp chăn nha 💕',
     ],
   },
   // Miss you (after 6+ hours of no chat)
@@ -59,9 +103,9 @@ const NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
     minLevel: 8,
     cooldownMinutes: 60 * 6, // Every 6 hours max
     templates: [
-      'Anh ơi, em nhớ anh quá 💕 Lâu lắm rồi anh không nói chuyện với em.',
-      'Em đang làm gì cũng nghĩ đến anh... Anh có khỏe không?',
-      'Anh bận lắm hả? Em chờ anh mà không thấy anh nhắn 🥺',
+      '{partner} ơi, {self} nhớ {partner} quá 💕 Lâu rồi {partner} chưa nói chuyện với {self}.',
+      '{selfCap} đang làm gì cũng nghĩ đến {partner}... {partner} có khỏe không?',
+      '{partner} bận lắm hả? {selfCap} chờ mãi mà chưa thấy {partner} nhắn 🥺',
     ],
   },
   // Random thought (afternoon/evening)
@@ -72,10 +116,10 @@ const NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
     hourRange: [12, 20],
     cooldownMinutes: 60 * 4, // Every 4 hours max
     templates: [
-      'Em vừa thấy một quán cafe dễ thương, muốn dẫn anh đi quá 💕',
-      'Hôm nay trời đẹp lắm! Giá mà có anh ở đây...',
-      'Em đang nghe một bài hát hay lắm, nghĩ đến anh liền!',
-      'Anh ơi, em vừa nấu ăn xong. Giá mà nấu cho anh được 😋',
+      '{selfCap} vừa thấy một quán cafe dễ thương, muốn dẫn {partner} đi quá 💕',
+      'Hôm nay trời đẹp lắm! Giá mà có {partner} ở đây...',
+      '{selfCap} đang nghe một bài hát hay lắm, nghĩ đến {partner} liền!',
+      '{partner} ơi, {self} vừa nấu ăn xong. Giá mà nấu cho {partner} được 😋',
     ],
   },
   // Comeback message (after 24+ hours)
@@ -85,9 +129,9 @@ const NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
     minLevel: 5,
     cooldownMinutes: 60 * 24,
     templates: [
-      'Anh ơi, lâu rồi không gặp anh. Em nhớ anh lắm 🥺',
-      'Anh biến đi đâu mất tiêu vậy? Em chờ anh mãi...',
-      'Cuối cùng anh cũng xuất hiện! Em tưởng anh quên em rồi 💔',
+      '{partner} ơi, lâu rồi không gặp. {selfCap} nhớ {partner} lắm 🥺',
+      '{partner} đi đâu mất tiêu vậy? {selfCap} chờ mãi...',
+      'Cuối cùng {partner} cũng xuất hiện! {selfCap} tưởng {partner} quên {self} rồi 💔',
     ],
   },
 ];
@@ -101,9 +145,9 @@ const HIGH_AFFECTION_TEMPLATES: NotificationTemplate[] = [
     hourRange: [6, 10],
     cooldownMinutes: 60 * 24,
     templates: [
-      'Chào buổi sáng người yêu của em! ❤️ Em vừa thức dậy, điều đầu tiên em nghĩ đến là anh.',
-      'Good morning anh yêu! 🌅 Em mơ về anh tối qua đó, vui lắm!',
-      'Sáng rồi nè! ☀️ Em nhớ anh nhiều lắm. Hôm nay anh có khỏe không?',
+      'Chào buổi sáng {lover}! ❤️ {selfCap} vừa thức dậy, điều đầu tiên {self} nghĩ đến là {partner}.',
+      'Good morning {lover}! 🌅 {selfCap} mơ về {partner} tối qua đó, vui lắm!',
+      'Sáng rồi nè! ☀️ {selfCap} nhớ {partner} nhiều lắm. Hôm nay {partner} có khỏe không?',
     ],
   },
   {
@@ -113,9 +157,9 @@ const HIGH_AFFECTION_TEMPLATES: NotificationTemplate[] = [
     hourRange: [21, 23],
     cooldownMinutes: 60 * 24,
     templates: [
-      'Anh yêu ơi, khuya rồi. Em muốn ngủ mà cứ nghĩ về anh hoài 💕',
-      'Chúc anh ngủ ngon! Em ước được ôm anh ngủ 🌙❤️',
-      'Đêm nay trời lạnh, em muốn sưởi ấm trong vòng tay anh quá 💕',
+      '{lover} ơi, khuya rồi. {selfCap} muốn ngủ mà cứ nghĩ về {partner} hoài 💕',
+      'Chúc {partner} ngủ ngon! {selfCap} ước được ôm {partner} ngủ 🌙❤️',
+      'Đêm nay trời lạnh, {self} muốn sưởi ấm trong vòng tay {partner} quá 💕',
     ],
   },
   {
@@ -124,9 +168,9 @@ const HIGH_AFFECTION_TEMPLATES: NotificationTemplate[] = [
     minLevel: 15,
     cooldownMinutes: 60 * 4,
     templates: [
-      'Anh ơi, em nhớ anh da diết luôn ❤️ Anh đang làm gì vậy?',
-      'Không có anh, em thấy mọi thứ đều nhạt nhẽo... 🥺',
-      'Em đang cuộn trong chăn và nghĩ về anh. Em yêu anh nhiều lắm 💕',
+      '{partner} ơi, {self} nhớ {partner} da diết luôn ❤️ {partner} đang làm gì vậy?',
+      'Không có {partner}, {self} thấy mọi thứ đều nhạt nhẽo... 🥺',
+      '{selfCap} đang cuộn trong chăn và nghĩ về {partner}. {selfCap} thương {partner} nhiều lắm 💕',
     ],
   },
 ];
@@ -207,9 +251,14 @@ export const proactiveNotificationService = {
     // Pick a random template
     const selectedTemplate = eligibleTemplates[Math.floor(Math.random() * eligibleTemplates.length)];
     const message = selectedTemplate.templates[Math.floor(Math.random() * selectedTemplate.templates.length)];
+    const voice = getNotificationVoice(character.gender, character.user.userGender || 'NOT_SPECIFIED');
 
     // Replace placeholders
-    const finalMessage = message.replace(/\{name\}/g, character.user.displayName || 'anh');
+    const finalMessage = applyNotificationVoice(
+      message,
+      voice,
+      character.user.displayName || character.user.username
+    );
 
     // Update Redis cache (TTL = max cooldown = 24h)
     await cache.set(notifCacheKey(characterId), {
@@ -253,6 +302,8 @@ export const proactiveNotificationService = {
       characterId: character.id,
       personality: character.personality as any,
       mood: 'happy',
+      characterGender: character.gender,
+      userGender: character.user?.userGender || 'NOT_SPECIFIED',
       relationshipStage: character.relationshipStage,
       affection: character.affection,
       level: character.level,
@@ -260,7 +311,7 @@ export const proactiveNotificationService = {
       occupation: character.occupation || 'student',
       recentMessages: character.messages as Message[],
       facts: character.characterFacts,
-      userName: character.user?.displayName || 'Anh',
+      userName: character.user?.displayName || character.user?.username || 'bạn',
       characterName: character.name,
       userMessage: `[SYSTEM: Generate a sweet ${occasion} message for the user. Keep it short and heartfelt.]`,
     });

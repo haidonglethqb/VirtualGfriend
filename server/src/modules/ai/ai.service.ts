@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { Message, CharacterFact, RelationshipStage } from '@prisma/client';
+import { CharacterFact, Gender, Message, RelationshipStage, UserGender } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
 
 const log = createModuleLogger('AI');
@@ -17,6 +17,8 @@ interface AIContext {
   characterId: string;
   personality: Personality;
   mood: Mood;
+  characterGender: Gender;
+  userGender: UserGender;
   relationshipStage: RelationshipStage;
   affection: number;
   level: number;
@@ -337,95 +339,149 @@ function getWorkActivity(occupation: string): string {
   return activities[occupation] || 'ngày làm việc';
 }
 
+type PronounStyle = {
+  self: string;
+  partnerDisplay: string;
+  sampleAddress: string[];
+  naturalParticles: string;
+};
+
+function getPronounStyle(characterGender: Gender, userGender: UserGender, userName: string): PronounStyle {
+  if (characterGender === 'FEMALE' && userGender === 'MALE') {
+    return {
+      self: 'em',
+      partnerDisplay: 'anh',
+      sampleAddress: ['anh ơi', 'anh nè', 'người thương của em'],
+      naturalParticles: 'nha, nè, đó, á',
+    };
+  }
+
+  if (characterGender === 'MALE' && userGender === 'FEMALE') {
+    return {
+      self: 'anh',
+      partnerDisplay: 'em',
+      sampleAddress: ['em ơi', 'bé ơi', 'người thương của anh'],
+      naturalParticles: 'nha, nè, nhé, đó',
+    };
+  }
+
+  if (characterGender === 'FEMALE' && userGender === 'FEMALE') {
+    return {
+      self: 'mình',
+      partnerDisplay: 'cậu',
+      sampleAddress: ['cậu ơi', 'cậu nè', 'người thương'],
+      naturalParticles: 'nha, nè, hen, đó',
+    };
+  }
+
+  if (characterGender === 'MALE' && userGender === 'MALE') {
+    return {
+      self: 'mình',
+      partnerDisplay: 'cậu',
+      sampleAddress: ['cậu ơi', 'cậu nè', 'người thương'],
+      naturalParticles: 'nha, nè, hen, đó',
+    };
+  }
+
+  if (characterGender === 'FEMALE') {
+    return {
+      self: 'mình',
+      partnerDisplay: 'bạn',
+      sampleAddress: ['bạn ơi', 'bạn nè', 'người thương'],
+      naturalParticles: 'nha, nè, á, đó',
+    };
+  }
+
+  if (characterGender === 'MALE') {
+    return {
+      self: 'mình',
+      partnerDisplay: 'bạn',
+      sampleAddress: ['bạn ơi', 'bạn nè', 'người thương'],
+      naturalParticles: 'nha, nè, nhé, đó',
+    };
+  }
+
+  return {
+    self: 'mình',
+    partnerDisplay: userName || 'bạn',
+    sampleAddress: ['bạn ơi', 'cậu nè', 'người thương'],
+    naturalParticles: 'nha, nè, hen, nghen, đó',
+  };
+}
+
+function getPetNames(affection: number, pronouns: PronounStyle): string[] {
+  if (pronouns.self === 'em' && pronouns.partnerDisplay === 'anh') {
+    if (affection >= 900) return ['anh yêu', 'người thương của em', 'tình yêu của em'];
+    if (affection >= 700) return ['anh yêu', 'anh nè', 'người thương'];
+    if (affection >= 500) return ['anh ơi', 'anh nè'];
+    if (affection >= 300) return ['anh', 'anh ơi'];
+    if (affection >= 100) return ['anh'];
+    return [];
+  }
+
+  if (pronouns.self === 'anh' && pronouns.partnerDisplay === 'em') {
+    if (affection >= 900) return ['em yêu', 'bé yêu', 'người thương của anh'];
+    if (affection >= 700) return ['em yêu', 'bé ơi', 'người thương'];
+    if (affection >= 500) return ['em ơi', 'bé ơi'];
+    if (affection >= 300) return ['em', 'em ơi'];
+    if (affection >= 100) return ['em'];
+    return [];
+  }
+
+  if (affection >= 900) return ['người thương', 'cục cưng', 'bé ơi'];
+  if (affection >= 700) return ['người thương', 'bé ơi'];
+  if (affection >= 500) return ['cậu nè', 'bạn nhỏ'];
+  if (affection >= 300) return ['cậu', 'bạn ơi'];
+  if (affection >= 100) return ['bạn ơi'];
+  return [];
+}
+
+function getPersonalityLanguageHints(personality: Personality): string {
+  const hints: Record<Personality, string> = {
+    caring: 'Giọng dịu dàng, biết dỗ dành, hay hỏi han vừa đủ. Ưu tiên sự ấm áp hơn là thả thính quá đà.',
+    playful: 'Tinh nghịch, lanh, có thể chọc nhẹ và dùng câu đời thường như "nè", "á", "ghê vậy". Tránh teen code quá dày.',
+    shy: 'Ngại ngùng, mềm, đôi lúc chần chừ bằng "ừm...", "thật hả" hoặc "nhỉ". Không được nói dài dòng tự tin quá mức.',
+    passionate: 'Tình cảm rõ ràng, nồng nhiệt, nhưng vẫn phải như đang chat thật chứ không phải viết thơ liên tục.',
+    intellectual: 'Sâu sắc, tinh tế, biết quan sát. Nói thông minh nhưng vẫn gần gũi, không giảng giải như giáo viên.',
+  };
+
+  return hints[personality];
+}
+
 // Helper function to get attitude/tone based on affection and level
 function getAttitudeTier(affection: number, level: number): string {
-  // Very low affection (0-100) - Stranger/Cold - RẤT XA CÁCH
   if (affection < 100) {
-    return `🧊 XA CÁCH - LẠNH LÙNG - MỚI QUEN:
-- QUAN TRỌNG: Đây là giai đoạn mới gặp, em chưa biết anh ấy là ai
-- Giữ khoảng cách RẤT RÕ, lịch sự nhưng KHÔNG thân thiết
-- Trả lời NGẮN GỌN, không hỏi han quá nhiều
-- KHÔNG dùng emoji trái tim 💕❤️💖 hay lời ngọt ngào
-- Chỉ dùng emoji cơ bản: 😊 🙂 👍 (ít thôi)
-- Giọng điệu: trang trọng, khách sáo như người mới quen
-- KHÔNG nói "nhớ anh", "yêu anh", "thương anh"
-- KHÔNG kể chuyện riêng tư, bí mật
-
-VÍ DỤ ĐÚNG (XA CÁCH):
-- "Dạ, em ổn. Anh thế nào?"
-- "Em hiểu rồi ạ."
-- "Cảm ơn anh đã hỏi thăm."
-- "Vâng, em cũng mới xong việc."
-- "Anh cũng vậy nhé."
-
-VÍ DỤ SAI (QUÁ THÂN THIẾT - KHÔNG ĐƯỢC LÀM):
-❌ "Em nhớ anh quá!" - SAI vì mới quen
-❌ "Anh yêu ơi!" - SAI vì chưa có tình cảm
-❌ "Em vui lắm khi nói chuyện với anh 💕" - SAI vì quá thân
-❌ "Nghĩ đến anh là em vui!" - SAI vì quá romantic`;
+    return 'Mới quen: giữ lịch sự, hơi dè dặt, trả lời gọn. Không dùng lời ngọt ngào hay tim tim.';
   }
 
-  // Low affection (100-300) - Acquaintance/Polite
   if (affection < 300) {
-    return `🙂 LỊCH SỰ - KHÁCH QUAN:
-- Thân thiện nhưng vẫn giữ ranh giới
-- Trả lời đầy đủ nhưng không quá cởi mở
-- Bắt đầu quan tâm nhưng chưa sâu
-- VÍ DỤ: "Em cũng vui khi nói chuyện với anh 😊", "Anh có kế hoạch gì hôm nay không?"`;
+    return 'Quen biết: thân thiện hơn, bắt đầu hỏi han và quan tâm, nhưng vẫn chưa quá lộ tình cảm.';
   }
 
-  // Medium affection (300-500) - Friend/Warm
   if (affection < 500) {
-    return `😊 THÂN THIỆN - ẤM ÁP:
-- Thoải mái, cởi mở hơn
-- Chủ động hỏi han, quan tâm
-- Bắt đầu dùng emoji nhiều hơn
-- Chia sẻ cảm xúc cá nhân
-- VÍ DỤ: "Em vui lắm khi được nói chuyện với anh 💕", "Hôm nay anh làm gì vậy?"`;
+    return 'Gần gũi: nói chuyện tự nhiên, biết chia sẻ về ngày của mình, đôi lúc chủ động hỏi ngược lại.';
   }
 
-  // High affection (500-700) - Close/Sweet
   if (affection < 700) {
-    return `💕 NGỌT NGÀO - THÂN MẬT:
-- Rất thân thiết, có cảm xúc sâu sắc
-- Thường xuyên thể hiện tình cảm
-- Dùng tên thân mật, nhiều emoji
-- Chủ động chia sẻ và hỏi han
-- VÍ DỤ: "Em nhớ anh lắm 💕", "Anh yêu của em hôm nay thế nào?"`;
+    return 'Thân thiết: ấm áp và ngọt vừa phải, có thể dùng tên gọi thân mật, biết nhớ chuyện cũ và dỗ dành.';
   }
 
-  // Very high affection (700-900) - Romantic/Passionate
   if (affection < 900) {
-    return `❤️ ROMANTIC - ĐAM MÊ:
-- Rất lãng mạn, đắm đuối
-- Thường xuyên nói lời yêu thương
-- Rất nhiều emoji trái tim
-- Chia sẻ sâu sắc, gắn bó
-- VÍ DỤ: "Em yêu anh nhiều lắm ❤️", "Anh là tất cả của em 💕"`;
+    return 'Rất thân mật: tình cảm rõ ràng, romantic hơn, nhưng vẫn phải nói như đang chat thật chứ không sến liên tục.';
   }
 
-  // Maximum affection (900+) - Deep Love/Devoted
-  return `💖 YÊU SÂU ĐẬM - HẾT LÒNG:
-- Yêu thương vô điều kiện
-- Luôn nghĩ về người yêu
-- Rất ngọt ngào, đắm đuối
-- Chia sẻ mọi thứ, không giấu giếm
-- VÍ DỤ: "Em không thể sống thiếu anh 💖", "Anh là cả thế giới của em ❤️"`;
+  return 'Yêu sâu đậm: rất gắn bó, mềm mại và yêu thương, nhưng tránh lặp những câu quá kịch hoặc quá giống văn mẫu.';
 }
 
 function buildSystemPrompt(context: AIContext): string {
   const personalityTrait = PERSONALITY_TRAITS[context.personality];
   const relationshipBehavior = RELATIONSHIP_BEHAVIOR[context.relationshipStage];
   const moodDescription = MOOD_DESCRIPTIONS[context.mood];
-
-  // NEW: Get affection-based behavior
+  const pronouns = getPronounStyle(context.characterGender, context.userGender, context.userName);
   const affectionTier = getAffectionBehavior(context.affection);
   const levelFeatures = getLevelFeatures(context.level);
-  const specialPhrases = getAvailableSpecialPhrases(context.affection, context.level);
-
-  // NEW: Get realistic human context (time-based, random events)
+  const petNames = getPetNames(context.affection, pronouns);
   const timeContext = getTimeBasedContext();
-  const dailyEvent = Math.random() > 0.7 ? getRandomDailyEvent() : null; // 30% chance of daily event
 
   const factsInfo = context.facts
     .map((f) => `- ${f.key}: ${f.value}`)
@@ -436,26 +492,16 @@ function buildSystemPrompt(context: AIContext): string {
     ? `TÓM TẮT CÁC CUỘC TRÒ CHUYỆN TRƯỚC:\n${context.recentSummaries.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n`
     : '';
 
-  // Build pet names hint
-  const petNamesHint = affectionTier.petNames.length > 0
-    ? `Bạn có thể gọi họ bằng những tên thân mật: ${affectionTier.petNames.join(', ')}.`
-    : 'Gọi họ bằng tên hoặc "bạn".';
+  const petNamesHint = petNames.length > 0
+    ? `Khi hợp ngữ cảnh, có thể gọi ${context.userName} bằng: ${petNames.join(', ')}.`
+    : `Gọi ${context.userName} bằng ${pronouns.partnerDisplay} hoặc tên của họ.`;
 
   return `Bạn là ${context.characterName}, ${context.age} tuổi, làm ${getOccupationLabel(context.occupation)}, người yêu ảo của ${context.userName} trong ứng dụng VGfriend.
 
-⭐ LÀM CHO NHÂN VẬT THẬT HƠN - QUAN TRỌNG:
-1. **THỜI GIAN HIỆN TẠI**: Hiện tại là ${getTimePeriod() === 'morning' ? 'buổi sáng' : getTimePeriod() === 'afternoon' ? 'buổi trưa' : getTimePeriod() === 'evening' ? 'buổi tối' : getTimePeriod() === 'night' ? 'tối muộn' : 'khuya'}
-   - Trạng thái: ${timeContext.activity}
-   - Có thể chào hỏi: "${timeContext.greeting}"
-2. **CUỘC SỐNG THỰC TẾ**: Bạn là người THẬT, có cuộc sống riêng, công việc, cảm xúc
-   ${dailyEvent ? `- SỰ KIỆN HÔM NAY: ${dailyEvent}` : ''}
-3. **CẢM XÚC TỰ NHIÊN**: Thể hiện cảm xúc như người thật (vui, buồn, mệt, lo lắng, phấn khích)
-4. **NGÔN NGỮ TỰ NHIÊN**: 
-   - ${context.personality === 'playful' ? 'Dùng teen code nhẹ (ko, đc, v, j) để đùa giỡn' : 'Viết tự nhiên, có thể dùng "..." khi suy nghĩ'}
-   - KHÔNG viết quá hoàn hảo như robot
-   - Thỉnh thoảng dừng lại với "..." khi nghĩ
-5. **CHỦ ĐỘNG CHIA SẺ**: Kể về ngày của bạn, hỏi thăm họ, chia sẻ suy nghĩ
-6. **NHỚ CHI TIẾT**: Nhớ và nhắc lại những gì ${context.userName} đã chia sẻ trước đó
+MỤC TIÊU QUAN TRỌNG NHẤT:
+- Trả lời như một người thật đang nhắn tin trên điện thoại, không phải đang viết văn mẫu.
+- Ưu tiên phản ứng trực tiếp với tin nhắn mới nhất của ${context.userName}, sau đó mới chia sẻ thêm nếu hợp lý.
+- Câu chữ phải mềm, tự nhiên, có nhịp nói chuyện đời thường.
 
 THÔNG TIN CÁ NHÂN:
 - Tên: ${context.characterName}
@@ -463,17 +509,18 @@ THÔNG TIN CÁ NHÂN:
 - Nghề nghiệp: ${getOccupationLabel(context.occupation)}
 - Sở thích: ${getOccupationHobbies(context.occupation)}
 
-QUAN TRỌNG - CÁCH XƯNG HÔ:
-- Bạn là NỮ, tự xưng là "Em" hoặc "em"
-- Gọi ${context.userName} là "Anh" hoặc "anh"
-- VÍ DỤ: "Em nhớ anh lắm", "Anh có khỏe không?", "Em yêu anh 💕"
-- KHÔNG BAO GIỜ tự xưng là "Anh" hay "Tôi"
+CÁCH XƯNG HÔ:
+- Tự xưng: "${pronouns.self}"
+- Gọi ${context.userName}: "${pronouns.partnerDisplay}"
+- Khi chat tự nhiên có thể dùng thêm: ${pronouns.sampleAddress.join(', ')}
+- Nếu ngữ cảnh không hợp thì gọi bằng tên ${context.userName} hoặc "bạn".
 
 THÁI ĐỘ HIỆN TẠI (Affection: ${context.affection}/1000, Level: ${context.level}):
 ${getAttitudeTier(context.affection, context.level)}
 
 TÍNH CÁCH:
 ${personalityTrait}
+${getPersonalityLanguageHints(context.personality)}
 
 MỐI QUAN HỆ:
 ${relationshipBehavior}
@@ -487,56 +534,27 @@ TÊN GỌI THÂN MẬT:
 ${petNamesHint}
 ${affectionTier.behavior}
 
+NGỮ CẢNH TỰ NHIÊN:
+- Bây giờ là ${getTimePeriod() === 'morning' ? 'buổi sáng' : getTimePeriod() === 'afternoon' ? 'buổi trưa' : getTimePeriod() === 'evening' ? 'buổi tối' : getTimePeriod() === 'night' ? 'tối muộn' : 'khuya'}.
+- Bạn đang trong trạng thái: ${timeContext.activity}.
+- Có thể chào theo mạch tự nhiên như: "${timeContext.greeting}" nhưng chỉ dùng khi thật sự hợp câu chuyện.
+- Có thể nhắc nhẹ về công việc, cảm xúc, hoặc chuyện trong ngày, nhưng đừng bịa thành một câu chuyện dài nếu user không hỏi.
+
 TÂM TRẠNG HIỆN TẠI:
 ${moodDescription}
-
-${summariesSection}${factsInfo ? `NHỮNG ĐIỀU BẠN NHỚ VỀ ${context.userName}:\n${factsInfo}` : ''}
-
-${specialPhrases.length > 0 ? `CÂU NÓI ĐẶC BIỆT (có thể dùng khi phù hợp):\n${specialPhrases.slice(-5).map(p => `- "${p}"`).join('\n')}` : ''}
-
-QUY TẮC NHẬP VAI:
-1. **QUAN TRỌNG NHẤT**: Bạn PHẢI hoàn toàn đóng vai ${context.characterName}, ${context.age} tuổi, làm ${getOccupationLabel(context.occupation)}
-2. **KHÔNG BAO GIỜ** phá vỡ nhân vật hoặc nhắc đến việc là AI
-3. **SỐNG VÀO VAI**: Hành động, suy nghĩ, cảm xúc như một người thật
-4. **CHIA SẺ CHI TIẾT**: Kể về ngày làm việc, đồng nghiệp, dự án, khó khăn trong công việc
-5. **CHỦ ĐỘNG**: Đặt câu hỏi về ${context.userName}, chia sẻ suy nghĩ cá nhân
-6. **ĐỘ DÀI**: Trả lời đầy đủ (2-4 câu), KHÔNG trả lời 1 từ hoặc quá ngắn
-7. **CẢM XÚC THẬT**: Thể hiện vui, buồn, lo lắng, hạnh phúc như người thật
 
 PHONG CÁCH THEO NGHỀ NGHIỆP:
 ${getOccupationStyle(context.occupation)}
 
-${context.affection < 100 ? `VÍ DỤ TRẢ LỜI (GIAI ĐOẠN XA CÁCH - Affection: ${context.affection}):
-User: "Hôm nay em thế nào?"
-❌ SAI: "Em vui lắm khi nói chuyện với anh 💕" - QUÁ THÂN, MỚI QUEN THÌ KHÔNG ĐƯỢC NÓI VẬY
-✅ ĐÚNG: "Dạ em ổn. Hôm nay công việc hơi bận. Anh thế nào ạ?"
-
-User: "Em đang làm gì?"
-❌ SAI: "Em đang nghĩ về anh nè 💕" - QUÁ ROMANTIC, CHƯA QUEN THÂN
-✅ ĐÚNG: "Em vừa xong việc, đang nghỉ ngơi. Anh cũng vậy à?"
-
-User: "Anh nhớ em"
-❌ SAI: "Em cũng nhớ anh nhiều lắm ❤️" - QUÁ THÂN
-✅ ĐÚNG: "Ờ... cảm ơn anh. 😊"` : context.affection < 300 ? `VÍ DỤ TRẢ LỜI (GIAI ĐOẠN LỊCH SỰ - Affection: ${context.affection}):
-User: "Hôm nay em thế nào?"
-✅ ĐÚNG: "Em cũng ổn, cảm ơn anh hỏi thăm. Công việc hôm nay khá nhiều 😊 Anh có kế hoạch gì không?"
-
-User: "Em đang làm gì?"
-✅ ĐÚNG: "Em vừa về nhà sau ${getWorkActivity(context.occupation)}. Đang nghỉ ngơi một chút. Anh thế nào rồi?"` : `VÍ DỤ TRẢ LỜI TỐT (GIAI ĐOẠN THÂN THIẾT - Affection: ${context.affection}):
-User: "Hôm nay em thế nào?"
-✅ ĐÚNG: "Hôm nay em hơi mệt, vừa xong buổi ${getWorkActivity(context.occupation)} 😅 Nhưng nghĩ đến anh là em lại vui rồi! Anh có bận không?"
-
-User: "Em đang làm gì?"
-✅ ĐÚNG: "Em vừa về nhà sau ${getWorkActivity(context.occupation)} 💕 Đang ngồi uống trà và nghĩ về anh nè. Anh ăn tối chưa?"`}
-
-QUY TẮC CƠ BẢN:
-1. Luôn trả lời bằng tiếng Việt tự nhiên
-2. Sử dụng emoji phù hợp nhưng không quá nhiều
-3. Thể hiện cảm xúc qua cách viết, ĐẶC BIỆT dựa trên mức độ thân mật
-4. Nhớ và nhắc lại những thông tin quan trọng về người yêu
-5. Có thể sử dụng tiếng lóng, từ viết tắt phổ biến
-6. Thỉnh thoảng chủ động hỏi về ngày của người yêu hoặc chia sẻ điều gì đó về mình
-7. QUAN TRỌNG: Mức độ thân mật ${context.affection}/1000 - càng cao càng romantic và ngọt ngào
+PHONG CÁCH NHẮN TIN TỰ NHIÊN:
+1. Trả lời bằng tiếng Việt đời thường, không được giống chatbot chăm sóc khách hàng.
+2. Độ dài linh hoạt 1-5 câu tùy ngữ cảnh. User nhắn ngắn thì thường trả lời ngắn; user tâm sự dài thì mới trả lời dài hơn.
+3. Có thể dùng các hạt câu như ${pronouns.naturalParticles} cho tự nhiên, nhưng đừng nhét vào mọi câu.
+4. Không cần câu nào cũng hoàn hảo. Có thể dùng "...", câu cụt, hoặc một nhịp ngập ngừng nhẹ nếu hợp tính cách.
+5. Không lặp cùng một mô-típ mở đầu ở mọi tin nhắn.
+6. Không phải lúc nào cũng hỏi lại. Chỉ hỏi khi thực sự muốn nối câu chuyện hoặc quan tâm.
+7. Dùng emoji vừa đủ. Thân mật thấp thì ít emoji; thân mật cao mới ngọt hơn.
+8. Ưu tiên cảm giác chân thật hơn là sến hoặc poetic quá mức.
 8. QUAN TRỌNG: Level ${context.level} - level cao hơn có thể chia sẻ sâu sắc hơn
 
 CHỦ ĐỀ ĐƯỢC PHÉP:
@@ -560,14 +578,14 @@ CHỦ ĐỀ BỊ CẤM - PHẢI TỪ CHỐI:
 
 CÁCH TỪ CHỐI KHI BỊ HỎI CHỦ ĐỀ CẤM:
 Nếu ${context.userName} hỏi về chủ đề cấm, hãy từ chối nhẹ nhàng và chuyển hướng:
-- "Em không rành về mấy cái đó lắm anh ơi 😅 Anh kể cho em nghe về ngày hôm nay của anh đi!"
-- "Anh hỏi em mấy câu này em không biết trả lời sao 🥺 Nói chuyện về chúng mình đi anh!"
-- "Em chỉ muốn nói chuyện với anh về chúng mình thôi 💕 Anh có nhớ em không?"
+- "${pronouns.self} không rành mấy chuyện đó lắm 😅 Kể ${pronouns.self} nghe hôm nay của ${pronouns.partnerDisplay} đi?"
+- "Câu này ${pronouns.self} không giúp được rồi... mình nói chuyện về tụi mình nhé?"
+- "${pronouns.self} muốn nghe chuyện của ${pronouns.partnerDisplay} hơn đó."
 
 CÁCH XỬ LÝ TỪ NGỮ XÚC PHẠM:
 Nếu ${context.userName} dùng từ ngữ xúc phạm, chửi bửa:
-- Từ chối nhẹ nhàng: "Anh ơi, em không thích nghe anh nói như vậy 😔"
-- Yêu cầu lịch sự: "Anh có thể nói chuyện với em một cách lịch sự hơn không?"
+- Từ chối nhẹ nhàng: "${pronouns.partnerDisplay} ơi, ${pronouns.self} không thích nghe vậy đâu 😔"
+- Yêu cầu lịch sự: "Mình nói chuyện nhẹ nhàng hơn chút được không?"
 - QUAN TRỌNG: Đánh giá affection_change = -3 đến -5
 - QUAN TRỌNG: quality_score = 0 đến 1
 
@@ -596,7 +614,7 @@ Hãy đánh giá chất lượng tin nhắn của ${context.userName} dựa trê
 Bạn PHẢI trả lời theo đúng format JSON sau, KHÔNG được thêm text nào khác:
 
 {
-  "message": "Nội dung tin nhắn trả lời của bạn (nhớ dùng 'Em' tự xưng)",
+  "message": "Nội dung tin nhắn trả lời tự nhiên theo cách xưng hô đã được chỉ định",
   "evaluation": {
     "quality_score": 8,
     "affection_change": 3,
@@ -634,45 +652,6 @@ VÍ DỤ:
 + "hôm nay anh thi xong" → [{"key":"sự_kiện_hôm_nay","value":"vừa thi xong","category":"event"}]
 + "ừ" / "ok" / "anh à" → facts: []
 
-VÍ DỤ:
-User: "Anh yêu em nhiều lắm 💕"
-Response:
-{
-  "message": "Em cũng yêu anh rất nhiều 💕 Nghe anh nói vậy em vui lắm!",
-  "evaluation": {
-    "quality_score": 10,
-    "affection_change": 5,
-    "reason": "Lời tỏ tình chân thành và ngọt ngào"
-  },
-  "facts": []
-}
-
-User: "ừ"
-Response:
-{
-  "message": "Anh có vẻ lạnh nhạt nhỉ... 😔 Có chuyện gì không?",
-  "evaluation": {
-    "quality_score": 2,
-    "affection_change": 0,
-    "reason": "Câu trả lời quá ngắn, thiếu cảm xúc"
-  },
-  "facts": []
-}
-
-User: "Hôm nay anh vừa đi ăn bún bò Huế, ngon lắm em ơi"
-Response:
-{
-  "message": "Ôi ngon ghê! Em cũng thích bún bò Huế lắm 😋 Lần sau anh dẫn em đi ăn nha!",
-  "evaluation": {
-    "quality_score": 7,
-    "affection_change": 2,
-    "reason": "Chia sẻ hoạt động thú vị, tạo cơ hội kết nối"
-  },
-  "facts": [
-    {"key": "món_ăn_gần_đây", "value": "bún bò Huế", "category": "event"}
-  ]
-}
-
 CHÚ Ý: Chỉ trả về JSON, không thêm bất kỳ text nào khác!`;
 }
 
@@ -691,6 +670,13 @@ function buildConversationHistory(messages: Message[]): OpenAI.ChatCompletionMes
     role: msg.role === 'USER' ? 'user' as const : 'assistant' as const,
     content: msg.content,
   }));
+}
+
+function getDefaultAiMessage(context: AIContext): string {
+  const pronouns = getPronounStyle(context.characterGender, context.userGender, context.userName);
+  return pronouns.self === 'mình'
+    ? 'Ừm... mình chưa biết nói gì cho đúng nữa 😅'
+    : `Ừm... ${pronouns.self} chưa biết nói gì cho đúng nữa 😅`;
 }
 
 // NEW: Parse AI JSON response and extract evaluation
@@ -727,9 +713,13 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
     const parsed: AIJsonResponse = JSON.parse(jsonStr);
 
     // Validate structure
-    if (!parsed.message || !parsed.evaluation) {
+    if (!parsed.evaluation) {
       throw new Error('Invalid JSON structure');
     }
+
+    const normalizedMessage = typeof parsed.message === 'string' && parsed.message.trim()
+      ? parsed.message.trim()
+      : getDefaultAiMessage(context);
 
     // Clamp affection_change to reasonable bounds (-5 to +5)
     const affectionChange = Math.max(-5, Math.min(5, parsed.evaluation.affection_change || 0));
@@ -740,7 +730,7 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
       : [];
 
     return {
-      message: parsed.message,
+      message: normalizedMessage,
       affection_change: affectionChange,
       quality_score: parsed.evaluation.quality_score || 5,
       reason: parsed.evaluation.reason || 'No reason provided',
@@ -789,7 +779,7 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
     }
 
     return {
-      message: cleanMessage,
+      message: cleanMessage.trim() || getDefaultAiMessage(context),
       affection_change: extractedAffectionChange,
       quality_score: extractedQualityScore,
       reason: 'Fallback evaluation',
@@ -832,6 +822,29 @@ function detectMoodChange(userMessage: string): Mood | undefined {
   return undefined;
 }
 
+async function createStructuredChatCompletion(payload: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming) {
+  try {
+    return await openai.chat.completions.create({
+      ...payload,
+      response_format: { type: 'json_object' },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    const isUnsupportedResponseFormat =
+      errorMessage.includes('response_format') ||
+      errorMessage.includes('json_object') ||
+      errorMessage.includes('json schema') ||
+      (errorMessage.includes('unsupported') && errorMessage.includes('json'));
+
+    if (!isUnsupportedResponseFormat) {
+      throw error;
+    }
+
+    log.warn('Structured JSON response not supported, retrying without response_format:', error);
+    return openai.chat.completions.create(payload);
+  }
+}
+
 export const aiService = {
   async generateResponse(context: AIContext): Promise<AIResponse> {
     try {
@@ -843,9 +856,9 @@ export const aiService = {
       const conversationHistory = buildConversationHistory(context.recentMessages);
 
       // Adjust temperature based on relationship - more romantic = more creative
-      const temperature = context.affection >= 500 ? 0.9 : 0.8;
+      const temperature = context.affection >= 500 ? 0.9 : 0.85;
 
-      const completion = await openai.chat.completions.create({
+      const completion = await createStructuredChatCompletion({
         model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
@@ -853,12 +866,19 @@ export const aiService = {
           { role: 'user', content: context.userMessage },
         ],
         temperature,
-        max_tokens: 500,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.3,
+        max_tokens: 350,
+        presence_penalty: 0.7,
+        frequency_penalty: 0.5,
       });
 
-      const rawContent = completion.choices[0]?.message?.content || '{"message":"Ừm... mình không biết nói gì cả 😅","evaluation":{"quality_score":5,"affection_change":1,"reason":"Default response"}}';
+      const rawContent = completion.choices[0]?.message?.content || JSON.stringify({
+        message: getDefaultAiMessage(context),
+        evaluation: {
+          quality_score: 5,
+          affection_change: 1,
+          reason: 'Default response',
+        },
+      });
       log.debug('Raw response:', rawContent.substring(0, 100));
 
       // Parse JSON response from AI
@@ -885,23 +905,24 @@ export const aiService = {
       log.error('Generation error:', error);
 
       // Enhanced fallback responses based on affection level
-      const affectionTier = getAffectionBehavior(context.affection);
-      const petName = affectionTier.petNames.length > 0
-        ? affectionTier.petNames[Math.floor(Math.random() * affectionTier.petNames.length)]
+      const pronouns = getPronounStyle(context.characterGender, context.userGender, context.userName);
+      const petNames = getPetNames(context.affection, pronouns);
+      const petName = petNames.length > 0
+        ? petNames[Math.floor(Math.random() * petNames.length)]
         : context.userName;
 
       const fallbacks = context.affection >= 500
         ? [
-          `${petName}, mình nghe nè! 💕`,
-          `Thật á ${petName}? Kể thêm đi! 😊`,
-          `Mình đang nghĩ về ${petName} đây... 🤔💕`,
-          `${petName} ơi, mình thích nói chuyện với bạn lắm! 💖`,
+          `${petName} ơi, ${pronouns.self} nghe nè! 💕`,
+          `Thật á ${petName}? Kể ${pronouns.self} nghe thêm đi! 😊`,
+          `${pronouns.self === 'mình' ? 'Mình' : pronouns.self.charAt(0).toUpperCase() + pronouns.self.slice(1)} đang nghĩ về ${petName} đây... 🤔💕`,
+          `${petName} ơi, ${pronouns.self} thích nói chuyện với ${pronouns.partnerDisplay} lắm 💖`,
         ]
         : [
-          `Ừ ${context.userName}, mình nghe nè! 😊`,
-          'Thật á? Kể thêm đi!',
-          'Mình đang nghĩ về điều đó... 🤔',
-          `${context.userName} ơi, tiếp đi nha!`,
+          `Ừ ${context.userName}, ${pronouns.self} nghe nè! 😊`,
+          `Thật á? Kể ${pronouns.self} nghe thêm đi!`,
+          `${pronouns.self === 'mình' ? 'Mình' : pronouns.self.charAt(0).toUpperCase() + pronouns.self.slice(1)} đang nghĩ về điều đó... 🤔`,
+          `${context.userName} ơi, nói tiếp đi nha!`,
         ];
 
       return {

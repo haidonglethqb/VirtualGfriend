@@ -118,6 +118,11 @@ export const giftService = {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
+    const userProfile = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true, username: true, userGender: true },
+    });
+
     // Check inventory
     const userGift = await prisma.userGift.findUnique({
       where: { userId_giftId: { userId, giftId: data.giftId } },
@@ -137,6 +142,8 @@ export const giftService = {
         characterId: data.characterId,
         personality: character.personality as any,
         mood: (character.mood || 'happy') as any,
+        characterGender: character.gender,
+        userGender: userProfile?.userGender || 'NOT_SPECIFIED',
         relationshipStage: character.relationshipStage,
         affection: character.affection,
         level: character.level,
@@ -144,13 +151,13 @@ export const giftService = {
         occupation: character.occupation || 'student',
         recentMessages: [],
         facts: [],
-        userName: '',
+        userName: userProfile?.displayName || userProfile?.username || 'bạn',
         characterName: character.name,
         userMessage: `[SYSTEM: User just gifted you "${gift.name}" (${gift.description || 'a special gift'}). React naturally and sweetly in 1-2 short Vietnamese sentences. Express gratitude in your unique personality.]`,
       });
       reaction = aiResponse.content;
     } catch {
-      reaction = `Wow! ${gift.name}! Cảm ơn em nhiều lắm! 💕`;
+      reaction = `Wow, ${gift.name} luôn hả? Cảm ơn nhiều nha 💕`;
     }
 
     // Use transaction for atomicity - all or nothing
