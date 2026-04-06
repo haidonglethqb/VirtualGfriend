@@ -24,6 +24,7 @@ interface AIContext {
   occupation: string; // Character occupation
   recentMessages: Message[];
   facts: CharacterFact[];
+  recentSummaries?: string[]; // Recent conversation summaries for long-term context
   userName: string;
   characterName: string;
   userMessage: string;
@@ -430,6 +431,11 @@ function buildSystemPrompt(context: AIContext): string {
     .map((f) => `- ${f.key}: ${f.value}`)
     .join('\n');
 
+  // Recent conversation summaries for long-term memory context
+  const summariesSection = context.recentSummaries && context.recentSummaries.length > 0
+    ? `TÓM TẮT CÁC CUỘC TRÒ CHUYỆN TRƯỚC:\n${context.recentSummaries.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n`
+    : '';
+
   // Build pet names hint
   const petNamesHint = affectionTier.petNames.length > 0
     ? `Bạn có thể gọi họ bằng những tên thân mật: ${affectionTier.petNames.join(', ')}.`
@@ -484,7 +490,7 @@ ${affectionTier.behavior}
 TÂM TRẠNG HIỆN TẠI:
 ${moodDescription}
 
-${factsInfo ? `NHỮNG ĐIỀU BẠN NHỚ VỀ ${context.userName}:\n${factsInfo}` : ''}
+${summariesSection}${factsInfo ? `NHỮNG ĐIỀU BẠN NHỚ VỀ ${context.userName}:\n${factsInfo}` : ''}
 
 ${specialPhrases.length > 0 ? `CÂU NÓI ĐẶC BIỆT (có thể dùng khi phù hợp):\n${specialPhrases.slice(-5).map(p => `- "${p}"`).join('\n')}` : ''}
 
@@ -601,16 +607,32 @@ Bạn PHẢI trả lời theo đúng format JSON sau, KHÔNG được thêm text
   ]
 }
 
-TRÍCH XUẤT FACTS (QUAN TRỌNG):
-- Mỗi tin nhắn, hãy xem ${context.userName} có chia sẻ thông tin cá nhân nào không
-- Nếu có, thêm vào "facts" array (tối đa 3 facts mỗi tin nhắn)
-- Nếu không có thông tin mới, "facts" là mảng rỗng []
-- Chỉ trích xuất thông tin RÕ RÀNG, không suy đoán
-- Categories: preference (sở thích), memory (kỷ niệm), trait (tính cách), event (sự kiện)
-- VÍ DỤ facts:
-  + User nói "anh thích ăn phở" → {"key": "món_ăn_yêu_thích", "value": "phở", "category": "preference"}
-  + User nói "anh là dev" → {"key": "nghề_nghiệp", "value": "developer", "category": "trait"}
-  + User nói "hôm nay anh thi xong" → {"key": "sự_kiện_gần_đây", "value": "vừa thi xong", "category": "event"}
+TRÍCH XUẤT FACTS (QUAN TRỌNG - ĐÂY LÀ BỘ NHỚ DÀI HẠN):
+Phân tích tin nhắn của ${context.userName}, xác định thông tin cá nhân quan trọng cần ghi nhớ lâu dài.
+
+CATEGORIES:
+- preference: Sở thích, thức ăn/nhạc/phim yêu thích, màu sắc, phong cách sống
+- trait: Tính cách, đặc điểm cá nhân, thói quen, nghề nghiệp, info cố định (QUAN TRỌNG NHẤT)
+- memory: Kỷ niệm đáng nhớ, trải nghiệm quan trọng đã chia sẻ
+- event: Việc đang xảy ra hôm nay/tuần này (tạm thời, ít quan trọng hơn)
+
+ƯU TIÊN TRÍCH XUẤT:
+✅ LUÔN extract: tên thật, quê quán, nghề nghiệp, gia đình, tuổi, tên pet
+✅ Nên extract: sở thích rõ ràng, milestone quan hệ, bí mật chia sẻ lần đầu
+⚠️ Cẩn thận: chỉ extract event nếu đủ cụ thể và có ý nghĩa
+❌ Không extract: lời chào hỏi "ok", "ừ", "ừm", cảm xúc thông thường
+
+QUY TẮC:
+- Tối đa 3 facts mỗi tin nhắn
+- Key: snake_case 2-4 từ (tên_thật, nghề_nghiệp, món_yêu_thích)
+- Không suy đoán - chỉ từ thông tin ${context.userName} chia sẻ RÕ RÀNG
+- "facts" là [] nếu không có thông tin mới
+
+VÍ DỤ:
++ "anh tên Minh, làm dev" → [{"key":"tên_thật","value":"Minh","category":"trait"},{"key":"nghề_nghiệp","value":"developer","category":"trait"}]
++ "anh thích ăn phở, ghét đồ ngọt" → [{"key":"món_yêu_thích","value":"phở","category":"preference"},{"key":"không_thích_ăn","value":"đồ ngọt","category":"preference"}]
++ "hôm nay anh thi xong" → [{"key":"sự_kiện_hôm_nay","value":"vừa thi xong","category":"event"}]
++ "ừ" / "ok" / "anh à" → facts: []
 
 VÍ DỤ:
 User: "Anh yêu em nhiều lắm 💕"
@@ -893,7 +915,8 @@ export const aiService = {
   async extractFacts(messages: Message[]): Promise<Array<{ key: string; value: string; category: string }>> {
     try {
       const conversationText = messages
-        .map((m) => `${m.role}: ${m.content}`)
+        .slice(-20) // Use last 20 messages for context
+        .map((m) => `${m.role === 'USER' ? 'Người dùng' : 'AI'}: ${m.content}`)
         .join('\n');
 
       const completion = await openai.chat.completions.create({
@@ -901,19 +924,41 @@ export const aiService = {
         messages: [
           {
             role: 'system',
-            content: `Trích xuất thông tin quan trọng về người dùng từ cuộc hội thoại.
-Trả về JSON array với format: [{"key": "tên thông tin", "value": "giá trị", "category": "preference|memory|trait|event"}]
-Ví dụ: [{"key": "màu_yêu_thích", "value": "xanh", "category": "preference"}]
-Chỉ trích xuất thông tin rõ ràng, không suy đoán.`,
+            content: `Bạn là AI chuyên phân tích và trích xuất thông tin cá nhân từ cuộc trò chuyện.
+
+NHIỆM VỤ: Trích xuất TẤT CẢ thông tin quan trọng về NGƯỜI DÙNG từ cuộc hội thoại.
+
+CATEGORIES:
+- trait: Thông tin CỐ ĐỊNH (tên, nghề nghiệp, quê quán, tuổi, gia đình) - nhớ mãi mãi
+- preference: Sở thích DÀI HẠN (món ăn, nhạc, phim, màu sắc, sport) - ít thay đổi
+- memory: Kỷ niệm hoặc sự kiện quan trọng đáng nhớ
+- event: Sự kiện tạm thời (hôm nay, tuần này)
+
+ƯU TIÊN:
+1. LUÔN extract: tên thật, tuổi, quê quán, nghề nghiệp, thành viên gia đình, tên pet
+2. Nên extract: sở thích rõ ràng, milestone quan hệ, bí mật chia sẻ
+3. Cẩn thận: chỉ extract event khi đủ cụ thể
+
+QUY TẮC:
+- Key: snake_case, 2-4 từ (tên_thật, nghề_nghiệp, món_yêu_thích)
+- Value: ngắn gọn, cụ thể
+- Tối đa 7 facts, ưu tiên facts có category trait/preference
+- Cập nhật value mới nhất nếu đã biết
+- Không suy đoán từ ngữ cảnh không rõ ràng
+- Bỏ qua lời chào, "ok", "ừ", tin nhắn cảm xúc đơn giản
+
+FORMAT: Chỉ trả về JSON array. Nếu không có: []
+VÍ DỤ: [{"key":"tên_thật","value":"Minh","category":"trait"},{"key":"nghề_nghiệp","value":"kỹ sư phần mềm","category":"trait"}]`,
           },
           { role: 'user', content: conversationText },
         ],
-        temperature: 0.3,
-        max_tokens: 500,
+        temperature: 0.2,
+        max_tokens: 600,
       });
 
       const content = completion.choices[0]?.message?.content || '[]';
-      return JSON.parse(content);
+      const jsonMatch = content.match(/\[.*\]/s);
+      return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
     } catch {
       return [];
     }

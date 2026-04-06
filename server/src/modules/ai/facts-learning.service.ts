@@ -175,25 +175,43 @@ export const factsLearningService = {
   },
 
   /**
-   * Decay old facts (reduce importance over time)
-   * This should be run periodically (e.g., daily cron job)
+   * Decay old facts (reduce importance over time).
+   * Rules:
+   *   - trait, preference, personal_info, hobby → NEVER decay (permanent)
+   *   - memory → decay after 60 days
+   *   - event → decay after 30 days (default)
    */
   async decayOldFacts(daysOld: number = 30): Promise<number> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+    let totalDecayed = 0;
 
-    // Reduce importance of old facts by 1, but not below 1
-    const result = await prisma.characterFact.updateMany({
+    // Decay event facts quickly (after daysOld days, default 30)
+    const eventCutoff = new Date();
+    eventCutoff.setDate(eventCutoff.getDate() - daysOld);
+    const eventResult = await prisma.characterFact.updateMany({
       where: {
-        updatedAt: { lt: cutoffDate },
+        updatedAt: { lt: eventCutoff },
         importance: { gt: 1 },
+        category: 'event',
       },
-      data: {
-        importance: { decrement: 1 },
-      },
+      data: { importance: { decrement: 1 } },
     });
+    totalDecayed += eventResult.count;
 
-    log.info('Decayed ' + result.count + ' old facts');
-    return result.count;
+    // Decay memory facts slower (after 60 days)
+    const memoryCutoff = new Date();
+    memoryCutoff.setDate(memoryCutoff.getDate() - daysOld * 2);
+    const memoryResult = await prisma.characterFact.updateMany({
+      where: {
+        updatedAt: { lt: memoryCutoff },
+        importance: { gt: 1 },
+        category: 'memory',
+      },
+      data: { importance: { decrement: 1 } },
+    });
+    totalDecayed += memoryResult.count;
+
+    // trait, preference, personal_info, hobby, emotional → never decay (permanent/evolving)
+    log.info(`Decayed ${totalDecayed} old facts (event: ${eventResult.count}, memory: ${memoryResult.count})`);
+    return totalDecayed;
   },
 };

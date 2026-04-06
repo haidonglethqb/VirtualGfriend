@@ -3,6 +3,8 @@ import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { aiService } from '../ai/ai.service';
 import { factsLearningService } from '../ai/facts-learning.service';
+import { conversationSummaryService } from '../ai/conversation-summary.service';
+import { autoMemoryService } from '../memory/auto-memory.service';
 import { characterService } from '../character/character.service';
 import { gameEventService } from '../game/game-event.service';
 import { MessageType } from '@prisma/client';
@@ -123,7 +125,7 @@ export const chatService = {
         include: {
           characterFacts: {
             orderBy: { importance: 'desc' },
-            take: 10,
+            take: 20, // Increased from 10 for richer context
           },
         },
       });
@@ -169,6 +171,11 @@ export const chatService = {
       take: 20,
     });
 
+    // Load recent conversation summaries for long-term AI memory context
+    const recentSummaries = await conversationSummaryService.getRecentSummaries(
+      userId, data.characterId, 3
+    );
+
     // Generate AI response
     const aiResponse = await aiService.generateResponse({
       characterId: character.id,
@@ -181,6 +188,7 @@ export const chatService = {
       occupation: character.occupation,
       recentMessages: recentMessages.reverse(),
       facts: character.characterFacts,
+      recentSummaries,
       userName: user?.displayName || user?.username || 'bạn',
       characterName: character.name,
       userMessage: data.content,
@@ -252,7 +260,13 @@ export const chatService = {
         relationshipUpgrade = true;
         previousStage = affectionResult.previousStage;
         newStage = affectionResult.relationshipStage;
+        // Auto-create memory for stage change (background)
+        autoMemoryService.createRelationshipStageMemory(userId, data.characterId, newStage)
+          .catch(err => log.error('Stage memory error:', err));
       }
+      // Check affection milestones (background)
+      autoMemoryService.checkAffinityMilestone(userId, data.characterId, character.affection, newAffection)
+        .catch(err => log.error('Milestone memory error:', err));
     }
 
     // Add XP for chatting
@@ -268,6 +282,9 @@ export const chatService = {
           affection: xpResult.milestoneReward.affection,
         };
       }
+      // Auto-create memory for level up (background)
+      autoMemoryService.createLevelUpMemory(userId, data.characterId, newLevel)
+        .catch(err => log.error('Level up memory error:', err));
     }
 
     // Invalidate character cache after affection/XP updates
@@ -286,17 +303,15 @@ export const chatService = {
     const msgCounterKey = `msg_count:${userId}:${data.characterId}`;
     const cachedCount = await cache.get<number>(msgCounterKey);
     const totalMessages = cachedCount !== null ? cachedCount + 1 : 1;
-    await cache.set(msgCounterKey, totalMessages, 86400); // 24h TTL
+    await cache.set(msgCounterKey, totalMessages, 604800); // 7-day TTL
     
     if (factsLearningService.shouldExtractFacts(totalMessages)) {
-      // Run in background, don't block response
+      // Run batch background operations (don't block response)
       factsLearningService.extractAndSaveFacts(data.characterId, recentMessages)
-        .then(facts => {
-          if (facts.length > 0) {
-            log.info('Auto-extracted ' + facts.length + ' facts');
-          }
-        })
+        .then(facts => { if (facts.length > 0) log.info('Auto-extracted ' + facts.length + ' facts'); })
         .catch(err => log.error('Facts extraction error:', err));
+      conversationSummaryService.createSummary(userId, data.characterId, recentMessages)
+        .catch(err => log.error('Summary creation error:', err));
     }
 
     log.debug('=== SEND MESSAGE END ===');
