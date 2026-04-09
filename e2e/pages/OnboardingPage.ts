@@ -112,7 +112,12 @@ export class OnboardingPage extends BasePage {
    * Set age with slider
    */
   async setAge(age: number): Promise<void> {
-    await this.ageSlider.fill(age.toString());
+    // Range inputs don't support .fill() — must use evaluate to set value
+    await this.ageSlider.evaluate((el, val) => {
+      (el as HTMLInputElement).value = val;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, age.toString());
   }
 
   /**

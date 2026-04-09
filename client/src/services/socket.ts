@@ -272,8 +272,11 @@ class SocketService {
       useChatStore.getState().setTyping(data.typing)
     })
 
-    this.socket.on('error', () => {
-      // Socket error handled silently
+    this.socket.on('error', (error: unknown) => {
+      // Log socket errors for debugging
+      console.warn('[Socket] Connection error:', error)
+      // Update connection state to show error UI
+      useChatStore.getState().setConnected(false)
     })
   }
 

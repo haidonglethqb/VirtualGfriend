@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { passwordResetService } from './password-reset.service';
+import { AppError } from '../../middlewares/error.middleware';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Email không hợp lệ'),
@@ -31,10 +32,7 @@ export const passwordResetController = {
       res.json(result);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: error.errors[0].message,
-        });
+        throw new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR');
       }
       next(error);
     }
@@ -62,10 +60,7 @@ export const passwordResetController = {
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: error.errors[0].message,
-        });
+        throw new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR');
       }
       next(error);
     }
@@ -88,10 +83,7 @@ export const passwordResetController = {
       res.json(result);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: error.errors[0].message,
-        });
+        throw new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR');
       }
       next(error);
     }

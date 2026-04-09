@@ -123,50 +123,54 @@ export const giftService = {
       select: { displayName: true, username: true, userGender: true },
     });
 
-    // Check inventory
-    const userGift = await prisma.userGift.findUnique({
-      where: { userId_giftId: { userId, giftId: data.giftId } },
-      include: { gift: true },
-    });
-
-    if (!userGift || userGift.quantity < 1) {
-      throw new AppError('Gift not in inventory', 400, 'GIFT_NOT_OWNED');
-    }
-
-    const gift = userGift.gift;
-
-    // Generate AI reaction for gift (with fallback)
-    let reaction: string;
-    try {
-      const aiResponse = await aiService.generateResponse({
-        characterId: data.characterId,
-        personality: character.personality as any,
-        mood: (character.mood || 'happy') as any,
-        characterGender: character.gender,
-        userGender: userProfile?.userGender || 'NOT_SPECIFIED',
-        relationshipStage: character.relationshipStage,
-        affection: character.affection,
-        level: character.level,
-        age: character.age,
-        occupation: character.occupation || 'student',
-        recentMessages: [],
-        facts: [],
-        userName: userProfile?.displayName || userProfile?.username || 'bạn',
-        characterName: character.name,
-        userMessage: `[SYSTEM: User just gifted you "${gift.name}" (${gift.description || 'a special gift'}). React naturally and sweetly in 1-2 short Vietnamese sentences. Express gratitude in your unique personality.]`,
-      });
-      reaction = aiResponse.content;
-    } catch {
-      reaction = `Wow, ${gift.name} luôn hả? Cảm ơn nhiều nha 💕`;
-    }
-
-    // Use transaction for atomicity - all or nothing
+    // Use transaction with atomic quantity check to prevent double-spend
+    let reaction = '';
     const result = await prisma.$transaction(async (tx) => {
-      // Deduct from inventory
-      await tx.userGift.update({
-        where: { id: userGift.id },
+      // Load gift and verify ownership inside transaction
+      const userGift = await tx.userGift.findUnique({
+        where: { userId_giftId: { userId, giftId: data.giftId } },
+        include: { gift: true },
+      });
+
+      if (!userGift || userGift.quantity < 1) {
+        throw new AppError('Gift not in inventory', 400, 'GIFT_NOT_OWNED');
+      }
+
+      const gift = userGift.gift;
+
+      // Generate AI reaction for gift (with fallback)
+      try {
+        const aiResponse = await aiService.generateResponse({
+          characterId: data.characterId,
+          personality: character.personality as any,
+          mood: (character.mood || 'happy') as any,
+          characterGender: character.gender,
+          userGender: userProfile?.userGender || 'NOT_SPECIFIED',
+          relationshipStage: character.relationshipStage,
+          affection: character.affection,
+          level: character.level,
+          age: character.age,
+          occupation: character.occupation || 'student',
+          recentMessages: [],
+          facts: [],
+          userName: userProfile?.displayName || userProfile?.username || 'bạn',
+          characterName: character.name,
+          userMessage: `[SYSTEM: User just gifted you "${gift.name}" (${gift.description || 'a special gift'}). React naturally and sweetly in 1-2 short Vietnamese sentences. Express gratitude in your unique personality.]`,
+        });
+        reaction = aiResponse.content;
+      } catch {
+        reaction = `Wow, ${gift.name} luôn hả? Cảm ơn nhiều nha 💕`;
+      }
+
+      // Atomically decrement quantity — concurrent requests: only one will succeed
+      const updated = await tx.userGift.updateMany({
+        where: { id: userGift.id, quantity: { gte: 1 } },
         data: { quantity: { decrement: 1 } },
       });
+
+      if (updated.count === 0) {
+        throw new AppError('Gift not in inventory', 400, 'GIFT_NOT_OWNED');
+      }
 
       // Record gift history
       await tx.giftHistory.create({
@@ -202,11 +206,13 @@ export const giftService = {
         },
       });
 
-      return { success: true };
+      return { success: true, gift };
     });
 
+    const gift = result.gift;
+
     // Update affection (outside transaction as it has its own logic)
-    const updatedCharacter = await characterService.updateAffection(data.characterId, gift.affectionBonus);
+    const updatedCharacter = await characterService.updateAffection(data.characterId, gift.affectionBonus, userId);
 
     // Invalidate caches
     await cache.del(CacheKeys.giftInventory(userId));

@@ -296,41 +296,49 @@ export const relationshipService = {
       )
     }
 
-    // Deactivate any current active relationships
-    await prisma.character.updateMany({
-      where: { userId, isActive: true },
-      data: { isActive: false },
-    })
-
-    // Reactivate the character with reduced affection
     const newAffection = Math.floor(character.affection * 0.5) // 50% affection penalty
     const newStage = calculateRelationshipStage(newAffection)
 
-    const updated = await prisma.character.update({
-      where: { id: character.id },
-      data: {
-        isActive: true,
-        isEnded: false,
-        endedAt: null,
-        endReason: null,
-        affection: newAffection,
-        relationshipStage: newStage,
-      },
-    })
-
-    // Deduct gems for non-premium users
-    if (user.premiumTier === 'FREE') {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { gems: { decrement: reconcileCost } },
+    // Wrap all DB operations in transaction for atomicity
+    await prisma.$transaction(async (tx) => {
+      // Deactivate any current active relationships
+      await tx.character.updateMany({
+        where: { userId, isActive: true },
+        data: { isActive: false },
       })
-    }
 
-    // Record reconciliation event
-    await this.recordEvent(userId, character.id, 'RECONCILIATION', {
-      toStage: newStage,
-      note: 'Quay lại với nhau',
-      metadata: { previousAffection: character.affection, newAffection },
+      // Reactivate the character with reduced affection
+      await tx.character.update({
+        where: { id: character.id },
+        data: {
+          isActive: true,
+          isEnded: false,
+          endedAt: null,
+          endReason: null,
+          affection: newAffection,
+          relationshipStage: newStage,
+        },
+      })
+
+      // Deduct gems for non-premium users
+      if (user.premiumTier === 'FREE') {
+        await tx.user.update({
+          where: { id: userId },
+          data: { gems: { decrement: reconcileCost } },
+        })
+      }
+
+      // Record reconciliation event
+      await tx.relationshipHistory.create({
+        data: {
+          userId,
+          characterId: character.id,
+          eventType: 'RECONCILIATION',
+          toStage: newStage,
+          note: 'Quay lại với nhau',
+          metadata: { previousAffection: character.affection, newAffection },
+        },
+      })
     })
 
     // Invalidate cache
@@ -338,7 +346,6 @@ export const relationshipService = {
 
     return {
       message: `Đã quay lại với ${character.name}`,
-      character: updated,
       affectionPenalty: character.affection - newAffection,
     }
   },

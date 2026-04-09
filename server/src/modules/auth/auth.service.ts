@@ -6,6 +6,9 @@ import { cache, CacheKeys } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { validatePassword } from '../../lib/constants';
 import { passwordResetService } from './password-reset.service';
+import { createModuleLogger } from '../../lib/logger';
+
+const log = createModuleLogger('Auth')
 
 interface RegisterData {
   email: string;
@@ -199,18 +202,16 @@ export const authService = {
       where: { email: data.email.toLowerCase().trim() },
     });
 
-    console.log('[Auth] Login attempt:', { email: data.email, userFound: !!user });
-
     if (!user) {
-      console.log('[Auth] User not found for email:', data.email);
+      log.debug('Login attempt: user not found')
       throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
     }
 
     // Check password
     const isValidPassword = await bcrypt.compare(data.password, user.password);
-    console.log('[Auth] Password check:', { isValid: isValidPassword });
 
     if (!isValidPassword) {
+      log.debug('Login attempt: invalid password')
       throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
     }
 
@@ -256,7 +257,8 @@ export const authService = {
     try {
       decoded = jwt.verify(
         token,
-        process.env.JWT_REFRESH_SECRET!
+        process.env.JWT_REFRESH_SECRET!,
+        { algorithms: ['HS256'] }
       ) as { userId: string; email: string };
     } catch {
       throw new AppError('Invalid refresh token', 401, 'INVALID_REFRESH_TOKEN');

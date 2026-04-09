@@ -169,6 +169,34 @@ export const cache = {
   },
 
   /**
+   * Increment a numeric key atomically
+   * Auto-initializes to 1 if key doesn't exist
+   */
+  async incr(key: string): Promise<number> {
+    try {
+      const client = await getClient();
+      if (!client) return 0;
+      return await client.incr(key);
+    } catch {
+      return 0;
+    }
+  },
+
+  /**
+   * Set TTL on an existing key
+   */
+  async expire(key: string, ttlSeconds: number): Promise<boolean> {
+    try {
+      const client = await getClient();
+      if (!client) return false;
+      const result = await client.expire(key, ttlSeconds);
+      return result === 1;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
    * Check if Redis is available
    */
   async isAvailable(): Promise<boolean> {

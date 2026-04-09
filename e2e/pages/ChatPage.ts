@@ -56,8 +56,8 @@ export class ChatPage extends BasePage {
     this.typingIndicator = page.locator('[data-testid="typing-indicator"], .typing-indicator');
 
     // Input
-    this.messageInput = page.locator('input[placeholder*="Nhắn tin"], input[placeholder*="message" i], input[type="text"]:near(button:has(svg))').first();
-    this.sendButton = page.locator('button:has(svg.lucide-send), button svg.lucide-send').locator('..').first();
+    this.messageInput = page.getByRole('textbox', { name: /message|nhắn|type|input/i }).first();
+    this.sendButton = page.getByRole('button', { name: /send|gửi|send message/i }).first();
     this.emojiButton = page.locator('button:has(svg.lucide-smile)');
     this.micButton = page.locator('button:has(svg.lucide-mic)');
 

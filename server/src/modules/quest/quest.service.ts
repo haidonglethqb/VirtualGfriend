@@ -159,8 +159,30 @@ export const questService = {
   },
 
   async claimReward(userId: string, questId: string) {
-    const userQuest = await prisma.userQuest.findUnique({
-      where: { userId_questId: { userId, questId } },
+    // Atomic update: only transition COMPLETED -> CLAIMED
+    const updated = await prisma.userQuest.updateMany({
+      where: { userId, questId, status: 'COMPLETED' },
+      data: { status: 'CLAIMED', claimedAt: new Date() },
+    });
+
+    if (updated.count === 0) {
+      // Either quest doesn't exist or already claimed — determine which
+      const userQuest = await prisma.userQuest.findFirst({
+        where: { userId, questId },
+        include: { quest: true },
+      });
+
+      if (!userQuest) {
+        throw new AppError('Quest not found', 404, 'QUEST_NOT_FOUND');
+      }
+      if (userQuest.status === 'CLAIMED') {
+        throw new AppError('Reward already claimed', 400, 'REWARD_ALREADY_CLAIMED');
+      }
+      throw new AppError('Quest not completed', 400, 'QUEST_NOT_COMPLETED');
+    }
+
+    const userQuest = await prisma.userQuest.findFirst({
+      where: { userId, questId },
       include: { quest: true },
     });
 
@@ -168,31 +190,16 @@ export const questService = {
       throw new AppError('Quest not found', 404, 'QUEST_NOT_FOUND');
     }
 
-    if (userQuest.status !== 'COMPLETED') {
-      throw new AppError('Quest not completed', 400, 'QUEST_NOT_COMPLETED');
-    }
-
     const quest = userQuest.quest;
 
-    // Use transaction to ensure atomicity of claim + reward
-    await prisma.$transaction([
-      // Update user quest to claimed
-      prisma.userQuest.update({
-        where: { id: userQuest.id },
-        data: {
-          status: 'CLAIMED',
-          claimedAt: new Date(),
-        },
-      }),
-      // Give currency rewards
-      prisma.user.update({
-        where: { id: userId },
-        data: {
-          coins: { increment: quest.rewardCoins },
-          gems: { increment: quest.rewardGems },
-        },
-      }),
-    ]);
+    // Give currency rewards
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        coins: { increment: quest.rewardCoins },
+        gems: { increment: quest.rewardGems },
+      },
+    });
 
     // Update character XP/affection (outside transaction as these are non-critical)
     const character = await prisma.character.findFirst({
@@ -204,7 +211,7 @@ export const questService = {
         await characterService.addExperience(character.id, quest.rewardXp);
       }
       if (quest.rewardAffection > 0) {
-        await characterService.updateAffection(character.id, quest.rewardAffection);
+        await characterService.updateAffection(character.id, quest.rewardAffection, userId);
       }
     }
 

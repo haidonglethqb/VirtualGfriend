@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { AdminRequest } from './admin.middleware'
 import { getPricingConfig, updatePricingConfig } from '../payment/payment.service'
 import { PremiumTier } from '../../lib/prisma'
+import { AppError } from '../../middlewares/error.middleware'
 
 const VALID_TIERS: Array<Exclude<PremiumTier, 'FREE'>> = ['BASIC', 'PRO', 'ULTIMATE']
 
@@ -31,18 +32,12 @@ export async function updateAdminPricing(req: AdminRequest, res: Response, next:
     const { tier } = req.params as { tier: string }
 
     if (!VALID_TIERS.includes(tier as Exclude<PremiumTier, 'FREE'>)) {
-      return res.status(400).json({
-        success: false,
-        error: `Invalid tier: ${tier}. Must be BASIC | PRO | ULTIMATE`,
-      })
+      throw new AppError(`Invalid tier: ${tier}. Must be BASIC | PRO | ULTIMATE`, 400, 'INVALID_TIER');
     }
 
     const parsed = pricingPatchSchema.safeParse(req.body)
     if (!parsed.success) {
-      return res.status(400).json({
-        success: false,
-        error: parsed.error.issues[0]?.message || 'Invalid pricing payload',
-      })
+      throw new AppError(parsed.error.issues[0]?.message || 'Invalid pricing payload', 400, 'VALIDATION_ERROR');
     }
 
     const updated = await updatePricingConfig(

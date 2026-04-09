@@ -12,6 +12,7 @@ import {
   TierConfig,
   PremiumTier,
 } from './tier-config.service';
+import { AppError } from '../../middlewares/error.middleware';
 
 const VALID_TIERS: PremiumTier[] = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
 
@@ -46,15 +47,12 @@ export async function updateTierConfigHandler(req: AdminRequest, res: Response, 
     const { tier } = req.params as { tier: string };
 
     if (!VALID_TIERS.includes(tier as PremiumTier)) {
-      return res.status(400).json({ success: false, error: `Invalid tier: ${tier}. Must be FREE | BASIC | PRO | ULTIMATE` });
+      throw new AppError(`Invalid tier: ${tier}. Must be FREE | BASIC | PRO | ULTIMATE`, 400, 'INVALID_TIER');
     }
 
     const parsed = tierConfigPatchSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({
-        success: false,
-        error: parsed.error.issues[0]?.message || 'Invalid tier config payload',
-      });
+      throw new AppError(parsed.error.issues[0]?.message || 'Invalid tier config payload', 400, 'VALIDATION_ERROR');
     }
     const patch = parsed.data as Partial<TierConfig>;
 

@@ -125,10 +125,9 @@ export abstract class BasePage {
   }
 
   /**
-   * Fill input with clear first
+   * Fill input — Playwright's fill() automatically clears the field first
    */
   async fillInput(locator: Locator, value: string): Promise<void> {
-    await locator.clear();
     await locator.fill(value);
   }
 

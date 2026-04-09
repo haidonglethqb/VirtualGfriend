@@ -138,14 +138,17 @@ async function getOrCreateStripeCustomer(userId: string, email: string): Promise
 // ── Subscription Status ──
 
 export async function getSubscriptionStatus(userId: string) {
-  const sub = await prisma.subscription.findUnique({
-    where: { userId },
-  })
-
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { isPremium: true, premiumTier: true, premiumExpiresAt: true },
+    select: {
+      isPremium: true,
+      premiumTier: true,
+      premiumExpiresAt: true,
+      subscription: true,
+    },
   })
+
+  const sub = user?.subscription ?? null
 
   return {
     subscription: sub ? {
@@ -260,6 +263,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
   const priceId = stripeSub.items.data[0]?.price?.id || ''
   const period = getSubPeriod(stripeSub)
+
+  // Idempotency check: skip user activation if subscription is already ACTIVE
+  // Stripe retries webhooks for up to 3 days; without this check the user
+  // update runs on every retry attempt unnecessarily.
+  const existingSub = await prisma.subscription.findUnique({
+    where: { userId },
+    select: { status: true },
+  })
+
+  if (existingSub?.status === 'ACTIVE') {
+    log.debug(`User ${userId} subscription already ACTIVE, skipping duplicate webhook processing`)
+    return
+  }
 
   // Upsert subscription record
   await prisma.subscription.upsert({

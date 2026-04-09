@@ -75,7 +75,7 @@ export function adminAuth(req: AdminRequest, res: Response, next: NextFunction) 
   const token = authHeader.split(' ')[1];
   
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as { username: string; isAdmin: boolean };
+    const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] }) as { username: string; isAdmin: boolean };
     
     if (!decoded.isAdmin) {
       return res.status(403).json({ error: 'Admin access required' });

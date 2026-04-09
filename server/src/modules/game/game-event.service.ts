@@ -5,7 +5,7 @@
  */
 
 import { prisma } from '../../lib/prisma';
-import { cache } from '../../lib/redis';
+import { cache, CacheKeys } from '../../lib/redis';
 import { questService } from '../quest/quest.service';
 import { characterService } from '../character/character.service';
 import { createModuleLogger } from '../../lib/logger';
@@ -95,25 +95,23 @@ export const gameEventService = {
     result.questsUpdated = questUpdates.updated;
     result.questsCompleted = questUpdates.completed;
 
-    // 3. Auto-claim completed quests and give rewards (parallel)
-    await Promise.all(
-      result.questsCompleted.map((completed) => this.autoClaimQuest(userId, completed.questId, _depth))
-    );
+    // 3. Auto-claim completed quests and give rewards (sequential to bound DB transactions)
+    for (const completed of result.questsCompleted) {
+      await this.autoClaimQuest(userId, completed.questId, _depth);
+    }
 
     // 4. Increment Redis milestone counters for relevant actions
     if (action === 'SEND_MESSAGE') {
       const key = `milestone_msg_count:${userId}`;
-      const current = await cache.get<number>(key);
-      if (current !== null) {
-        await cache.set(key, current + 1, 3600);
-      }
+      // Use INCR which auto-initializes to 1 if key doesn't exist
+      await cache.incr(key);
+      await cache.expire(key, 3600);
     }
     if (action === 'SEND_GIFT') {
       const key = `milestone_gift_count:${userId}`;
-      const current = await cache.get<number>(key);
-      if (current !== null) {
-        await cache.set(key, current + 1, 3600);
-      }
+      // Use INCR which auto-initializes to 1 if key doesn't exist
+      await cache.incr(key);
+      await cache.expire(key, 3600);
     }
 
     // 5. Check for milestones
@@ -169,29 +167,34 @@ export const gameEventService = {
 
     const questIdsToStart = questsToStart.map((q) => q.id);
 
-    // Batch: delete old daily quest progress + create new in a single transaction
-    await prisma.$transaction([
-      // Delete old daily quest progress for quests that need restart
-      prisma.userQuest.deleteMany({
+    // Only delete expired (yesterday's) quest progress — not in-progress quests from other server instances
+    await prisma.$transaction(async (tx) => {
+      // Delete ONLY expired daily quest progress (started before today)
+      await tx.userQuest.deleteMany({
         where: {
           userId,
           questId: { in: questIdsToStart },
           startedAt: { lt: today },
         },
-      }),
-      // Create new progress for today (batch create)
-      ...questsToStart.map((quest) => {
+      });
+
+      // Upsert: create new progress, skip if already exists today (handles race with other instances)
+      for (const quest of questsToStart) {
         const requirements = quest.requirements as { count?: number };
-        return prisma.userQuest.create({
-          data: {
+        await tx.userQuest.upsert({
+          where: {
+            userId_questId: { userId, questId: quest.id },
+          },
+          update: {}, // No-op if already exists today — preserves in-progress state
+          create: {
             userId,
             questId: quest.id,
             maxProgress: requirements.count || 1,
             status: 'IN_PROGRESS',
           },
         });
-      }),
-    ]);
+      }
+    });
 
     // Set Redis flag — TTL = seconds until midnight
     const midnight = new Date(today);
@@ -230,7 +233,7 @@ export const gameEventService = {
     // Check for time-based quest matching
     const currentHour = new Date().getHours();
     const isMorning = currentHour >= 6 && currentHour < 10;
-    const isEvening = currentHour >= 21 && currentHour <= 24;
+    const isEvening = currentHour >= 21 && currentHour < 24;
 
     if (action === 'SEND_MESSAGE' || action === 'FIRST_MESSAGE_TODAY') {
       if (isMorning) matchingActions.push('morning_greeting');
@@ -303,25 +306,26 @@ export const gameEventService = {
    * Auto-claim a completed quest and distribute rewards
    */
   async autoClaimQuest(userId: string, questId: string, _depth: number = 0): Promise<void> {
-    const userQuest = await prisma.userQuest.findUnique({
-      where: { userId_questId: { userId, questId } },
+    // Atomic update: only transition COMPLETED -> CLAIMED, prevents double-claim
+    const updated = await prisma.userQuest.updateMany({
+      where: { userId, questId, status: 'COMPLETED' },
+      data: { status: 'CLAIMED', claimedAt: new Date() },
+    });
+
+    if (updated.count === 0) {
+      return; // Already claimed or not completed
+    }
+
+    const userQuest = await prisma.userQuest.findFirst({
+      where: { userId, questId },
       include: { quest: true },
     });
 
-    if (!userQuest || userQuest.status !== 'COMPLETED') {
+    if (!userQuest) {
       return;
     }
 
     const quest = userQuest.quest;
-
-    // Update to claimed
-    await prisma.userQuest.update({
-      where: { id: userQuest.id },
-      data: {
-        status: 'CLAIMED',
-        claimedAt: new Date(),
-      },
-    });
 
     // Give rewards to user
     await prisma.user.update({
@@ -342,7 +346,7 @@ export const gameEventService = {
         await characterService.addExperience(character.id, quest.rewardXp);
       }
       if (quest.rewardAffection > 0) {
-        await characterService.updateAffection(character.id, quest.rewardAffection);
+        await characterService.updateAffection(character.id, quest.rewardAffection, userId);
       }
     }
 
@@ -561,19 +565,30 @@ export const gameEventService = {
     const reward = rewards[milestoneType];
     if (!reward) return;
 
-    // Update user
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        coins: { increment: reward.coins },
-        gems: { increment: reward.gems },
-      },
+    // Wrap balance update and affection update in a single transaction
+    await prisma.$transaction(async (tx) => {
+      // Update user balance
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          coins: { increment: reward.coins },
+          gems: { increment: reward.gems },
+        },
+      });
+
+      // Update character affection (direct, not via service to avoid cache invalidation inside transaction)
+      if (reward.affection > 0) {
+        await tx.character.update({
+          where: { id: characterId },
+          data: {
+            affection: { increment: reward.affection },
+          },
+        });
+      }
     });
 
-    // Update character affection
-    if (reward.affection > 0) {
-      await characterService.updateAffection(characterId, reward.affection);
-    }
+    // Invalidate cache after transaction completes
+    await cache.del(CacheKeys.characterById(characterId));
   },
 
   /**

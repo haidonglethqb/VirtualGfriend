@@ -2,10 +2,11 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from './auth.service';
 import { z } from 'zod';
 import { AppError } from '../../middlewares/error.middleware';
+import { PASSWORD_REQUIREMENTS } from '../../lib/constants';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email format'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string().min(PASSWORD_REQUIREMENTS.MIN_LENGTH, `Password must be at least ${PASSWORD_REQUIREMENTS.MIN_LENGTH} characters`),
   username: z.string().min(5, 'Username must be at least 5 characters').optional(),
   displayName: z.string().optional(),
 });
@@ -26,7 +27,9 @@ const loginSchema = z.object({
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(6, 'New password must be at least 6 characters'),
+  newPassword: z.string()
+    .min(PASSWORD_REQUIREMENTS.MIN_LENGTH, `Password must be at least ${PASSWORD_REQUIREMENTS.MIN_LENGTH} characters`)
+    .max(PASSWORD_REQUIREMENTS.MAX_LENGTH, `Password must not exceed ${PASSWORD_REQUIREMENTS.MAX_LENGTH} characters`),
 });
 
 export const authController = {

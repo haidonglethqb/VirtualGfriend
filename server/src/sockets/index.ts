@@ -14,6 +14,17 @@ const log = createModuleLogger('Socket')
 // Rate limiting state (per user per event type)
 const rateLimiters = new Map<string, { count: number; resetAt: number }>()
 
+// Periodic cleanup to prevent memory leak (every 5 minutes)
+const RATE_LIMITER_CLEANUP_INTERVAL = 5 * 60 * 1000
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, limiter] of rateLimiters.entries()) {
+    if (now > limiter.resetAt) {
+      rateLimiters.delete(key)
+    }
+  }
+}, RATE_LIMITER_CLEANUP_INTERVAL)
+
 function checkRateLimit(userId: string, eventType: 'message' | 'dm' | 'typing'): boolean {
   const key = `${userId}:${eventType}`
   const now = Date.now()
@@ -59,7 +70,8 @@ export function setupSocketHandlers(io: Server) {
 
       const decoded = jwt.verify(
         token,
-        process.env.JWT_SECRET!
+        process.env.JWT_SECRET!,
+        { algorithms: ['HS256'] }
       ) as JwtPayload
 
       // Use cache-aside pattern (same as auth middleware) instead of raw DB query
@@ -262,13 +274,13 @@ export function setupSocketHandlers(io: Server) {
           // Broadcast milestone unlocks to all tabs
           if (result.milestonesUnlocked && result.milestonesUnlocked.length > 0) {
             result.milestonesUnlocked.forEach(milestone => {
-              io.to(userRoom).emit('milestone:unlocked', { 
+              io.to(userRoom).emit('milestone:unlocked', {
                 milestone,
                 sourceSocketId: socket.id,
               })
             })
           }
-        }, 1000 + Math.random() * 2000) // 1-3 seconds delay
+        }, TIMINGS.AI_TYPING_DELAY) // Use constant from constants module
 
       } catch (error) {
         log.error('Error sending message:', error)

@@ -187,6 +187,7 @@ export const useAuthStore = create<AuthState>()(
       name: 'vgfriend-auth',
       partialize: (state) => ({
         accessToken: state.accessToken,
+        user: state.user,
       }),
     }
   )

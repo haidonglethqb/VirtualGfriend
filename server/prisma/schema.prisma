@@ -126,8 +126,9 @@ model UserSettings {
   allowMessages         Boolean  @default(true)
 
   // Active scene
-  activeSceneId         String?
-  
+  activeSceneId         String?   @unique
+  activeScene           Scene?    @relation("UserActiveScene", fields: [activeSceneId], references: [id], onDelete: SetNull)
+
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -532,6 +533,7 @@ model Scene {
   updatedAt     DateTime @updatedAt
 
   characterScenes CharacterScene[]
+  userActiveScene UserSettings? @relation("UserActiveScene")
 
   @@unique([name])
   @@index([isActive])                     // Optimize active scene queries

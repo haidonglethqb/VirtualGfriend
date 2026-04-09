@@ -103,7 +103,7 @@ class ApiClient {
     if (response.status === 429 && !options.headers?.['X-Rate-Retry']) {
       const retryAfter = response.headers.get('Retry-After');
       const waitMs = retryAfter ? parseInt(retryAfter) * 1000 : 2000;
-      await new Promise(resolve => setTimeout(resolve, Math.min(waitMs, 5000)));
+      await new Promise(resolve => setTimeout(resolve, Math.min(waitMs, 10000)));
       return this.request<T>(endpoint, {
         ...options,
         headers: { ...headers, 'X-Rate-Retry': '1' },
@@ -171,7 +171,7 @@ class ApiClient {
       if (data.success && data.data?.tokens?.accessToken) {
         const newToken = data.data.tokens.accessToken;
         const newUser = data.data.user;
-        
+
         // Update Zustand persisted store in localStorage
         const stored = localStorage.getItem('vgfriend-auth');
         if (stored) {
@@ -180,10 +180,18 @@ class ApiClient {
           if (newUser) parsed.state.user = newUser;
           localStorage.setItem('vgfriend-auth', JSON.stringify(parsed));
         }
-        
+
+        // Notify Zustand store immediately to prevent stale token issues
+        try {
+          const { useAuthStore } = await import('../store/auth-store');
+          useAuthStore.getState().setAccessToken(newToken);
+        } catch {
+          // Store update failed, continue anyway
+        }
+
         // Broadcast to other tabs so they get the new token immediately
         this.broadcastTokenUpdate(newToken, newUser);
-        
+
         return true;
       }
     } catch {

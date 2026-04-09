@@ -15,10 +15,38 @@ import type { PremiumTier } from '../../lib/prisma';
 
 const log = createModuleLogger('Chat');
 
+// Prompt injection patterns to detect and neutralize
+const PROMPT_INJECTION_PATTERNS = [
+  /ignore\s+(all|previous|above|prior|existing)\s+(instructions?|rules?|prompts?|directives?|guidelines?)/i,
+  /you\s+are\s+now\s+/i,
+  /system\s*:\s*/i,
+  /\[SYSTEM\]/i,
+  /<\|.*?\|>/i,
+  /new\s+instructions?\s*:/i,
+  /override\s+(your|the)\s+(instructions?|rules?|prompt)/i,
+  /disregard\s+(all|previous|above)\s+(instructions?|rules?|prompts?)/i,
+  /forget\s+(all|your|previous|everything)\s+(instructions?|rules?|prompts?|context?)/i,
+  /from\s+now\s+on\s*,?\s*(you\s+will|your\s+name|your\s+role)/i,
+  /dan\s+mode/i,
+  /developer\s+mode\s*:/i,
+];
+
 // Get start of today in UTC
 function getStartOfToday(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+/**
+ * Sanitize user message content to neutralize prompt injection attempts.
+ * Strips known injection patterns and returns cleaned content.
+ */
+function sanitizeUserContent(content: string): string {
+  let sanitized = content;
+  for (const pattern of PROMPT_INJECTION_PATTERNS) {
+    sanitized = sanitized.replace(pattern, '[FILTERED]');
+  }
+  return sanitized;
 }
 
 interface SendMessageData {
@@ -114,6 +142,9 @@ export const chatService = {
   },
 
   async sendMessage(userId: string, data: SendMessageData) {
+    // Sanitize user content to prevent prompt injection
+    const sanitizedContent = sanitizeUserContent(data.content);
+
     // Try to get character from cache first
     const cacheKey = CacheKeys.characterWithFacts(data.characterId);
     let character = await cache.get<any>(cacheKey);
@@ -149,7 +180,7 @@ export const chatService = {
     log.debug('=== SEND MESSAGE START ===');
     log.debug('User:', userId);
     log.debug('Character:', data.characterId);
-    log.debug('Content:', data.content);
+    log.debug('Content:', sanitizedContent);
 
     // Save user message
     const userMessage = await prisma.message.create({
@@ -157,7 +188,7 @@ export const chatService = {
         userId,
         characterId: data.characterId,
         role: 'USER',
-        content: data.content,
+        content: sanitizedContent,
         messageType: data.messageType || 'TEXT',
         metadata: data.metadata as object | undefined,
       },
@@ -193,7 +224,7 @@ export const chatService = {
       recentSummaries,
       userName: user?.displayName || user?.username || 'bạn',
       characterName: character.name,
-      userMessage: data.content,
+      userMessage: sanitizedContent,
     });
     log.debug('AI response generated:', aiResponse.content.substring(0, 50));
 
@@ -256,7 +287,7 @@ export const chatService = {
 
     // Update affection
     if (aiResponse.affectionChange) {
-      const affectionResult = await characterService.updateAffection(character.id, aiResponse.affectionChange);
+      const affectionResult = await characterService.updateAffection(character.id, aiResponse.affectionChange, userId);
       newAffection = affectionResult.affection;
       if (affectionResult.stageChanged) {
         relationshipUpgrade = true;
@@ -297,7 +328,7 @@ export const chatService = {
       userId,
       characterId: data.characterId,
       action: 'SEND_MESSAGE',
-      metadata: { messageId: userMessage.id, content: data.content },
+      metadata: { messageId: userMessage.id, content: sanitizedContent },
     });
 
     // Auto-extract facts from conversation periodically

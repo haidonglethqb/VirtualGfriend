@@ -99,6 +99,7 @@ function getTotalXpForLevel(level: number): number {
 
 function calculateRelationshipStage(affection: number): RelationshipStage {
   if (affection >= 900) return 'LOVER';
+  if (affection >= 850) return 'IN_LOVE';
   if (affection >= 750) return 'DATING';
   if (affection >= 600) return 'CRUSH';
   if (affection >= 450) return 'CLOSE_FRIEND';
@@ -351,7 +352,7 @@ export const characterService = {
     };
   },
 
-  async updateAffection(characterId: string, amount: number, userId?: string) {
+  async updateAffection(characterId: string, amount: number, userId: string) {
     const character = await prisma.character.findUnique({
       where: { id: characterId },
       select: { id: true, userId: true, affection: true, relationshipStage: true },
@@ -361,8 +362,8 @@ export const characterService = {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
-    // Authorization check: if userId is provided, verify ownership
-    if (userId && character.userId !== userId) {
+    // Authorization check: verify ownership
+    if (character.userId !== userId) {
       throw new AppError('Not authorized to update this character', 403, 'FORBIDDEN');
     }
 

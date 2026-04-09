@@ -4,6 +4,7 @@ import { AppError } from './error.middleware';
 import { isVipTier } from '../lib/constants';
 import { getTierConfig, TierConfig } from '../modules/admin/tier-config.service';
 import { logger } from '../lib/logger';
+import { cache, CacheKeys } from '../lib/redis';
 
 // Premium tier hierarchy (higher index = more features)
 const TIER_HIERARCHY: PremiumTier[] = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
@@ -34,6 +35,10 @@ async function autoDowngradeIfExpired(userId: string, expiresAt: Date | null): P
       },
     });
     logger.info(`User ${userId} premium expired - auto-downgraded to FREE`);
+
+    // Invalidate cache to prevent stale premium access
+    await cache.del(CacheKeys.userAuth(userId), CacheKeys.user(userId));
+
     return true;
   } catch (error) {
     logger.error(`Failed to auto-downgrade user ${userId}:`, error);

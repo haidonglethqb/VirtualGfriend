@@ -14,7 +14,7 @@ import { handleWebhook } from './modules/payment/payment.controller';
 import { errorHandler } from './middlewares/error.middleware';
 import { requestIdMiddleware } from './middlewares/request-id.middleware';
 import { setupSocketHandlers } from './sockets';
-import { prisma } from './lib/prisma';
+import { prisma, connectPrisma } from './lib/prisma';
 import { cache } from './lib/redis';
 import { createModuleLogger } from './lib/logger';
 
@@ -107,7 +107,7 @@ const authenticatedLimiter = rateLimit({
     if (authHeader?.startsWith('Bearer ')) {
       try {
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!, { algorithms: ['HS256'] }) as { userId: string };
         return `user:${decoded.userId}`;
       } catch {
         // Token invalid/expired — fall back to IP
@@ -124,6 +124,10 @@ app.use('/api/auth', publicLimiter);
 app.use('/api/', authenticatedLimiter);
 
 // Health check (with DB connectivity) — cached for 5 seconds
+// NOTE: healthCache is per-instance (in-memory). In horizontal scaling scenarios,
+// each instance maintains its own cache, so health results may differ briefly between
+// instances. This is acceptable because each check still validates live DB/Redis connectivity;
+// the cache only reduces redundant checks within the same instance.
 let healthCache: { data: Record<string, unknown>; expiry: number } | null = null;
 app.get('/health', async (_: Request, res: Response) => {
   const now = Date.now();
@@ -182,6 +186,12 @@ setupSocketHandlers(io);
 // Start server
 const PORT = process.env.PORT || 3001;
 
+// Explicitly connect to database (not on module import, to avoid hot-reload reconnects)
+connectPrisma().catch((err) => {
+  log.error('Failed to connect to database:', err);
+  process.exit(1);
+});
+
 httpServer.listen(PORT, () => {
   log.info(`Running on http://localhost:${PORT}`);
   log.info('Socket.IO ready');
@@ -239,9 +249,19 @@ setInterval(async () => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   log.info('SIGTERM received. Shutting down gracefully...');
-  await cache.disconnect();
-  await prisma.$disconnect();
-  httpServer.close(() => {
+
+  // Notify socket clients before disconnecting
+  io.emit('server:shutting_down', {
+    message: 'Server is shutting down. Please reconnect shortly.',
+    timestamp: new Date().toISOString(),
+  });
+
+  // Wait briefly for clients to receive the event
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  httpServer.close(async () => {
+    await cache.disconnect();
+    await prisma.$disconnect();
     log.info('Closed');
     process.exit(0);
   });

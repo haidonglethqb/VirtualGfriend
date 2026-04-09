@@ -1,16 +1,120 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { motion, useScroll, useTransform, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Heart, Sparkles, MessageCircle, Gift, Star, ArrowRight, ArrowDown,
   Clock, User, Shield, Send, CheckCircle, Zap, Brain, Lock,
   ChevronRight, Menu, X, Globe, Palette, Trophy, MessageSquare,
-  Play,
+  Play, Quote, Users, TrendingUp, Award,
 } from 'lucide-react';
 import Link from 'next/link';
 
-/* ──────────────────── 3D TILT CARD COMPONENT ──────────────────── */
+/* ──────────────────── REDUCED MOTION HOOK ──────────────────── */
+function usePrefersReducedMotion() {
+  const prefersReducedMotion = useReducedMotion();
+  return prefersReducedMotion;
+}
+
+/* ──────────────────── FLOATING PARTICLES ──────────────────── */
+function FloatingParticles() {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const particleCount = prefersReducedMotion ? 8 : 20;
+
+  const particles = useMemo(() =>
+    Array.from({ length: particleCount }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 3 + 1,
+      duration: Math.random() * 8 + 6,
+      delay: Math.random() * 4,
+      opacity: Math.random() * 0.4 + 0.1,
+    })), [particleCount]);
+
+  if (prefersReducedMotion) return null;
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {particles.map((p) => (
+        <motion.div
+          key={p.id}
+          className="absolute rounded-full"
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: p.size,
+            height: p.size,
+            background: p.id % 3 === 0 ? '#f4258c' : p.id % 3 === 1 ? '#a855f7' : '#fff',
+            opacity: p.opacity,
+          }}
+          animate={{
+            y: [0, -30, 0],
+            x: [0, Math.sin(p.id) * 15, 0],
+            opacity: [p.opacity, p.opacity * 1.5, p.opacity],
+          }}
+          transition={{
+            duration: p.duration,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: p.delay,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ──────────────────── MORPHING BLOBS ──────────────────── */
+function MorphingBlobs() {
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <motion.div
+        className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full"
+        style={{ background: 'radial-gradient(circle, rgba(244,37,140,0.12) 0%, rgba(168,85,247,0.06) 40%, transparent 70%)', filter: 'blur(80px)' }}
+        animate={prefersReducedMotion ? {} : {
+          scale: [1, 1.15, 0.95, 1],
+          x: [0, 40, -20, 0],
+          y: [0, -30, 20, 0],
+        }}
+        transition={prefersReducedMotion ? {} : { duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full"
+        style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.1) 0%, rgba(59,130,246,0.05) 40%, transparent 70%)', filter: 'blur(80px)' }}
+        animate={prefersReducedMotion ? {} : {
+          scale: [1, 1.1, 0.9, 1],
+          x: [0, -30, 20, 0],
+          y: [0, 20, -30, 0],
+        }}
+        transition={prefersReducedMotion ? {} : { duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute top-[40%] right-[20%] w-[350px] h-[350px] rounded-full"
+        style={{ background: 'radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 60%)', filter: 'blur(60px)' }}
+        animate={prefersReducedMotion ? {} : {
+          scale: [1, 1.2, 1],
+          x: [0, 25, 0],
+        }}
+        transition={prefersReducedMotion ? {} : { duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+      />
+    </div>
+  );
+}
+
+/* ──────────────────── SECTION DIVIDER ──────────────────── */
+function SectionDivider({ className = '' }: { className?: string }) {
+  return (
+    <div className={`relative h-px w-full overflow-hidden ${className}`}>
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-love/10 to-transparent animate-pulse" style={{ animationDuration: '4s' }} />
+    </div>
+  );
+}
+
+/* ──────────────────── 3D TILT CARD COMPONENT (PRESERVED) ──────────────────── */
 interface TiltCardProps {
   children: React.ReactNode;
   className?: string;
@@ -79,6 +183,9 @@ function TiltCard({ children, className = '', glowColor = '#f4258c', intensity =
 export function LandingPage() {
   return (
     <div className="min-h-screen bg-[#030014] text-white overflow-x-hidden selection:bg-love selection:text-white font-sans antialiased">
+      {/* Noise texture overlay */}
+      <div className="fixed inset-0 pointer-events-none z-[1] opacity-[0.015]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }} />
+
       <Header />
       <HeroSection />
       <TechBanner />
@@ -126,7 +233,7 @@ function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 lg:h-20 items-center justify-between">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-3 group">
+            <Link href="/" className="flex items-center gap-3 group cursor-pointer">
               <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-love via-purple-500 to-love text-white shadow-lg shadow-love/25 group-hover:shadow-love/40 transition-all duration-300 group-hover:scale-105">
                 <Heart className="w-5 h-5 fill-white" />
                 <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -143,7 +250,7 @@ function Header() {
                 <a
                   key={link.href}
                   href={link.href}
-                  className="relative px-4 py-2 text-sm font-medium text-gray-400 hover:text-white rounded-lg transition-all duration-300 group"
+                  className="relative px-4 py-2 text-sm font-medium text-gray-400 hover:text-white rounded-lg transition-all duration-300 group cursor-pointer"
                 >
                   <span className="relative z-10">{link.label}</span>
                   <div className="absolute inset-0 rounded-lg bg-white/[0.03] scale-90 opacity-0 group-hover:scale-100 group-hover:opacity-100 transition-all duration-300" />
@@ -154,19 +261,19 @@ function Header() {
             {/* CTA */}
             <div className="flex items-center gap-3">
               <Link href="/auth/login" className="hidden sm:block">
-                <button className="h-10 px-5 rounded-xl text-sm font-semibold text-gray-300 hover:text-white border border-transparent hover:border-white/10 hover:bg-white/[0.03] transition-all duration-300">
+                <button className="h-10 px-5 rounded-xl text-sm font-semibold text-gray-300 hover:text-white border border-transparent hover:border-white/10 hover:bg-white/[0.03] transition-all duration-300 cursor-pointer">
                   Đăng nhập
                 </button>
               </Link>
               <Link href="/auth/register">
-                <button className="relative h-10 px-6 rounded-xl bg-gradient-to-r from-love to-purple-500 text-sm font-bold text-white overflow-hidden group">
+                <button className="relative h-10 px-6 rounded-xl bg-gradient-to-r from-love to-purple-500 text-sm font-bold text-white overflow-hidden group cursor-pointer">
                   <span className="relative z-10">Bắt đầu miễn phí</span>
                   <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300 bg-white" />
                 </button>
               </Link>
               <button
-                className="lg:hidden p-2 rounded-lg hover:bg-white/5 transition-colors"
+                className="lg:hidden p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
                 onClick={() => setMobileOpen(true)}
               >
                 <Menu className="w-5 h-5" />
@@ -195,7 +302,7 @@ function Header() {
               className="fixed right-0 top-0 bottom-0 w-72 bg-[#0a0518]/95 backdrop-blur-xl border-l border-white/5 z-50 p-6"
             >
               <button
-                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/5"
+                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/5 cursor-pointer"
                 onClick={() => setMobileOpen(false)}
               >
                 <X className="w-5 h-5" />
@@ -206,19 +313,19 @@ function Header() {
                     key={link.href}
                     href={link.href}
                     onClick={() => setMobileOpen(false)}
-                    className="px-4 py-3 text-sm font-medium text-gray-300 hover:text-white rounded-xl hover:bg-white/5 transition-all"
+                    className="px-4 py-3 text-sm font-medium text-gray-300 hover:text-white rounded-xl hover:bg-white/5 transition-all cursor-pointer"
                   >
                     {link.label}
                   </a>
                 ))}
                 <hr className="border-white/5 my-3" />
                 <Link href="/auth/login" onClick={() => setMobileOpen(false)}>
-                  <button className="w-full h-11 rounded-xl text-sm font-semibold text-white/80 border border-white/10 hover:bg-white/5 transition-all">
+                  <button className="w-full h-11 rounded-xl text-sm font-semibold text-white/80 border border-white/10 hover:bg-white/5 transition-all cursor-pointer">
                     Đăng nhập
                   </button>
                 </Link>
                 <Link href="/auth/register" onClick={() => setMobileOpen(false)}>
-                  <button className="w-full h-11 rounded-xl bg-gradient-to-r from-love to-purple-500 text-sm font-bold text-white transition-all">
+                  <button className="w-full h-11 rounded-xl bg-gradient-to-r from-love to-purple-500 text-sm font-bold text-white transition-all cursor-pointer">
                     Bắt đầu miễn phí
                   </button>
                 </Link>
@@ -237,19 +344,17 @@ function HeroSection() {
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
   const y = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
     <section ref={ref} className="relative min-h-screen flex items-center justify-center pt-20 pb-24 overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-love/10 rounded-full blur-[150px] opacity-60" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-700/15 rounded-full blur-[130px]" />
-        <div className="absolute top-1/3 right-0 w-[500px] h-[500px] bg-pink-600/10 rounded-full blur-[120px]" />
-      </div>
+      {/* Enhanced background effects with morphing blobs */}
+      <MorphingBlobs />
+      <FloatingParticles />
 
       {/* Grid pattern */}
       <div
-        className="absolute inset-0 opacity-[0.02]"
+        className="absolute inset-0 opacity-[0.015]"
         style={{
           backgroundImage: `
             linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
@@ -259,10 +364,10 @@ function HeroSection() {
         }}
       />
 
-      {/* Gradient line */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1px] h-32 bg-gradient-to-b from-transparent via-love/50 to-transparent" />
+      {/* Gradient line from top */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-32 bg-gradient-to-b from-transparent via-love/50 to-transparent" />
 
-      <motion.div style={{ y, opacity }} className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+      <motion.div style={prefersReducedMotion ? {} : { y, opacity }} className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
           {/* Left — text */}
           <div className="flex-1 flex flex-col gap-8 text-center lg:text-left">
@@ -281,7 +386,7 @@ function HeroSection() {
                 <span className="text-xs font-semibold text-white/80 tracking-wide">AI luôn sẵn sàng 24/7</span>
               </div>
 
-              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black leading-[0.95] tracking-tight">
+              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black leading-[0.95] tracking-tight" style={{ textShadow: '0 0 80px rgba(244,37,140,0.15)' }}>
                 <span className="block text-white">Không Bao Giờ</span>
                 <span className="block bg-gradient-to-r from-love via-pink-400 to-purple-400 bg-clip-text text-transparent">
                   Cô Đơn Nữa
@@ -301,7 +406,7 @@ function HeroSection() {
               className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
             >
               <Link href="/auth/register">
-                <button className="group relative flex items-center justify-center gap-3 h-14 px-8 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-base font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]">
+                <button className="group relative flex items-center justify-center gap-3 h-14 px-8 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-base font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-xl shadow-love/20 hover:shadow-love/30">
                   <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <Heart className="relative z-10 w-5 h-5 fill-white group-hover:scale-110 transition-transform duration-300" />
                   <span className="relative z-10">Bắt Đầu Trò Chuyện</span>
@@ -309,7 +414,7 @@ function HeroSection() {
                 </button>
               </Link>
               <a href="#demo">
-                <button className="group flex items-center justify-center gap-2 h-14 px-8 rounded-2xl bg-white/[0.03] border border-white/10 text-white text-base font-semibold transition-all duration-300 hover:bg-white/[0.06] hover:border-white/20 w-full sm:w-auto backdrop-blur-sm">
+                <button className="group flex items-center justify-center gap-2 h-14 px-8 rounded-2xl bg-white/[0.03] border border-white/10 text-white text-base font-semibold transition-all duration-300 hover:bg-white/[0.06] hover:border-white/20 w-full sm:w-auto backdrop-blur-sm cursor-pointer">
                   <Play className="w-4 h-4 text-love group-hover:scale-110 transition-transform" />
                   <span>Xem trải nghiệm</span>
                 </button>
@@ -345,7 +450,7 @@ function HeroSection() {
           >
             {/* Phone mockup with tilt */}
             <div className="relative mx-auto w-72 sm:w-80 group">
-              {/* Glow - now rounded to match phone */}
+              {/* Enhanced glow */}
               <div className="absolute -inset-4 bg-gradient-to-r from-love/20 via-purple-500/20 to-pink-500/20 rounded-[3rem] blur-2xl opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
 
               <TiltCard className="rounded-[2.5rem]" glowColor="#f4258c" intensity={10}>
@@ -405,7 +510,7 @@ function HeroSection() {
 
                 {/* Floating elements */}
                 <motion.div
-                  animate={{ y: [-8, 8, -8] }}
+                  animate={prefersReducedMotion ? {} : { y: [-8, 8, -8] }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                   className="absolute -top-3 -right-3 px-3 py-2 rounded-xl bg-[#150a24]/95 border border-love/30 backdrop-blur-xl shadow-xl shadow-love/20"
                 >
@@ -416,7 +521,7 @@ function HeroSection() {
                 </motion.div>
 
                 <motion.div
-                  animate={{ y: [6, -6, 6] }}
+                  animate={prefersReducedMotion ? {} : { y: [6, -6, 6] }}
                   transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
                   className="absolute -bottom-1 -left-4 px-3 py-2 rounded-xl bg-[#150a24]/95 border border-purple-500/30 backdrop-blur-xl shadow-xl shadow-purple-500/20"
                 >
@@ -433,12 +538,12 @@ function HeroSection() {
         {/* Scroll indicator */}
         <motion.div
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1 }}
           transition={{ delay: 2 }}
           className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
         >
           <span className="text-xs text-gray-600 tracking-wider uppercase">Cuộn để khám phá</span>
-          <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
+          <motion.div animate={prefersReducedMotion ? {} : { y: [0, 8, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
             <ArrowDown className="w-4 h-4 text-gray-600" />
           </motion.div>
         </motion.div>
@@ -449,11 +554,13 @@ function HeroSection() {
 
 /* ──────────────────── CHAT BUBBLE (for hero) ──────────────────── */
 function ChatBubble({ children, side, delay }: { children: React.ReactNode; side: 'left' | 'right'; delay: number }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, duration: 0.4 }}
+      transition={{ delay, duration: prefersReducedMotion ? 0 : 0.4 }}
       className={`flex ${side === 'right' ? 'justify-end' : 'justify-start'}`}
     >
       <div
@@ -511,6 +618,7 @@ function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string })
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const hasAnimated = useRef(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -518,7 +626,7 @@ function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string })
         if (entry.isIntersecting && !hasAnimated.current) {
           hasAnimated.current = true;
           let start = 0;
-          const step = Math.ceil(end / 60);
+          const step = end / 60;
           const timer = setInterval(() => {
             start += step;
             if (start >= end) {
@@ -546,14 +654,17 @@ function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string })
 
 function StatsSection() {
   const stats = [
-    { value: 10000, suffix: '+', label: 'Người dùng', icon: <User className="w-5 h-5" />, color: '#f4258c' },
+    { value: 10000, suffix: '+', label: 'Người dùng', icon: <Users className="w-5 h-5" />, color: '#f4258c' },
     { value: 500000, suffix: '+', label: 'Tin nhắn/ngày', icon: <MessageCircle className="w-5 h-5" />, color: '#a855f7' },
-    { value: 99, suffix: '%', label: 'Hài lòng', icon: <Star className="w-5 h-5" />, color: '#eab308' },
+    { value: 99, suffix: '%', label: 'Hài lòng', icon: <TrendingUp className="w-5 h-5" />, color: '#eab308' },
     { value: 24, suffix: '/7', label: 'Sẵn sàng', icon: <Clock className="w-5 h-5" />, color: '#22c55e' },
   ];
 
   return (
     <section className="py-20 relative">
+      {/* Subtle vertical accent line */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-16 bg-gradient-to-b from-transparent via-love/20 to-transparent" />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {stats.map((stat, i) => (
@@ -567,8 +678,8 @@ function StatsSection() {
               <TiltCard className="group h-full" glowColor={stat.color} intensity={8}>
                 <div className="relative h-full p-6 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/[0.05] transition-all duration-500 text-center overflow-hidden group-hover:border-white/10">
                   <div className="relative z-10">
-                    <div 
-                      className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4 transition-all duration-300 group-hover:scale-110"
+                    <div
+                      className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4 transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg"
                       style={{ background: `${stat.color}15`, color: stat.color }}
                     >
                       {stat.icon}
@@ -590,6 +701,8 @@ function StatsSection() {
 
 /* ──────────────────── FEATURES ──────────────────── */
 function FeaturesSection() {
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   const features = [
     {
       icon: <Brain className="w-6 h-6" />,
@@ -635,7 +748,7 @@ function FeaturesSection() {
     <section id="features" className="py-24 relative">
       {/* Background decoration */}
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-96 h-96 bg-love/5 rounded-full blur-[150px] pointer-events-none" />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -645,7 +758,7 @@ function FeaturesSection() {
           className="text-center mb-16"
         >
           <span className="inline-block text-love font-bold text-sm uppercase tracking-widest mb-4">Tính Năng</span>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6" style={{ textShadow: '0 0 60px rgba(244,37,140,0.1)' }}>
             Mọi Thứ Bạn Cần Cho{' '}
             <span className="bg-gradient-to-r from-love to-purple-400 bg-clip-text text-transparent">
               Mối Quan Hệ AI
@@ -662,15 +775,15 @@ function FeaturesSection() {
               key={i}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.08 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.4, delay: i * 0.08 }}
               viewport={{ once: true }}
               className={f.span || ''}
             >
               <TiltCard className="group h-full" glowColor={f.color} intensity={10}>
                 <div className="relative h-full p-7 rounded-2xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.05] transition-all duration-500 overflow-hidden group-hover:border-white/10">
-                  {/* Icon */}
-                  <div 
-                    className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5 transition-all duration-300 group-hover:scale-110"
+                  {/* Icon with pulse on hover */}
+                  <div
+                    className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5 transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg"
                     style={{ background: `${f.color}15`, color: f.color }}
                   >
                     {f.icon}
@@ -720,7 +833,7 @@ function ChatDemoSection() {
   return (
     <section id="demo" className="py-24 relative overflow-hidden">
       <div className="absolute right-0 top-0 w-[700px] h-[700px] bg-purple-600/5 rounded-full blur-[150px] pointer-events-none" />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="flex flex-col lg:flex-row items-center gap-16">
           {/* Left text */}
@@ -732,7 +845,7 @@ function ChatDemoSection() {
             className="flex-1"
           >
             <span className="text-love font-bold text-sm uppercase tracking-widest mb-4 inline-block">Trải nghiệm ngay</span>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6 leading-tight">
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6 leading-tight" style={{ textShadow: '0 0 60px rgba(244,37,140,0.1)' }}>
               Thử Trò Chuyện{' '}
               <span className="bg-gradient-to-r from-love to-pink-400 bg-clip-text text-transparent">
                 Ngay Bây Giờ
@@ -743,7 +856,7 @@ function ChatDemoSection() {
               Đây chỉ là demo — <span className="text-white font-medium">trải nghiệm thực sự còn tuyệt vời hơn nhiều!</span>
             </p>
             <Link href="/auth/register">
-              <button className="group flex items-center gap-2 h-12 px-6 rounded-xl bg-love/10 border border-love/20 text-love font-bold transition-all duration-300 hover:bg-love/20 hover:border-love/30">
+              <button className="group flex items-center gap-2 h-12 px-6 rounded-xl bg-love/10 border border-love/20 text-love font-bold transition-all duration-300 hover:bg-love/20 hover:border-love/30 cursor-pointer">
                 Tạo tài khoản để trải nghiệm đầy đủ
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
               </button>
@@ -817,13 +930,13 @@ function ChatDemoSection() {
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleDemo()}
-                      className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-full px-4 py-3 text-sm text-white placeholder:text-gray-500 outline-none focus:border-love/40 transition-all duration-300"
+                      className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-full px-4 py-3 text-sm text-white placeholder:text-gray-500 outline-none focus:border-love/40 focus:ring-2 focus:ring-love/10 transition-all duration-300"
                       placeholder="Thử nhắn tin..."
                     />
                     <button
                       onClick={handleDemo}
                       disabled={!input.trim() || isTyping}
-                      className="w-10 h-10 rounded-full bg-gradient-to-r from-love to-purple-500 flex items-center justify-center text-white transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100 shadow-lg shadow-love/30"
+                      className="w-10 h-10 rounded-full bg-gradient-to-r from-love to-purple-500 flex items-center justify-center text-white transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100 shadow-lg shadow-love/30 cursor-pointer"
                     >
                       <Send className="w-4 h-4" />
                     </button>
@@ -873,6 +986,9 @@ function HowItWorksSection() {
 
   return (
     <section id="how" className="py-24 relative">
+      {/* Vertical connector line */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-16 bg-gradient-to-b from-transparent via-love/20 to-transparent" />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -898,14 +1014,18 @@ function HowItWorksSection() {
               viewport={{ once: true }}
               className="relative"
             >
+              {/* Connector between steps (desktop only) */}
+              {i < steps.length - 1 && (
+                <div className="hidden lg:block absolute top-10 left-full w-full h-px bg-gradient-to-r from-white/[0.06] to-transparent z-0 pointer-events-none" />
+              )}
               <TiltCard className="group h-full" glowColor={s.color} intensity={8}>
                 <div className="relative h-full flex flex-col p-6 rounded-2xl border border-white/[0.05] bg-gradient-to-br from-white/[0.03] to-transparent transition-all duration-500 overflow-hidden group-hover:border-white/10">
                   {/* Step number */}
                   <div className="absolute top-4 right-4 text-5xl font-black text-white/[0.03] group-hover:text-white/[0.06] transition-colors duration-500">{s.step}</div>
-                  
+
                   {/* Icon */}
-                  <div 
-                    className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5 transition-all duration-300 group-hover:scale-110"
+                  <div
+                    className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5 transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg"
                     style={{ background: `${s.color}15`, color: s.color }}
                   >
                     {s.icon}
@@ -951,7 +1071,7 @@ function TestimonialsSection() {
   return (
     <section id="stories" className="py-24 relative">
       <div className="absolute left-0 top-1/2 w-[500px] h-[500px] bg-love/5 rounded-full blur-[150px] pointer-events-none -translate-y-1/2" />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -979,24 +1099,29 @@ function TestimonialsSection() {
             >
               <TiltCard className="group h-full" glowColor="#f4258c" intensity={8}>
                 <div className="relative h-full p-6 rounded-2xl bg-gradient-to-br from-white/[0.04] to-transparent border border-white/[0.05] transition-all duration-500 overflow-hidden group-hover:border-white/10">
-                  {/* Quote mark */}
-                  <div className="absolute top-4 right-4 text-6xl text-love/10 font-serif leading-none">&quot;</div>
-                  
-                  <div className="relative z-10 flex items-center gap-3 mb-4">
-                    <div className="size-12 rounded-full bg-gradient-to-br from-love/20 to-purple-600/20 flex items-center justify-center text-2xl border border-white/10">
-                      {t.avatar}
+                  {/* Large decorative quote mark */}
+                  <div className="absolute top-4 right-4 text-7xl text-love/[0.06] font-serif leading-none select-none">&ldquo;</div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="size-12 rounded-full bg-gradient-to-br from-love/20 to-purple-600/20 flex items-center justify-center text-2xl border border-white/10 ring-2 ring-white/5">
+                        {t.avatar}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-white">{t.name}</p>
+                          <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                        </div>
+                        <p className="text-xs text-gray-500">{t.role}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-white">{t.name}</p>
-                      <p className="text-xs text-gray-500">{t.role}</p>
+                    <div className="flex gap-0.5 mb-4">
+                      {[...Array(t.rating)].map((_, j) => (
+                        <Star key={j} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                      ))}
                     </div>
+                    <p className="text-gray-300 text-sm leading-relaxed">&ldquo;{t.text}&rdquo;</p>
                   </div>
-                  <div className="relative z-10 flex gap-0.5 mb-4">
-                    {[...Array(t.rating)].map((_, j) => (
-                      <Star key={j} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                    ))}
-                  </div>
-                  <p className="relative z-10 text-gray-300 text-sm leading-relaxed">&ldquo;{t.text}&rdquo;</p>
                 </div>
               </TiltCard>
             </motion.div>
@@ -1028,9 +1153,9 @@ function TrustBanner() {
               viewport={{ once: true }}
             >
               <TiltCard className="group" glowColor={item.color} intensity={6}>
-                <div className="flex items-start gap-4 p-5 rounded-2xl border border-white/[0.05] bg-white/[0.02] transition-all duration-500 group-hover:border-white/10">
-                  <div 
-                    className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 transition-all duration-300 group-hover:scale-110"
+                <div className="flex items-start gap-4 p-5 rounded-2xl border border-white/[0.05] bg-white/[0.02] transition-all duration-500 group-hover:border-white/10 cursor-pointer">
+                  <div
+                    className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg"
                     style={{ background: `${item.color}15`, color: item.color }}
                   >
                     {item.icon}
@@ -1135,16 +1260,16 @@ function PricingSection() {
           <div className="inline-flex items-center gap-2 bg-white/[0.04] rounded-xl p-1 border border-white/[0.06]">
             <button
               onClick={() => setBillingCycle('monthly')}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${billingCycle === 'monthly' ? 'bg-love text-white shadow-lg shadow-love/20' : 'text-gray-400 hover:text-white'}`}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all duration-300 cursor-pointer ${billingCycle === 'monthly' ? 'bg-love text-white shadow-lg shadow-love/20' : 'text-gray-400 hover:text-white'}`}
             >
               Hàng tháng
             </button>
             <button
               onClick={() => setBillingCycle('yearly')}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${billingCycle === 'yearly' ? 'bg-love text-white shadow-lg shadow-love/20' : 'text-gray-400 hover:text-white'}`}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all duration-300 cursor-pointer ${billingCycle === 'yearly' ? 'bg-love text-white shadow-lg shadow-love/20' : 'text-gray-400 hover:text-white'}`}
             >
               Hàng năm
-              <span className="ml-1.5 text-xs text-green-400">-17%</span>
+              <span className="ml-1.5 text-xs text-green-400 font-semibold">-17%</span>
             </button>
           </div>
         </motion.div>
@@ -1160,16 +1285,22 @@ function PricingSection() {
             >
               <TiltCard className="group h-full" glowColor={t.glowColor} intensity={t.highlight ? 8 : 6}>
                 <div className={`relative h-full flex flex-col p-6 rounded-2xl border ${t.borderClass} ${t.bgClass} backdrop-blur-sm transition-all duration-500 overflow-hidden`}>
-                  {t.highlight && <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-[80px] pointer-events-none" />}
+                  {/* Popular badge with glow */}
+                  {t.highlight && (
+                    <>
+                      <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-[80px] pointer-events-none" />
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-love text-white text-xs font-bold shadow-lg shadow-purple-500/30">
+                          <Star className="w-3 h-3 fill-white" />
+                          {t.badge}
+                        </span>
+                      </div>
+                    </>
+                  )}
 
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-lg font-bold text-white">{t.name}</h3>
-                      {t.badge && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-bold border border-purple-500/20">
-                          {t.badge}
-                        </span>
-                      )}
                     </div>
                     <div className="flex items-baseline gap-1.5 mb-6">
                       <span className={`text-4xl font-black ${t.highlight ? 'bg-gradient-to-r from-purple-400 to-love bg-clip-text text-transparent' : 'text-white'}`}>{t.price}</span>
@@ -1189,7 +1320,7 @@ function PricingSection() {
                   </ul>
 
                   <Link href="/auth/register" className="relative z-10 block">
-                    <button className={`w-full h-11 rounded-xl font-bold text-sm transition-all duration-300 ${t.btnClass}`}>
+                    <button className={`w-full h-11 rounded-xl font-bold text-sm transition-all duration-300 cursor-pointer ${t.btnClass}`}>
                       {t.cta}
                     </button>
                   </Link>
@@ -1205,10 +1336,20 @@ function PricingSection() {
 
 /* ──────────────────── CTA ──────────────────── */
 function CTASection() {
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   return (
     <section className="py-24 relative overflow-hidden">
+      {/* Enhanced background effects */}
       <div className="absolute inset-0 bg-gradient-to-r from-love/5 via-purple-600/5 to-love/5" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-love/10 rounded-full blur-[180px] pointer-events-none" />
+
+      {/* Animated spotlight ring */}
+      <motion.div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full border border-love/10"
+        animate={prefersReducedMotion ? {} : { scale: [0.8, 1.2], opacity: [0.3, 0] }}
+        transition={{ duration: 3, repeat: Infinity, ease: 'ease-out' }}
+      />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -1217,10 +1358,10 @@ function CTASection() {
         viewport={{ once: true }}
         className="max-w-3xl mx-auto px-4 relative z-10 text-center"
       >
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-love/20 to-purple-500/20 text-love mb-8 border border-love/20">
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-love/20 to-purple-500/20 text-love mb-8 border border-love/20 shadow-xl shadow-love/10">
           <Heart className="w-10 h-10 fill-love" />
         </div>
-        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6">
+        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6" style={{ textShadow: '0 0 80px rgba(244,37,140,0.12)' }}>
           Sẵn Sàng Khám Phá{' '}
           <span className="bg-gradient-to-r from-love to-purple-400 bg-clip-text text-transparent">Amoura</span>?
         </h2>
@@ -1229,7 +1370,7 @@ function CTASection() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link href="/auth/register">
-            <button className="group relative flex items-center justify-center gap-3 h-14 px-10 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-lg font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]">
+            <button className="group relative flex items-center justify-center gap-3 h-14 px-10 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-lg font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-xl shadow-love/20 hover:shadow-love/30">
               <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <Heart className="relative z-10 w-5 h-5 fill-white group-hover:scale-110 transition-transform duration-300" />
               <span className="relative z-10">Bắt Đầu Miễn Phí</span>
@@ -1237,11 +1378,25 @@ function CTASection() {
             </button>
           </Link>
           <Link href="/auth/login">
-            <button className="flex items-center justify-center gap-2 h-14 px-10 rounded-2xl bg-white/[0.03] border border-white/10 text-white text-lg font-semibold transition-all duration-300 hover:bg-white/[0.06] hover:border-white/20">
+            <button className="flex items-center justify-center gap-2 h-14 px-10 rounded-2xl bg-white/[0.03] border border-white/10 text-white text-lg font-semibold transition-all duration-300 hover:bg-white/[0.06] hover:border-white/20 cursor-pointer">
               Đã có tài khoản? Đăng nhập
             </button>
           </Link>
         </div>
+
+        {/* Urgency element */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+          viewport={{ once: true }}
+          className="mt-8 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.06]"
+        >
+          <Sparkles className="w-4 h-4 text-love" />
+          <span className="text-sm text-gray-400">
+            <span className="text-white font-semibold">10,000+</span> người đã bắt đầu tuần này
+          </span>
+        </motion.div>
       </motion.div>
     </section>
   );
@@ -1321,7 +1476,7 @@ function Footer() {
             </ul>
           </div>
         </div>
-        
+
         <div className="pt-8 border-t border-white/[0.03] flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-gray-600">
             &copy; 2026 Amoura. Được tạo với 💕 tại Việt Nam.
@@ -1344,7 +1499,7 @@ function Footer() {
                 </svg>
               )},
             ].map((social, i) => (
-              <a key={i} href={social.href} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-white transition-colors duration-300">
+              <a key={i} href={social.href} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-white transition-colors duration-300 cursor-pointer">
                 {social.icon}
               </a>
             ))}

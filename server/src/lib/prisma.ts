@@ -27,10 +27,12 @@ export const prisma = global.prisma || new PrismaClient({
   },
 });
 
-// Log connection events
-prisma.$connect()
-  .then(() => log.info('Connected to database'))
-  .catch((err) => log.error('Failed to connect to database:', err));
+// Log connection events — only connect explicitly, not on module import
+// This prevents re-connection on every hot-reload in dev mode
+export async function connectPrisma(): Promise<void> {
+  await prisma.$connect();
+  log.info('Connected to database');
+}
 
 if (process.env.NODE_ENV !== 'production') {
   global.prisma = prisma;

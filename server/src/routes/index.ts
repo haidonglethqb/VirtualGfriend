@@ -14,6 +14,7 @@ import { leaderboardRouter } from '../modules/leaderboard/leaderboard.routes';
 import { adminRouter } from '../modules/admin';
 import { paymentRouter } from '../modules/payment/payment.routes';
 import { getAllTierConfigs } from '../modules/admin/tier-config.service';
+import { AppError } from '../middlewares/error.middleware';
 
 export const router = Router();
 
@@ -35,13 +36,12 @@ router.use('/admin', adminRouter);
 router.use('/payment', paymentRouter);
 
 // Public config endpoint for frontend dynamic premium plans
-router.get('/config/tier-plans', async (_: Request, res: Response) => {
+router.get('/config/tier-plans', async (_: Request, res: Response, next: (err: Error) => void) => {
   try {
     const configs = await getAllTierConfigs();
     res.json({ success: true, data: configs });
   } catch (error) {
-    console.error('Failed to load tier plans:', error);
-    res.status(500).json({ success: false, error: 'Failed to load tier plans' });
+    next(new AppError('Failed to load tier plans', 500, 'TIER_PLANS_ERROR'));
   }
 });
 

@@ -17,40 +17,56 @@ interface LeaderboardEntry {
 export const leaderboardService = {
   /**
    * Top users by character level (highest level character)
+   * Uses two-query approach to avoid N+1 with distinct + nested relation.
    */
   async getByLevel(limit = 20): Promise<LeaderboardEntry[]> {
     const cacheKey = 'leaderboard:level'
     const cached = await cache.get<LeaderboardEntry[]>(cacheKey)
     if (cached) return cached.slice(0, limit)
 
-    const results = await prisma.character.findMany({
+    // Step 1: Get top userIds with their best character (no nested relation)
+    // Uses distinct: ['userId'] to get one character per user.
+    // The two-query approach avoids PostgreSQL's DISTINCT ON ordering constraints
+    // and prevents N+1 queries when fetching user details.
+    const characterResults = await prisma.character.findMany({
       where: { isActive: true },
       orderBy: [{ level: 'desc' }, { experience: 'desc' }],
       take: limit,
       distinct: ['userId'],
       select: {
+        userId: true,
         level: true,
-        user: {
-          select: {
-            id: true,
-            username: true,
-            displayName: true,
-            avatar: true,
-            isPremium: true,
-          },
-        },
       },
     })
 
-    const entries: LeaderboardEntry[] = results.map((r, i) => ({
-      rank: i + 1,
-      userId: r.user.id,
-      username: r.user.username,
-      displayName: r.user.displayName,
-      avatar: r.user.avatar,
-      isPremium: r.user.isPremium,
-      value: r.level,
-    }))
+    // Step 2: Batch-fetch users with WHERE id IN (...)
+    const userIds = characterResults.map(r => r.userId)
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatar: true,
+        isPremium: true,
+      },
+    })
+
+    const userMap = new Map(users.map(u => [u.id, u]))
+    const charMap = new Map(characterResults.map(r => [r.userId, r.level]))
+
+    const entries: LeaderboardEntry[] = characterResults.map((r, i) => {
+      const user = userMap.get(r.userId)
+      return {
+        rank: i + 1,
+        userId: r.userId,
+        username: user?.username ?? null,
+        displayName: user?.displayName ?? null,
+        avatar: user?.avatar ?? null,
+        isPremium: user?.isPremium ?? false,
+        value: charMap.get(r.userId) ?? 0,
+      }
+    })
 
     await cache.set(cacheKey, entries, 300) // 5 min cache
     return entries
@@ -58,40 +74,53 @@ export const leaderboardService = {
 
   /**
    * Top users by affection (highest affection with any character)
+   * Uses two-query approach to avoid N+1 with distinct + nested relation.
    */
   async getByAffection(limit = 20): Promise<LeaderboardEntry[]> {
     const cacheKey = 'leaderboard:affection'
     const cached = await cache.get<LeaderboardEntry[]>(cacheKey)
     if (cached) return cached.slice(0, limit)
 
-    const results = await prisma.character.findMany({
+    // Step 1: Get top userIds with their best affection (no nested relation)
+    const characterResults = await prisma.character.findMany({
       where: { isActive: true },
       orderBy: { affection: 'desc' },
       take: limit,
       distinct: ['userId'],
       select: {
+        userId: true,
         affection: true,
-        user: {
-          select: {
-            id: true,
-            username: true,
-            displayName: true,
-            avatar: true,
-            isPremium: true,
-          },
-        },
       },
     })
 
-    const entries: LeaderboardEntry[] = results.map((r, i) => ({
-      rank: i + 1,
-      userId: r.user.id,
-      username: r.user.username,
-      displayName: r.user.displayName,
-      avatar: r.user.avatar,
-      isPremium: r.user.isPremium,
-      value: r.affection,
-    }))
+    // Step 2: Batch-fetch users with WHERE id IN (...)
+    const userIds = characterResults.map(r => r.userId)
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatar: true,
+        isPremium: true,
+      },
+    })
+
+    const userMap = new Map(users.map(u => [u.id, u]))
+    const affMap = new Map(characterResults.map(r => [r.userId, r.affection]))
+
+    const entries: LeaderboardEntry[] = characterResults.map((r, i) => {
+      const user = userMap.get(r.userId)
+      return {
+        rank: i + 1,
+        userId: r.userId,
+        username: user?.username ?? null,
+        displayName: user?.displayName ?? null,
+        avatar: user?.avatar ?? null,
+        isPremium: user?.isPremium ?? false,
+        value: affMap.get(r.userId) ?? 0,
+      }
+    })
 
     await cache.set(cacheKey, entries, 300)
     return entries
