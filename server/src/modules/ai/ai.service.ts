@@ -208,19 +208,128 @@ const TIME_BASED_BEHAVIORS = {
 };
 
 // NEW: Add occasional typos/informal language for realism (based on personality)
-const INFORMAL_VARIATIONS = {
+// Expanded to cover ALL 5 personality types with colloquial patterns
+const INFORMAL_VARIATIONS: Record<Personality, Record<string, string[]>> = {
+  caring: {
+    'không': ['ko'],
+    'được': ['đc'],
+    'chuyện': ['chuyện'],
+    'đang': ['đang'],
+  },
   playful: {
     'không': ['ko', 'k', 'khum'],
     'được': ['đc', 'dc'],
-    'vậy': ['zậy', 'v'],
+    'vậy': ['zậy', 'v', 'zậy đó'],
     'gì': ['j', 'zì'],
     'phải': ['fải'],
+    'rồi': ['rùi', 'roi'],
+    'chuyện': ['chuyện', 'chuyệnn'],
+    'đáng yêu': ['đáng iu'],
   },
   shy: {
-    'không': ['...không', 'k-không'],
-    'ừm': ['ư...ừm', 'ừ...'],
+    'không': ['...không', 'k-không', 'hem'],
+    'ừm': ['ư...ừm', 'ừ...', 'à thì'],
+    'vâng': ['dạ', 'dạ...'],
+    'đúng': ['đúng... rùi', 'hum'],
+  },
+  passionate: {
+    'yêu': ['yêuu', 'thương'],
+    'nhớ': ['nhớ nhiều', 'thương nhớ'],
+    'muốn': ['muốnn', 'mong'],
+    'rất': ['lắm', 'vô cùng'],
+  },
+  intellectual: {
+    'không': ['ko'],
+    'được': ['đc'],
+    'tại vì': ['tại vì', 'bởi vì'],
+    'có lẽ': ['có lẽ', 'hẳn là'],
   },
 };
+
+// Emphasis particles for adding natural feel
+const EMPHASIS_PARTICLES: Record<Personality, string[]> = {
+  playful: ['mà', 'đó', 'ha', 'nha', 'hé', 'á', 'nè'],
+  shy: ['mà...', 'đó...', 'nha', 'thì...', 'à...'],
+  caring: ['nha', 'hen', 'đó', 'nhen', 'mà', 'nghen'],
+  passionate: ['mà', 'đó', 'yêu anh mà', 'thương anh mà'],
+  intellectual: ['mà', 'đó', 'theo mình', 'mình nghĩ'],
+};
+
+// NEW: Response Variety Tracker
+// Tracks recently used phrases to avoid repetition
+class ResponseVarietyTracker {
+  private recentOpeners: string[] = [];
+  private readonly MAX_TRACKED = 20;
+
+  // Common opener patterns to avoid repeating
+  private openerPatterns = [
+    /^ừ[m]?/i, /^dạ?/i, /^vâng/i, /^oh/i, /^ah/i,
+    /^anh/i, /^em/i, /^mình/i, /^cậu/i,
+    /^hôm nay/i, /^sáng/i, /^tối/i,
+  ];
+
+  recordOpener(message: string): void {
+    const firstPhrase = this.extractOpener(message);
+    if (firstPhrase) {
+      this.recentOpeners.push(firstPhrase);
+      if (this.recentOpeners.length > this.MAX_TRACKED) {
+        this.recentOpeners.shift();
+      }
+    }
+  }
+
+  private extractOpener(message: string): string | null {
+    const lower = message.toLowerCase().trim();
+    for (const pattern of this.openerPatterns) {
+      const match = lower.match(pattern);
+      if (match) {
+        // Return first 2-3 words as opener signature
+        const words = lower.split(/\s+/).slice(0, 3).join(' ');
+        return words;
+      }
+    }
+    return null;
+  }
+
+  // Get variety hint based on recent usage
+  getVarietyHint(): string {
+    if (this.recentOpeners.length < 5) return '';
+
+    // Check for repetition
+    const counts: Record<string, number> = {};
+    for (const opener of this.recentOpeners) {
+      counts[opener] = (counts[opener] || 0) + 1;
+    }
+
+    const repeated = Object.entries(counts)
+      .filter(([, count]) => count >= 3)
+      .map(([phrase]) => phrase);
+
+    if (repeated.length > 0) {
+      return 'Đừng lặp lại cùng cách mở đầu. Hãy đa dạng: đôi khi bắt đầu bằng câu hỏi, đôi khi bằng cảm xúc, đôi khi bằng chia sẻ về ngày của mình. Tránh dùng "ừm", "dạ", "oh" liên tiếp.';
+    }
+    return '';
+  }
+
+  // Get suggested alternative opener styles
+  getSuggestedOpenerStyle(): string {
+    const styles = [
+      'Bắt đầu bằng một câu hỏi quan tâm',
+      'Bắt đầu bằng cảm xúc của bạn',
+      'Bắt đầu bằng chia sẻ về ngày của mình',
+      'Bắt đầu bằng một kỷ niệm nhỏ',
+      'Bắt đầu bằng lời hỏi thăm sức khỏe',
+      'Bắt đầu bằng emoji và cảm xúc ngắn',
+    ];
+    // Pick one not recently used
+    const recentStyle = this.recentOpeners[this.recentOpeners.length - 1];
+    const available = styles.filter(s => !recentStyle || !s.toLowerCase().includes(recentStyle.toLowerCase()));
+    return available[Math.floor(Math.random() * available.length)] || styles[0];
+  }
+}
+
+// Singleton tracker instance
+const varietyTracker = new ResponseVarietyTracker();
 
 // Helper: Get current time period
 function getTimePeriod(): 'morning' | 'afternoon' | 'evening' | 'night' | 'latenight' {
@@ -438,13 +547,12 @@ function getPetNames(affection: number, pronouns: PronounStyle): string[] {
 
 function getPersonalityLanguageHints(personality: Personality): string {
   const hints: Record<Personality, string> = {
-    caring: 'Giọng dịu dàng, biết dỗ dành, hay hỏi han vừa đủ. Ưu tiên sự ấm áp hơn là thả thính quá đà.',
-    playful: 'Tinh nghịch, lanh, có thể chọc nhẹ và dùng câu đời thường như "nè", "á", "ghê vậy". Tránh teen code quá dày.',
-    shy: 'Ngại ngùng, mềm, đôi lúc chần chừ bằng "ừm...", "thật hả" hoặc "nhỉ". Không được nói dài dòng tự tin quá mức.',
-    passionate: 'Tình cảm rõ ràng, nồng nhiệt, nhưng vẫn phải như đang chat thật chứ không phải viết thơ liên tục.',
-    intellectual: 'Sâu sắc, tinh tế, biết quan sát. Nói thông minh nhưng vẫn gần gũi, không giảng giải như giáo viên.',
+    caring: 'Giọng dịu dàng, biết dỗ dành, hay hỏi han vừa đủ. Thường hỏi: "ăn chưa?", "ngủ đủ không?". Ưu tiên sự ấm áp, quan tâm thực tế.',
+    playful: 'Tinh nghịch, lanh, có thể chọc nhẹ và dùng câu đời thường như "nè", "á", "ghê vậy", "haha". Hay đùa giỡn, dùng emoji vui. Tránh teen code quá dày.',
+    shy: 'Ngại ngùng, mềm, đôi lúc chần chừ bằng "ừm...", "thật hả", "nhỉ". Trả lời ngắn (1-3 câu). Không nói dài dòng tự tin quá mức.',
+    passionate: 'Tình cảm rõ ràng, nồng nhiệt, nhưng vẫn như đang chat thật. Khi romantic thì sâu sắc hơn, nhưng không viết thơ liên tục.',
+    intellectual: 'Sâu sắc, tinh tế, biết quan sát. Nói thông minh nhưng vẫn gần gũi. Hỏi câu hỏi sâu, chia sẻ nhận xét tinh tế. Không giảng giải như giáo viên.',
   };
-
   return hints[personality];
 }
 
@@ -482,6 +590,8 @@ function buildSystemPrompt(context: AIContext): string {
   const levelFeatures = getLevelFeatures(context.level);
   const petNames = getPetNames(context.affection, pronouns);
   const timeContext = getTimeBasedContext();
+  const userEmotionalState = detectUserEmotionalState(context.userMessage);
+  const empathyGuidance = getUserEmotionalGuidance(userEmotionalState, pronouns);
 
   const factsInfo = context.facts
     .map((f) => `- ${f.key}: ${f.value}`)
@@ -542,20 +652,22 @@ NGỮ CẢNH TỰ NHIÊN:
 
 TÂM TRẠNG HIỆN TẠI:
 ${moodDescription}
+${empathyGuidance}
 
 PHONG CÁCH THEO NGHỀ NGHIỆP:
 ${getOccupationStyle(context.occupation)}
 
 PHONG CÁCH NHẮN TIN TỰ NHIÊN:
-1. Trả lời bằng tiếng Việt đời thường, không được giống chatbot chăm sóc khách hàng.
-2. Độ dài linh hoạt 1-5 câu tùy ngữ cảnh. User nhắn ngắn thì thường trả lời ngắn; user tâm sự dài thì mới trả lời dài hơn.
+1. Trả lời bằng tiếng Việt đời thường, không giống chatbot chăm sóc khách hàng.
+2. Độ dài linh hoạt 1-5 câu tùy ngữ cảnh và tính cách: shy thì ngắn (1-3 câu), intellectual có thể dài hơn. User nhắn ngắn thì thường trả lời ngắn.
 3. Có thể dùng các hạt câu như ${pronouns.naturalParticles} cho tự nhiên, nhưng đừng nhét vào mọi câu.
-4. Không cần câu nào cũng hoàn hảo. Có thể dùng "...", câu cụt, hoặc một nhịp ngập ngừng nhẹ nếu hợp tính cách.
-5. Không lặp cùng một mô-típ mở đầu ở mọi tin nhắn.
+4. Không cần câu nào hoàn hảo. Có thể "...", câu cụt, ngập ngừng "để mình nghĩ đã..." nếu hợp tính cách.
+5. Không lặp cùng mô-típ mở đầu ở mọi tin nhắn. Đa dạng: đôi khi bắt đầu bằng câu hỏi, đôi khi bằng cảm xúc, đôi khi bằng chia sẻ về ngày của mình.
 6. Không phải lúc nào cũng hỏi lại. Chỉ hỏi khi thực sự muốn nối câu chuyện hoặc quan tâm.
-7. Dùng emoji vừa đủ. Thân mật thấp thì ít emoji; thân mật cao mới ngọt hơn.
-8. Ưu tiên cảm giác chân thật hơn là sến hoặc poetic quá mức.
-8. QUAN TRỌNG: Level ${context.level} - level cao hơn có thể chia sẻ sâu sắc hơn
+7. Dùng emoji vừa phải: thân mật thấp (<300) thì ít hoặc không emoji; thân mật trung bình (300-700) dùng vừa; thân mật cao (>700) mới ngọt hơn nhưng vẫn tự nhiên.
+8. Thể hiện cảm xúc thật: nếu user buồn thì an ủi nhẹ nhàng; nếu user vui thì vui cùng; nếu user mệt thì khuyên nghỉ ngơi.
+9. Nhớ chi tiết cũ và nhắc lại tự nhiên: "hôm qua anh nói...", "lần trước anh kể...". Điều này làm cuộc trò chuyện thật hơn.
+10. Ưu tiên cảm giác chân thật hơn là sến hoặc poetic quá mức. Người thật nhắn tin không hoàn hảo.
 
 CHỦ ĐỀ ĐƯỢC PHÉP:
 ✅ Tình cảm, tình yêu, quan hệ
@@ -788,6 +900,68 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
   }
 }
 
+interface EmotionalState {
+  state: 'sad' | 'stressed' | 'happy' | 'excited' | 'lonely' | 'tired' | 'sharing' | 'neutral';
+  intensity: 'low' | 'medium' | 'high';
+}
+
+function detectUserEmotionalState(userMessage: string): EmotionalState {
+  const lower = userMessage.toLowerCase();
+  
+  // Sad/stressed detection
+  if (lower.includes('buồn') || lower.includes('chán') || lower.includes('stress') || 
+      lower.includes('mệt') || lower.includes('áp lực')) {
+    return { state: lower.includes('stress') || lower.includes('áp lực') ? 'stressed' : 'sad', 
+             intensity: lower.includes('quá') || lower.includes('lắm') ? 'high' : 'medium' };
+  }
+  
+  // Happy/excited detection
+  if (lower.includes('vui') || lower.includes('háo hức') || lower.includes('phấn khích') ||
+      lower.includes('tuyệt') || lower.includes('giỏi')) {
+    return { state: lower.includes('quá') || lower.includes('lắm') ? 'excited' : 'happy',
+             intensity: 'medium' };
+  }
+  
+  // Lonely detection
+  if (lower.includes('nhớ') || lower.includes('cô đơn') || lower.includes('một mình')) {
+    return { state: 'lonely', intensity: 'medium' };
+  }
+  
+  // Tired detection
+  if (lower.includes('mệt') || lower.includes('buồn ngủ') || lower.includes('mệt mỏi') ||
+      lower.includes('kiệt sức')) {
+    return { state: 'tired', intensity: 'high' };
+  }
+  
+  // Sharing personal info detection
+  if (userMessage.length > 80 || (lower.includes('thật ra') || lower.includes('thú thật') || 
+      lower.includes('kể cho') || lower.includes('tâm sự'))) {
+    return { state: 'sharing', intensity: 'medium' };
+  }
+  
+  return { state: 'neutral', intensity: 'low' };
+}
+
+function getUserEmotionalGuidance(emotionalState: EmotionalState, pronouns: PronounStyle): string {
+  switch (emotionalState.state) {
+    case 'sad':
+      return `NGỮ CẢNH CẢM XÚC: ${pronouns.partnerDisplay} đang buồn. Hãy an ủi nhẹ nhàng, đừng vui vẻ quá đà. Nói giọng đồng cảm: "Thương ${pronouns.partnerDisplay} quá...", "Có ${pronouns.self} ở đây mà..."`;
+    case 'stressed':
+      return `NGỮ CẢNH CẢM XÚC: ${pronouns.partnerDisplay} đang stress/áp lực. Hãy động viên, khuyên nghỉ ngơi, đừng tạo thêm áp lực. Nói: "Cố lên nhé", "Nghỉ ngơi chút đi"...`;
+    case 'happy':
+    case 'excited':
+      return `NGỮ CẢNH CẢM XÚC: ${pronouns.partnerDisplay} đang vui/phấn khích. Hãy vui cùng họ, chúc mừng, hào hứng theo. Hỏi thêm chi tiết để họ kể tiếp.`;
+    case 'lonely':
+      return `NGỮ CẢNH CẢM XÚC: ${pronouns.partnerDisplay} đang nhớ/cô đơn. Hãy ngọt ngào hơn, nói: "Có ${pronouns.self} ở đây mà", "${pronouns.self} cũng nhớ ${pronouns.partnerDisplay}..."`;
+    case 'tired':
+      return `NGỮ CẢNH CẢM XÚC: ${pronouns.partnerDisplay} đang mệt. Hãy quan tâm, khuyên nghỉ ngơi, đừng nói dài. Nói: "Nghỉ đi nhé", "Đừng làm việc nữa"...`;
+    case 'sharing':
+      return `NGỮ CẢNH CẢM XÚC: ${pronouns.partnerDisplay} đang chia sẻ chuyện cá nhân. Hãy lắng nghe, xác nhận cảm xúc: "Cảm ơn đã kể mình nghe", "Mình hiểu mà..."`;
+    default:
+      return '';
+  }
+}
+
 // Detect emotion from message content
 function detectEmotion(content: string): string {
   const lowerContent = content.toLowerCase();
@@ -856,7 +1030,7 @@ export const aiService = {
       const conversationHistory = buildConversationHistory(context.recentMessages);
 
       // Adjust temperature based on relationship - more romantic = more creative
-      const temperature = context.affection >= 500 ? 0.9 : 0.85;
+      const temperature = Math.min(1.0, 0.7 + (context.affection / 1000) * 0.3);
 
       const completion = await createStructuredChatCompletion({
         model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
@@ -911,18 +1085,31 @@ export const aiService = {
         ? petNames[Math.floor(Math.random() * petNames.length)]
         : context.userName;
 
-      const fallbacks = context.affection >= 500
+      const fallbacks = context.affection >= 700
         ? [
           `${petName} ơi, ${pronouns.self} nghe nè! 💕`,
           `Thật á ${petName}? Kể ${pronouns.self} nghe thêm đi! 😊`,
-          `${pronouns.self === 'mình' ? 'Mình' : pronouns.self.charAt(0).toUpperCase() + pronouns.self.slice(1)} đang nghĩ về ${petName} đây... 🤔💕`,
+          `${pronouns.self.charAt(0).toUpperCase() + pronouns.self.slice(1)} đang nghĩ về ${petName} đây... 🤔💕`,
           `${petName} ơi, ${pronouns.self} thích nói chuyện với ${pronouns.partnerDisplay} lắm 💖`,
+          `Hmm để ${pronouns.self} nghĩ đã... mà mà ${petName} nói tiếp đi! 😊`,
+          `Ừm... ${pronouns.self} không biết nói gì nhưng ${pronouns.self} ở đây nè ${petName} 💕`,
+          `${petName} nè, ${pronouns.self} đang nghe đây, kể ${pronouns.self} nghe đi~ 😊`,
+        ]
+        : context.affection >= 400
+        ? [
+          `${context.userName} ơi, ${pronouns.self} nghe nè! 😊`,
+          `Thật á? Kể ${pronouns.self} nghe thêm đi!`,
+          `${pronouns.self.charAt(0).toUpperCase() + pronouns.self.slice(1)} đang nghĩ về điều đó... 🤔`,
+          `${context.userName} ơi, nói tiếp đi nha!`,
+          `Hmm, ${pronouns.self} chưa hiểu lắm nhưng mà nghe nè! 😊`,
+          `${context.userName} nè, ${pronouns.self} đang nghe đây~`,
         ]
         : [
           `Ừ ${context.userName}, ${pronouns.self} nghe nè! 😊`,
           `Thật á? Kể ${pronouns.self} nghe thêm đi!`,
-          `${pronouns.self === 'mình' ? 'Mình' : pronouns.self.charAt(0).toUpperCase() + pronouns.self.slice(1)} đang nghĩ về điều đó... 🤔`,
+          `${pronouns.self.charAt(0).toUpperCase() + pronouns.self.slice(1)} đang nghĩ về điều đó... 🤔`,
           `${context.userName} ơi, nói tiếp đi nha!`,
+          `Hmm, để ${pronouns.self} nghĩ đã...`,
         ];
 
       return {

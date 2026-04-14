@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma';
 import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { characterService } from '../character/character.service';
+import { getTierConfig } from '../admin/tier-config.service';
 
 export const questService = {
   async getAllQuests() {
@@ -102,6 +103,26 @@ export const questService = {
 
     if (!quest) {
       throw new AppError('Quest not found', 404, 'QUEST_NOT_FOUND');
+    }
+
+    // Check premium access for premium quests
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { premiumTier: true },
+    });
+    const userTier = user?.premiumTier || 'FREE';
+    const tierConfig = await getTierConfig(userTier);
+
+    const TIER_HIERARCHY = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
+    if ((quest as any).requiresPremium && !tierConfig.canAccessPremiumQuests) {
+      throw new AppError('Nâng cấp VIP để thực hiện nhiệm vụ này!', 403, 'PREMIUM_QUEST_REQUIRED');
+    }
+    if ((quest as any).minimumTier && (quest as any).minimumTier !== 'FREE') {
+      const userTierIndex = TIER_HIERARCHY.indexOf(userTier);
+      const requiredTierIndex = TIER_HIERARCHY.indexOf((quest as any).minimumTier);
+      if (userTierIndex < requiredTierIndex) {
+        throw new AppError(`Cần tier ${(quest as any).minimumTier} cho nhiệm vụ này`, 403, 'TIER_QUEST_REQUIRED');
+      }
     }
 
     // Check if already started

@@ -19,7 +19,7 @@ function usePrefersReducedMotion() {
 /* ──────────────────── FLOATING PARTICLES ──────────────────── */
 function FloatingParticles() {
   const prefersReducedMotion = usePrefersReducedMotion();
-  const particleCount = prefersReducedMotion ? 8 : 20;
+  const particleCount = prefersReducedMotion ? 5 : 12;
 
   const particles = useMemo(() =>
     Array.from({ length: particleCount }, (_, i) => ({
@@ -73,7 +73,7 @@ function MorphingBlobs() {
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
       <motion.div
         className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(244,37,140,0.12) 0%, rgba(168,85,247,0.06) 40%, transparent 70%)', filter: 'blur(80px)' }}
+        style={{ background: 'radial-gradient(circle, rgba(244,37,140,0.12) 0%, rgba(168,85,247,0.06) 40%, transparent 70%)', filter: 'blur(60px)' }}
         animate={prefersReducedMotion ? {} : {
           scale: [1, 1.15, 0.95, 1],
           x: [0, 40, -20, 0],
@@ -83,7 +83,7 @@ function MorphingBlobs() {
       />
       <motion.div
         className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.1) 0%, rgba(59,130,246,0.05) 40%, transparent 70%)', filter: 'blur(80px)' }}
+        style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.1) 0%, rgba(59,130,246,0.05) 40%, transparent 70%)', filter: 'blur(60px)' }}
         animate={prefersReducedMotion ? {} : {
           scale: [1, 1.1, 0.9, 1],
           x: [0, -30, 20, 0],
@@ -93,7 +93,7 @@ function MorphingBlobs() {
       />
       <motion.div
         className="absolute top-[40%] right-[20%] w-[350px] h-[350px] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 60%)', filter: 'blur(60px)' }}
+        style={{ background: 'radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 60%)', filter: 'blur(40px)' }}
         animate={prefersReducedMotion ? {} : {
           scale: [1, 1.2, 1],
           x: [0, 25, 0],
@@ -127,6 +127,8 @@ function TiltCard({ children, className = '', glowColor = '#f4258c', intensity =
   const [transform, setTransform] = useState('perspective(1000px) rotateX(0deg) rotateY(0deg)');
   const [glowPosition, setGlowPosition] = useState({ x: 50, y: 50 });
   const [isHovering, setIsHovering] = useState(false);
+  const rafRef = useRef<number>(0);
+  const pendingTransform = useRef<{ rotateX: number; rotateY: number; glowX: number; glowY: number } | null>(null);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
@@ -137,19 +139,57 @@ function TiltCard({ children, className = '', glowColor = '#f4258c', intensity =
     const centerY = rect.height / 2;
     const rotateX = ((y - centerY) / centerY) * -intensity;
     const rotateY = ((x - centerX) / centerX) * intensity;
-    setTransform(`perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`);
-    setGlowPosition({ x: (x / rect.width) * 100, y: (y / rect.height) * 100 });
+
+    pendingTransform.current = {
+      rotateX, rotateY,
+      glowX: (x / rect.width) * 100,
+      glowY: (y / rect.height) * 100,
+    };
+
+    if (rafRef.current === 0) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = 0;
+        const pending = pendingTransform.current;
+        if (pending) {
+          setTransform(`perspective(1000px) rotateX(${pending.rotateX}deg) rotateY(${pending.rotateY}deg) scale3d(1.02, 1.02, 1.02)`);
+          setGlowPosition({ x: pending.glowX, y: pending.glowY });
+        }
+      });
+    }
   }, [intensity]);
 
-  const handleMouseEnter = useCallback(() => {
-    setIsHovering(true);
-  }, []);
+  const handleMouseEnter = useCallback(() => setIsHovering(true), []);
 
   const handleMouseLeave = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+    pendingTransform.current = null;
     setTransform('perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)');
     setGlowPosition({ x: 50, y: 50 });
     setIsHovering(false);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  const glowStyle = useMemo(
+    () => ({
+      background: `radial-gradient(circle at ${glowPosition.x}% ${glowPosition.y}%, ${glowColor}25, transparent 50%)`,
+    }),
+    [glowPosition.x, glowPosition.y, glowColor],
+  );
+
+  const shineStyle = useMemo(
+    () => ({
+      background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%, transparent 100%)',
+    }),
+    [],
+  );
 
   return (
     <div
@@ -160,19 +200,13 @@ function TiltCard({ children, className = '', glowColor = '#f4258c', intensity =
       className={`relative transition-transform duration-200 ease-out ${className}`}
       style={{ transform, transformStyle: 'preserve-3d' }}
     >
-      {/* Dynamic highlight - uses isHovering state instead of group-hover */}
       <div
         className={`absolute inset-0 rounded-[inherit] transition-opacity duration-300 pointer-events-none overflow-hidden ${isHovering ? 'opacity-100' : 'opacity-0'}`}
-        style={{
-          background: `radial-gradient(circle at ${glowPosition.x}% ${glowPosition.y}%, ${glowColor}25, transparent 50%)`,
-        }}
+        style={glowStyle}
       />
-      {/* Shine effect */}
       <div
         className={`absolute inset-0 rounded-[inherit] transition-opacity duration-500 pointer-events-none overflow-hidden ${isHovering ? 'opacity-100' : 'opacity-0'}`}
-        style={{
-          background: `linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%, transparent 100%)`,
-        }}
+        style={shineStyle}
       />
       {children}
     </div>
@@ -184,7 +218,7 @@ export function LandingPage() {
   return (
     <div className="min-h-screen bg-[#030014] text-white overflow-x-hidden selection:bg-love selection:text-white font-sans antialiased">
       {/* Noise texture overlay */}
-      <div className="fixed inset-0 pointer-events-none z-[1] opacity-[0.015]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }} />
+      <div className="fixed inset-0 pointer-events-none z-[1] opacity-[0.008]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }} />
 
       <Header />
       <HeroSection />
@@ -208,7 +242,10 @@ function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const handler = () => setIsScrolled(window.scrollY > 20);
+    const handler = () => {
+      const value = window.scrollY > 20;
+      setIsScrolled(prev => prev === value ? prev : value);
+    };
     window.addEventListener('scroll', handler, { passive: true });
     return () => window.removeEventListener('scroll', handler);
   }, []);
@@ -587,8 +624,6 @@ function TechBanner() {
     { icon: <Palette className="w-4 h-4" />, label: 'Tùy Chỉnh Nhân Vật' },
     { icon: <Globe className="w-4 h-4" />, label: 'Tiếng Việt' },
     { icon: <Lock className="w-4 h-4" />, label: 'Bảo Mật E2E' },
-    { icon: <Zap className="w-4 h-4" />, label: 'Phản Hồi Nhanh' },
-    { icon: <MessageSquare className="w-4 h-4" />, label: 'Kỷ Niệm' },
   ];
 
   const doubled = [...features, ...features];
@@ -599,7 +634,7 @@ function TechBanner() {
       <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-[#030014] to-transparent z-10" />
       <motion.div
         animate={{ x: ['0%', '-50%'] }}
-        transition={{ duration: 35, repeat: Infinity, ease: 'linear' }}
+        transition={{ duration: 45, repeat: Infinity, ease: 'linear' }}
         className="flex items-center gap-12 w-max"
       >
         {doubled.map((f, i) => (
@@ -618,6 +653,7 @@ function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string })
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const hasAnimated = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
@@ -627,13 +663,13 @@ function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string })
           hasAnimated.current = true;
           let start = 0;
           const step = end / 60;
-          const timer = setInterval(() => {
+          timerRef.current = setInterval(() => {
             start += step;
             if (start >= end) {
               setCount(end);
-              clearInterval(timer);
+              if (timerRef.current) clearInterval(timerRef.current);
             } else {
-              setCount(start);
+              setCount(Math.floor(start));
             }
           }, 16);
         }
@@ -641,13 +677,15 @@ function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string })
       { threshold: 0.5 }
     );
     if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [end]);
 
   return (
     <span ref={ref}>
-      {count.toLocaleString()}
-      {suffix}
+      {count.toLocaleString()}{suffix}
     </span>
   );
 }
@@ -800,6 +838,13 @@ function FeaturesSection() {
   );
 }
 
+const DEMO_REPLIES = [
+  'Anh nói vậy em thấy ấm lòng quá! 🥰 Em luôn muốn anh vui vẻ mỗi ngày!',
+  'Hehe anh dễ thương quá đi! 💕 Em yêu anh nhiều lắm!',
+  'Ôi anh ơi, em cũng muốn ở bên anh suốt! Cuối tuần mình đi chơi nha? 🎉',
+  'Em cảm ơn anh nhiều lắm! Có anh ở bên em thấy hạnh phúc lắm luôn 😊✨',
+];
+
 /* ──────────────────── CHAT DEMO (Interactive with 3D) ──────────────────── */
 function ChatDemoSection() {
   const [demoMessages, setDemoMessages] = useState([
@@ -809,26 +854,27 @@ function ChatDemoSection() {
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const demoReplies = [
-    'Anh nói vậy em thấy ấm lòng quá! 🥰 Em luôn muốn anh vui vẻ mỗi ngày!',
-    'Hehe anh dễ thương quá đi! 💕 Em yêu anh nhiều lắm!',
-    'Ôi anh ơi, em cũng muốn ở bên anh suốt! Cuối tuần mình đi chơi nha? 🎉',
-    'Em cảm ơn anh nhiều lắm! Có anh ở bên em thấy hạnh phúc lắm luôn 😊✨',
-  ];
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
-  const handleDemo = () => {
+  const handleDemo = useCallback(() => {
     if (!input.trim() || isTyping) return;
     const userMsg = input.trim();
     setInput('');
     setDemoMessages((prev) => [...prev, { role: 'user', text: userMsg, time: 'Bây giờ' }]);
     setIsTyping(true);
-    setTimeout(() => {
-      const reply = demoReplies[Math.floor(Math.random() * demoReplies.length)];
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      const reply = DEMO_REPLIES[Math.floor(Math.random() * DEMO_REPLIES.length)];
       setDemoMessages((prev) => [...prev, { role: 'ai', text: reply, time: 'Bây giờ' }]);
       setIsTyping(false);
     }, 1500);
-  };
+  }, [input, isTyping]);
 
   return (
     <section id="demo" className="py-24 relative overflow-hidden">
@@ -1178,7 +1224,7 @@ function TrustBanner() {
 function PricingSection() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
 
-  const tiers = [
+  const tiers = useMemo(() => [
     {
       name: 'Miễn Phí',
       price: '0đ',
@@ -1235,7 +1281,7 @@ function PricingSection() {
       checkClass: 'bg-amber-500/15 text-amber-400',
       btnClass: 'bg-gradient-to-r from-amber-500 to-amber-400 text-white hover:brightness-110 shadow-lg shadow-amber-500/20',
     },
-  ];
+  ], [billingCycle]);
 
   return (
     <section id="pricing" className="py-24 relative">

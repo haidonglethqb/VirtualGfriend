@@ -16,6 +16,14 @@ export interface PremiumFeatures {
   canAccessPremiumQuests: boolean;
   prioritySupport: boolean;
   earlyAccess: boolean;
+  // NEW fields
+  monthlyCoinBonus: number;
+  monthlyGemBonus: number;
+  xpMultiplier: number;
+  affectionMultiplier: number;
+  freeTrialDays: number;
+  exclusiveContent: boolean;
+  maxScenes: number;
 }
 
 export type PremiumBooleanFeature = {
@@ -28,7 +36,7 @@ export type AllTierConfigs = Record<PremiumTier, PremiumFeatures>;
 // Current system: FREE vs VIP (BASIC/PRO/ULTIMATE all treated as VIP)
 export const PREMIUM_FEATURES: AllTierConfigs = {
   FREE: {
-    maxMessagesPerDay: -1,
+    maxMessagesPerDay: 20,
     maxCharacters: 1,
     adFree: false,
     voiceMessages: false,
@@ -40,8 +48,14 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
     canAccessPremiumQuests: false,
     prioritySupport: false,
     earlyAccess: false,
+    monthlyCoinBonus: 0,
+    monthlyGemBonus: 0,
+    xpMultiplier: 1.0,
+    affectionMultiplier: 1.0,
+    freeTrialDays: 0,
+    exclusiveContent: false,
+    maxScenes: 3,
   },
-  // VIP tiers - all have same core benefits
   BASIC: {
     maxMessagesPerDay: -1,
     maxCharacters: 5,
@@ -55,6 +69,13 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
     canAccessPremiumQuests: true,
     prioritySupport: false,
     earlyAccess: false,
+    monthlyCoinBonus: 500,
+    monthlyGemBonus: 50,
+    xpMultiplier: 1.2,
+    affectionMultiplier: 1.2,
+    freeTrialDays: 7,
+    exclusiveContent: false,
+    maxScenes: -1,
   },
   PRO: {
     maxMessagesPerDay: -1,
@@ -69,6 +90,13 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
     canAccessPremiumQuests: true,
     prioritySupport: true,
     earlyAccess: true,
+    monthlyCoinBonus: 1500,
+    monthlyGemBonus: 150,
+    xpMultiplier: 1.5,
+    affectionMultiplier: 1.5,
+    freeTrialDays: 7,
+    exclusiveContent: true,
+    maxScenes: -1,
   },
   ULTIMATE: {
     maxMessagesPerDay: -1,
@@ -83,6 +111,13 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
     canAccessPremiumQuests: true,
     prioritySupport: true,
     earlyAccess: true,
+    monthlyCoinBonus: 5000,
+    monthlyGemBonus: 500,
+    xpMultiplier: 2.0,
+    affectionMultiplier: 2.0,
+    freeTrialDays: 14,
+    exclusiveContent: true,
+    maxScenes: -1,
   },
 };
 

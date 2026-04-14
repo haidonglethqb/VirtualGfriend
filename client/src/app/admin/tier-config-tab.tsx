@@ -14,11 +14,21 @@ interface TierConfigTabProps {
 type TierConfigs = Record<PremiumTier, PremiumFeatures>;
 
 const TIERS: PremiumTier[] = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
-const NUMBER_FIELDS: Array<keyof Pick<PremiumFeatures, 'maxCharacters' | 'maxMessagesPerDay'>> = [
+
+type NumberField = 'maxCharacters' | 'maxMessagesPerDay' | 'monthlyCoinBonus' | 'monthlyGemBonus' | 'xpMultiplier' | 'affectionMultiplier' | 'freeTrialDays' | 'maxScenes';
+type BooleanField = Exclude<keyof PremiumFeatures, NumberField>;
+
+const NUMBER_FIELDS: NumberField[] = [
   'maxCharacters',
   'maxMessagesPerDay',
+  'monthlyCoinBonus',
+  'monthlyGemBonus',
+  'xpMultiplier',
+  'affectionMultiplier',
+  'freeTrialDays',
+  'maxScenes',
 ];
-const BOOLEAN_FIELDS: Array<Exclude<keyof PremiumFeatures, 'maxCharacters' | 'maxMessagesPerDay'>> = [
+const BOOLEAN_FIELDS: BooleanField[] = [
   'adFree',
   'voiceMessages',
   'sendImages',
@@ -29,11 +39,18 @@ const BOOLEAN_FIELDS: Array<Exclude<keyof PremiumFeatures, 'maxCharacters' | 'ma
   'canAccessPremiumQuests',
   'prioritySupport',
   'earlyAccess',
+  'exclusiveContent',
 ];
 
 const FIELD_LABELS: Record<keyof PremiumFeatures, string> = {
   maxCharacters: 'Số nhân vật',
   maxMessagesPerDay: 'Tin nhắn mỗi ngày',
+  monthlyCoinBonus: 'Thưởng xu/tháng',
+  monthlyGemBonus: 'Thưởng ngọc/tháng',
+  xpMultiplier: 'Nhân XP',
+  affectionMultiplier: 'Nhân affection',
+  freeTrialDays: 'Dùng thử (ngày)',
+  maxScenes: 'Số scene tối đa',
   adFree: 'Ẩn quảng cáo',
   voiceMessages: 'Gửi giọng nói',
   sendImages: 'Gửi ảnh',
@@ -44,11 +61,18 @@ const FIELD_LABELS: Record<keyof PremiumFeatures, string> = {
   canAccessPremiumQuests: 'Nhiệm vụ premium',
   prioritySupport: 'Hỗ trợ ưu tiên',
   earlyAccess: 'Truy cập sớm',
+  exclusiveContent: 'Nội dung độc quyền',
 };
 
 const FIELD_LABELS_EN: Record<keyof PremiumFeatures, string> = {
   maxCharacters: 'Max characters',
   maxMessagesPerDay: 'Messages per day',
+  monthlyCoinBonus: 'Monthly coin bonus',
+  monthlyGemBonus: 'Monthly gem bonus',
+  xpMultiplier: 'XP multiplier',
+  affectionMultiplier: 'Affection multiplier',
+  freeTrialDays: 'Free trial days',
+  maxScenes: 'Max scenes',
   adFree: 'Ad free',
   voiceMessages: 'Voice messages',
   sendImages: 'Send images',
@@ -59,13 +83,14 @@ const FIELD_LABELS_EN: Record<keyof PremiumFeatures, string> = {
   canAccessPremiumQuests: 'Premium quests',
   prioritySupport: 'Priority support',
   earlyAccess: 'Early access',
+  exclusiveContent: 'Exclusive content',
 };
 
 function getDefaultTierConfig(): TierConfigs {
   return {
     FREE: {
       maxCharacters: 1,
-      maxMessagesPerDay: -1,
+      maxMessagesPerDay: 20,
       adFree: false,
       voiceMessages: false,
       sendImages: false,
@@ -76,6 +101,13 @@ function getDefaultTierConfig(): TierConfigs {
       canAccessPremiumQuests: false,
       prioritySupport: false,
       earlyAccess: false,
+      monthlyCoinBonus: 0,
+      monthlyGemBonus: 0,
+      xpMultiplier: 1.0,
+      affectionMultiplier: 1.0,
+      freeTrialDays: 0,
+      exclusiveContent: false,
+      maxScenes: 3,
     },
     BASIC: {
       maxCharacters: 5,
@@ -90,6 +122,13 @@ function getDefaultTierConfig(): TierConfigs {
       canAccessPremiumQuests: true,
       prioritySupport: false,
       earlyAccess: false,
+      monthlyCoinBonus: 500,
+      monthlyGemBonus: 50,
+      xpMultiplier: 1.2,
+      affectionMultiplier: 1.2,
+      freeTrialDays: 7,
+      exclusiveContent: false,
+      maxScenes: -1,
     },
     PRO: {
       maxCharacters: 5,
@@ -104,6 +143,13 @@ function getDefaultTierConfig(): TierConfigs {
       canAccessPremiumQuests: true,
       prioritySupport: true,
       earlyAccess: true,
+      monthlyCoinBonus: 1500,
+      monthlyGemBonus: 150,
+      xpMultiplier: 1.5,
+      affectionMultiplier: 1.5,
+      freeTrialDays: 7,
+      exclusiveContent: true,
+      maxScenes: -1,
     },
     ULTIMATE: {
       maxCharacters: -1,
@@ -118,6 +164,13 @@ function getDefaultTierConfig(): TierConfigs {
       canAccessPremiumQuests: true,
       prioritySupport: true,
       earlyAccess: true,
+      monthlyCoinBonus: 5000,
+      monthlyGemBonus: 500,
+      xpMultiplier: 2.0,
+      affectionMultiplier: 2.0,
+      freeTrialDays: 14,
+      exclusiveContent: true,
+      maxScenes: -1,
     },
   };
 }
@@ -157,7 +210,7 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
     }
   }
 
-  function updateNumberField(tier: PremiumTier, field: keyof Pick<PremiumFeatures, 'maxCharacters' | 'maxMessagesPerDay'>, value: string) {
+  function updateNumberField(tier: PremiumTier, field: NumberField, value: string) {
     const parsed = Number(value);
     setConfigs((prev) => ({
       ...prev,
@@ -170,7 +223,7 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
 
   function updateBooleanField(
     tier: PremiumTier,
-    field: Exclude<keyof PremiumFeatures, 'maxCharacters' | 'maxMessagesPerDay'>,
+    field: BooleanField,
     checked: boolean,
   ) {
     setConfigs((prev) => ({

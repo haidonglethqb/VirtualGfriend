@@ -4,6 +4,7 @@ import { AppError } from '../../middlewares/error.middleware';
 import { characterService } from '../character/character.service';
 import { aiService } from '../ai/ai.service';
 import { gameEventService } from '../game/game-event.service';
+import { getTierConfig } from '../admin/tier-config.service';
 
 interface BuyGiftData {
   giftId: string;
@@ -53,17 +54,33 @@ export const giftService = {
       throw new AppError('Gift not found', 404, 'GIFT_NOT_FOUND');
     }
 
-    const user = await prisma.user.findUnique({
+    // Check premium access for premium gifts
+    const tierUser = await prisma.user.findUnique({
       where: { id: userId },
+      select: { premiumTier: true, coins: true, gems: true },
     });
+    const userTier = tierUser?.premiumTier || 'FREE';
+    const tierConfig = await getTierConfig(userTier);
 
-    if (!user) {
+    if (gift.requiresPremium && !tierConfig.canAccessPremiumGifts) {
+      throw new AppError('Nâng cấp VIP để mua quà này!', 403, 'PREMIUM_GIFT_REQUIRED');
+    }
+    if (gift.minimumTier && gift.minimumTier !== 'FREE') {
+      const TIER_HIERARCHY = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
+      const userTierIndex = TIER_HIERARCHY.indexOf(userTier);
+      const requiredTierIndex = TIER_HIERARCHY.indexOf(gift.minimumTier);
+      if (userTierIndex < requiredTierIndex) {
+        throw new AppError(`Cần tier ${gift.minimumTier} để mua quà này`, 403, 'TIER_GIFT_REQUIRED');
+      }
+    }
+
+    if (!tierUser) {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
     const price = data.paymentMethod === 'coins' ? gift.priceCoins : gift.priceGems;
     const totalPrice = price * data.quantity;
-    const userBalance = data.paymentMethod === 'coins' ? user.coins : user.gems;
+    const userBalance = data.paymentMethod === 'coins' ? tierUser.coins : tierUser.gems;
 
     if (userBalance < totalPrice) {
       throw new AppError(
@@ -137,6 +154,18 @@ export const giftService = {
       }
 
       const gift = userGift.gift;
+
+      // Check premium access for premium gifts
+      const sendUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { premiumTier: true },
+      });
+      const sendUserTier = sendUser?.premiumTier || 'FREE';
+      const sendTierConfig = await getTierConfig(sendUserTier);
+
+      if (gift.requiresPremium && !sendTierConfig.canAccessPremiumGifts) {
+        throw new AppError('Nâng cấp VIP để gửi quà này!', 403, 'PREMIUM_GIFT_REQUIRED');
+      }
 
       // Generate AI reaction for gift (with fallback)
       try {

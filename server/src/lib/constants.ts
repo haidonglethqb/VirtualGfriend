@@ -55,61 +55,49 @@ export function validatePassword(password: string): { valid: boolean; errors: st
   return { valid: errors.length === 0, errors };
 }
 
-// Premium Tier Features
-// Current system: FREE vs VIP (BASIC/PRO/ULTIMATE all treated as VIP)
+// Premium Tier Features — simplified; detailed configs now in TierConfig service
+// Kept only for legacy compatibility; prefer importing from tier-config.service
 export const PREMIUM_FEATURES = {
   FREE: {
     maxCharacters: 1,
-    maxMessagesPerDay: -1, // Unlimited for all users
-    maxScenes: 3,
+    maxMessagesPerDay: 20, // 20 messages/day for free users
     canAccessPremiumScenes: false,
     canAccessPremiumGifts: false,
     canAccessPremiumQuests: false,
-    aiResponseQuality: 'standard',
     adFree: false,
     prioritySupport: false,
     earlyAccess: false,
-    exclusiveContent: false,
   },
   // VIP tiers - all have same core benefits
   BASIC: {
     maxCharacters: 5,
     maxMessagesPerDay: -1, // Unlimited
-    maxScenes: -1, // Unlimited
     canAccessPremiumScenes: true,
     canAccessPremiumGifts: true,
     canAccessPremiumQuests: true,
-    aiResponseQuality: 'enhanced',
     adFree: true,
     prioritySupport: false,
     earlyAccess: false,
-    exclusiveContent: false,
   },
   PRO: {
     maxCharacters: 5,
     maxMessagesPerDay: -1, // Unlimited
-    maxScenes: -1, // Unlimited
     canAccessPremiumScenes: true,
     canAccessPremiumGifts: true,
     canAccessPremiumQuests: true,
-    aiResponseQuality: 'premium',
     adFree: true,
     prioritySupport: true,
     earlyAccess: true,
-    exclusiveContent: true,
   },
   ULTIMATE: {
     maxCharacters: -1, // Unlimited
     maxMessagesPerDay: -1,
-    maxScenes: -1,
     canAccessPremiumScenes: true,
     canAccessPremiumGifts: true,
     canAccessPremiumQuests: true,
-    aiResponseQuality: 'premium',
     adFree: true,
     prioritySupport: true,
     earlyAccess: true,
-    exclusiveContent: true,
   },
 } as const;
 

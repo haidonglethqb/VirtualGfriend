@@ -367,9 +367,20 @@ export const characterService = {
       throw new AppError('Not authorized to update this character', 403, 'FORBIDDEN');
     }
 
+    // Apply affection multiplier from user's tier config
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { premiumTier: true },
+    });
+    const tier = user?.premiumTier || 'FREE';
+    const { getTierConfig } = await import('../admin/tier-config.service');
+    const config = await getTierConfig(tier);
+    const multiplier = config.affectionMultiplier || 1.0;
+    const adjustedAmount = Math.round(amount * multiplier);
+
     const newAffection = Math.max(
       VALIDATION.AFFECTION_MIN,
-      Math.min(VALIDATION.AFFECTION_MAX, character.affection + amount)
+      Math.min(VALIDATION.AFFECTION_MAX, character.affection + adjustedAmount)
     );
     const newStage = calculateRelationshipStage(newAffection);
     const stageChanged = newStage !== character.relationshipStage;
@@ -393,7 +404,7 @@ export const characterService = {
   },
 
   // Enhanced addExperience with XP scaling and level-up rewards
-  async addExperience(characterId: string, xp: number): Promise<{
+  async addExperience(characterId: string, xp: number, userId?: string): Promise<{
     character: any;
     leveledUp: boolean;
     previousLevel: number;
@@ -406,6 +417,19 @@ export const characterService = {
 
     if (!character) {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
+    }
+
+    // Apply XP multiplier from user's tier config
+    if (userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { premiumTier: true },
+      });
+      const tier = user?.premiumTier || 'FREE';
+      const { getTierConfig } = await import('../admin/tier-config.service');
+      const config = await getTierConfig(tier);
+      const multiplier = config.xpMultiplier || 1.0;
+      xp = Math.round(xp * multiplier);
     }
 
     const previousLevel = character.level;

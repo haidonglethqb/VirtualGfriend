@@ -22,6 +22,14 @@ export interface TierConfig {
   canAccessPremiumQuests: boolean;
   prioritySupport: boolean;
   earlyAccess: boolean;
+  // VIP bonus fields
+  monthlyCoinBonus: number;      // Bonus coins per month
+  monthlyGemBonus: number;       // Bonus gems per month
+  xpMultiplier: number;          // XP multiplier (1.0 = normal, 1.5 = +50%)
+  affectionMultiplier: number;   // Affection multiplier (1.0 = normal, 1.5 = +50%)
+  freeTrialDays: number;         // Free trial days (0 = no trial)
+  exclusiveContent: boolean;     // Access exclusive content
+  maxScenes: number;             // Max scenes (-1 = unlimited)
 }
 
 export type AllTierConfigs = Record<PremiumTier, TierConfig>;
@@ -34,7 +42,7 @@ const CACHE_TTL_SECS = CacheTTL.QUESTS; // 1 hour
 export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
   FREE: {
     maxCharacters: 1,
-    maxMessagesPerDay: -1,
+    maxMessagesPerDay: 20, // 20 messages/day for free users
     adFree: false,
     voiceMessages: false,
     sendImages: false,
@@ -45,6 +53,13 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
     canAccessPremiumQuests: false,
     prioritySupport: false,
     earlyAccess: false,
+    monthlyCoinBonus: 0,
+    monthlyGemBonus: 0,
+    xpMultiplier: 1.0,
+    affectionMultiplier: 1.0,
+    freeTrialDays: 0,
+    exclusiveContent: false,
+    maxScenes: 3,
   },
   BASIC: {
     maxCharacters: 5,
@@ -59,6 +74,13 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
     canAccessPremiumQuests: true,
     prioritySupport: false,
     earlyAccess: false,
+    monthlyCoinBonus: 500,
+    monthlyGemBonus: 50,
+    xpMultiplier: 1.2,
+    affectionMultiplier: 1.2,
+    freeTrialDays: 7,
+    exclusiveContent: false,
+    maxScenes: -1,
   },
   PRO: {
     maxCharacters: 5,
@@ -73,6 +95,13 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
     canAccessPremiumQuests: true,
     prioritySupport: true,
     earlyAccess: true,
+    monthlyCoinBonus: 1500,
+    monthlyGemBonus: 150,
+    xpMultiplier: 1.5,
+    affectionMultiplier: 1.5,
+    freeTrialDays: 7,
+    exclusiveContent: true,
+    maxScenes: -1,
   },
   ULTIMATE: {
     maxCharacters: -1,
@@ -87,6 +116,13 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
     canAccessPremiumQuests: true,
     prioritySupport: true,
     earlyAccess: true,
+    monthlyCoinBonus: 5000,
+    monthlyGemBonus: 500,
+    xpMultiplier: 2.0,
+    affectionMultiplier: 2.0,
+    freeTrialDays: 14,
+    exclusiveContent: true,
+    maxScenes: -1,
   },
 };
 

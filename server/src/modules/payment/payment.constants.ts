@@ -7,6 +7,10 @@ export interface StripePricingTier {
   stripePriceIdYearly: string
   displayName: string
   description: string
+  // NEW fields
+  trialDays: number;            // Stripe free trial days
+  discountPercent: number;      // Yearly discount % (auto-computed)
+  stripeTrialPriceId: string;   // Stripe trial price ID
 }
 
 export type StripePricingConfig = Record<Exclude<PremiumTier, 'FREE'>, StripePricingTier>
@@ -22,6 +26,9 @@ export const DEFAULT_PRICING_CONFIG: StripePricingConfig = {
     stripePriceIdYearly: '',
     displayName: 'VIP Basic',
     description: 'Mở khóa tính năng premium cơ bản',
+    trialDays: 0,
+    discountPercent: 17,
+    stripeTrialPriceId: '',
   },
   PRO: {
     monthlyPrice: 199000,
@@ -30,6 +37,9 @@ export const DEFAULT_PRICING_CONFIG: StripePricingConfig = {
     stripePriceIdYearly: '',
     displayName: 'VIP Pro',
     description: 'Trải nghiệm đầy đủ với AI nâng cao',
+    trialDays: 0,
+    discountPercent: 17,
+    stripeTrialPriceId: '',
   },
   ULTIMATE: {
     monthlyPrice: 299000,
@@ -38,6 +48,9 @@ export const DEFAULT_PRICING_CONFIG: StripePricingConfig = {
     stripePriceIdYearly: '',
     displayName: 'VIP Ultimate',
     description: 'Tất cả tính năng không giới hạn',
+    trialDays: 0,
+    discountPercent: 17,
+    stripeTrialPriceId: '',
   },
 }
 

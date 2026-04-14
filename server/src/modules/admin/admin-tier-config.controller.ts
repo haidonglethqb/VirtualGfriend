@@ -29,6 +29,14 @@ const tierConfigPatchSchema = z.object({
   canAccessPremiumQuests: z.boolean().optional(),
   prioritySupport: z.boolean().optional(),
   earlyAccess: z.boolean().optional(),
+  // VIP bonus fields
+  monthlyCoinBonus: z.number().int().min(0).optional(),
+  monthlyGemBonus: z.number().int().min(0).optional(),
+  xpMultiplier: z.number().min(1.0).max(5.0).optional(),
+  affectionMultiplier: z.number().min(1.0).max(5.0).optional(),
+  freeTrialDays: z.number().int().min(0).max(365).optional(),
+  exclusiveContent: z.boolean().optional(),
+  maxScenes: z.number().int().optional(),
 }).strict();
 
 /** GET /admin/tier-configs — return all 4 tier configs */

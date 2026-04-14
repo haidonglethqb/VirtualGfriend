@@ -70,13 +70,20 @@ function getFeatureList(config: PremiumFeatures, isVi: boolean) {
   return [
     { label: isVi ? 'Tin nhắn/ngày' : 'Messages/day', value: fmtNum(config.maxMessagesPerDay), has: true },
     { label: isVi ? 'Số nhân vật' : 'Characters', value: fmtNum(config.maxCharacters), has: true },
+    { label: isVi ? 'Thưởng xu/tháng' : 'Monthly coin bonus', value: config.monthlyCoinBonus > 0 ? `${config.monthlyCoinBonus.toLocaleString('vi-VN')}` : null, has: config.monthlyCoinBonus > 0 },
+    { label: isVi ? 'Thưởng ngọc/tháng' : 'Monthly gem bonus', value: config.monthlyGemBonus > 0 ? `${config.monthlyGemBonus.toLocaleString('vi-VN')}` : null, has: config.monthlyGemBonus > 0 },
+    { label: isVi ? 'Nhân XP' : 'XP multiplier', value: config.xpMultiplier > 1 ? `x${config.xpMultiplier}` : null, has: config.xpMultiplier > 1 },
+    { label: isVi ? 'Nhân affection' : 'Affection multiplier', value: config.affectionMultiplier > 1 ? `x${config.affectionMultiplier}` : null, has: config.affectionMultiplier > 1 },
     { label: isVi ? 'Giọng nói' : 'Voice messages', value: null, has: config.voiceMessages },
     { label: isVi ? 'Ảnh & video' : 'Images & videos', value: null, has: config.sendImages && config.sendVideos },
     { label: isVi ? 'Sticker premium' : 'Premium stickers', value: null, has: config.sendStickers },
     { label: isVi ? 'Không quảng cáo' : 'Ad-free', value: null, has: config.adFree },
     { label: isVi ? 'Quà & cảnh premium' : 'Premium gifts & scenes', value: null, has: config.canAccessPremiumGifts },
+    { label: isVi ? 'Nhiệm vụ premium' : 'Premium quests', value: null, has: config.canAccessPremiumQuests },
+    { label: isVi ? 'Nội dung độc quyền' : 'Exclusive content', value: null, has: config.exclusiveContent },
     { label: isVi ? 'Hỗ trợ ưu tiên' : 'Priority support', value: null, has: config.prioritySupport },
     { label: isVi ? 'Truy cập sớm' : 'Early access', value: null, has: config.earlyAccess },
+    { label: isVi ? 'Dùng thử miễn phí' : 'Free trial', value: config.freeTrialDays > 0 ? `${config.freeTrialDays} ngày` : null, has: config.freeTrialDays > 0 },
   ];
 }
 
@@ -176,6 +183,13 @@ export default function SubscriptionPage() {
     return formatVND(billingCycle === 'MONTHLY' ? cfg.monthlyPrice : cfg.yearlyPrice);
   }
 
+  function getDiscountPercent(tier: PremiumTier) {
+    const cfg = pricingConfig?.[tier];
+    if (!cfg || cfg.monthlyPrice <= 0 || cfg.yearlyPrice <= 0) return 0;
+    const yearlyEquivalent = cfg.monthlyPrice * 12;
+    return Math.round(((yearlyEquivalent - cfg.yearlyPrice) / yearlyEquivalent) * 100);
+  }
+
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -244,7 +258,11 @@ export default function SubscriptionPage() {
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition ${billingCycle === 'YEARLY' ? 'bg-love text-white' : 'bg-[#251820]/50 text-[#ba9cab] hover:bg-[#2a1d24]'}`}
               >
                 {isVi ? 'Hàng năm' : 'Yearly'}
-                <span className="ml-1 text-xs text-green-400">(-17%)</span>
+                {billingCycle === 'YEARLY' && (
+                  <span className="ml-1 text-xs text-green-400">
+                    (-{getDiscountPercent('BASIC')}%)
+                  </span>
+                )}
               </button>
             </div>
 

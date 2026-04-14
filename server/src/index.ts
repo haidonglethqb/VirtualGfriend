@@ -246,6 +246,115 @@ setInterval(async () => {
   }
 }, LEADERBOARD_REFRESH_INTERVAL);
 
+// Periodic reconciliation: check and downgrade expired subscriptions every 1 hour
+const SUBSCRIPTION_RECONCILE_INTERVAL = 60 * 60 * 1000; // 1 hour
+setInterval(async () => {
+  try {
+    const now = new Date();
+
+    // Find subscriptions that have ended (currentPeriodEnd in past) and are not already CANCELED
+    const expiredSubs = await prisma.subscription.findMany({
+      where: {
+        currentPeriodEnd: { lt: now },
+        status: { notIn: ['CANCELED'] },
+      },
+      include: { user: true },
+    });
+
+    let downgraded = 0;
+    for (const sub of expiredSubs) {
+      // Downgrade user to FREE
+      await prisma.user.update({
+        where: { id: sub.userId },
+        data: {
+          isPremium: false,
+          premiumTier: 'FREE',
+        },
+      });
+
+      // Update subscription status
+      await prisma.subscription.update({
+        where: { id: sub.id },
+        data: { status: 'CANCELED' },
+      });
+
+      downgraded++;
+    }
+
+    if (downgraded > 0) {
+      log.info(`Reconciled ${downgraded} expired subscription(es)`);
+    }
+
+    // Clean up orphaned subscriptions (user is FREE with expired premiumExpiresAt)
+    const orphaned = await prisma.subscription.findMany({
+      where: {
+        user: {
+          isPremium: false,
+          premiumTier: 'FREE',
+          premiumExpiresAt: { lt: now },
+        },
+      },
+    });
+
+    if (orphaned.length > 0) {
+      await prisma.subscription.updateMany({
+        where: {
+          id: { in: orphaned.map(s => s.id) },
+        },
+        data: { status: 'CANCELED' },
+      });
+      log.info(`Cleaned up ${orphaned.length} orphaned subscription record(s)`);
+    }
+  } catch (err) {
+    log.error('Subscription reconciliation failed:', err);
+  }
+}, SUBSCRIPTION_RECONCILE_INTERVAL);
+
+// Periodic: distribute monthly coin/gem bonuses to VIP users (runs daily at midnight UTC)
+const BONUS_DISTRIBUTE_INTERVAL = 24 * 60 * 60 * 1000;
+setInterval(async () => {
+  try {
+    const now = new Date();
+    // Only distribute on the 1st of each month
+    if (now.getUTCDate() !== 1) return;
+
+    const premiumUsers = await prisma.user.findMany({
+      where: {
+        isPremium: true,
+        premiumTier: { not: 'FREE' },
+        premiumExpiresAt: { gt: now },
+      },
+      select: { id: true, premiumTier: true, coins: true, gems: true },
+    });
+
+    if (premiumUsers.length === 0) return;
+
+    const { getAllTierConfigs } = await import('./modules/admin/tier-config.service');
+    const configs = await getAllTierConfigs();
+
+    let distributed = 0;
+    for (const user of premiumUsers) {
+      const config = configs[user.premiumTier];
+      if (!config) continue;
+
+      const updates: any = {};
+      if (config.monthlyCoinBonus > 0) updates.coins = { increment: config.monthlyCoinBonus };
+      if (config.monthlyGemBonus > 0) updates.gems = { increment: config.monthlyGemBonus };
+
+      if (Object.keys(updates).length > 0) {
+        await prisma.user.update({ where: { id: user.id }, data: updates });
+        distributed++;
+      }
+    }
+
+    if (distributed > 0) {
+      log.info(`Distributed monthly bonuses to ${distributed} VIP user(s)`);
+    }
+  } catch (err) {
+    log.error('Monthly bonus distribution failed:', err);
+  }
+}, BONUS_DISTRIBUTE_INTERVAL);
+
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   log.info('SIGTERM received. Shutting down gracefully...');

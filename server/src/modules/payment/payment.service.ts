@@ -91,7 +91,7 @@ export async function createCheckoutSession(
   // Get or create Stripe customer
   const customerId = await getOrCreateStripeCustomer(userId, email)
 
-  const session = await stripe.checkout.sessions.create({
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
     customer: customerId,
     mode: 'subscription',
     line_items: [{ price: priceId, quantity: 1 }],
@@ -101,7 +101,17 @@ export async function createCheckoutSession(
     subscription_data: {
       metadata: { userId, tier, billingCycle },
     },
-  })
+  }
+
+  // Apply free trial if configured
+  if (tierPricing.trialDays && tierPricing.trialDays > 0) {
+    sessionParams.subscription_data = {
+      ...sessionParams.subscription_data,
+      trial_period_days: tierPricing.trialDays,
+    }
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams)
 
   if (!session.url) {
     throw new Error('Failed to create checkout session')

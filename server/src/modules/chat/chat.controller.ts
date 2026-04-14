@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { AppError } from '../../middlewares/error.middleware';
 import { prisma } from '../../lib/prisma';
 import { createModuleLogger } from '../../lib/logger';
+import { getTierConfig } from '../admin/tier-config.service';
+import type { TierConfig } from '../admin/tier-config.service';
 
 const log = createModuleLogger('ChatController');
 
@@ -85,6 +87,31 @@ export const chatController = {
 
       const data = sendMessageSchema.parse(req.body);
       log.debug('Validated data:', data);
+
+      // Check message type restrictions based on tier
+      const messageType = data.messageType || 'TEXT';
+      if (messageType !== 'TEXT' && messageType !== 'GIFT' && messageType !== 'EVENT') {
+        const tier = req.premiumInfo?.tier || 'FREE';
+        const tierConfig = await getTierConfig(tier);
+
+        const featureMap: Record<string, keyof TierConfig> = {
+          'IMAGE': 'sendImages',
+          'VOICE': 'voiceMessages',
+          'VIDEO': 'sendVideos',
+          'STICKER': 'sendStickers',
+        };
+
+        const feature = featureMap[messageType];
+        if (feature && !tierConfig[feature]) {
+          return next(
+            new AppError(
+              `Tin nhắn ${messageType.toLowerCase()} cần nâng cấp VIP`,
+              403,
+              'MESSAGE_TYPE_LOCKED'
+            )
+          );
+        }
+      }
 
       // Check daily message limit based on premium tier
       const tier = req.premiumInfo?.tier || 'FREE';
