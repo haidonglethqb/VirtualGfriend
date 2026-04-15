@@ -283,7 +283,7 @@ jobs:
             echo "DONE: Images pulled"
             echo ""
             echo "Pulled images:"
-            docker images | grep -i vgfriend
+            docker images | grep -i "virtualgfriend\|vgfriend" || echo "  (no images found)"
 
             # ── Bước 4: Start database trước, chờ healthy ─────────
             echo ""
