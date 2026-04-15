@@ -209,17 +209,15 @@ export default function ChatPage() {
     fetchMessages()
     fetchScenes() // Load scenes for background selector
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, router, fetchMessages, needsCreation])
+
+  // Connect socket when accessToken is available — separate effect to avoid re-running fetchMessages
+  useEffect(() => {
     if (accessToken) {
       socketService.connect(accessToken)
     }
-
-    // Socket events are handled in socketService.setupEventHandlers()
-    // No need to add listeners here - it causes duplicate messages
-
-    return () => {
-      // Cleanup not needed - socketService handles its own events
-    }
-  }, [isAuthenticated, router, fetchMessages, needsCreation, character, characterLoading, fetchCharacter, accessToken])
+  }, [accessToken])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

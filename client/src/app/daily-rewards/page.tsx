@@ -9,6 +9,14 @@ import { useAuthStore } from '@/store/auth-store';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+function getAuthToken(): string | null {
+  try {
+    const stored = localStorage.getItem('vgfriend-auth');
+    if (stored) return JSON.parse(stored).state?.accessToken || null;
+  } catch { /* noop */ }
+  return null;
+}
+
 interface DailyReward {
   day: number;
   type: string;
@@ -56,7 +64,7 @@ export default function DailyRewardsPage() {
 
   async function fetchStatus() {
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = getAuthToken();
       const res = await fetch(`${API_URL}/api/daily-reward/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -71,7 +79,7 @@ export default function DailyRewardsPage() {
   async function handleClaim() {
     setClaiming(true);
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = getAuthToken();
       const res = await fetch(`${API_URL}/api/daily-reward/claim`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },

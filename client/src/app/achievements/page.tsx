@@ -9,6 +9,14 @@ import { useAuthStore } from '@/store/auth-store';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+function getAuthToken(): string | null {
+  try {
+    const stored = localStorage.getItem('vgfriend-auth');
+    if (stored) return JSON.parse(stored).state?.accessToken || null;
+  } catch { /* noop */ }
+  return null;
+}
+
 interface Achievement {
   id: string;
   name: string;
@@ -45,7 +53,7 @@ export default function AchievementsPage() {
 
   async function fetchAchievements() {
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = getAuthToken();
       const [achRes, ptsRes] = await Promise.all([
         fetch(`${API_URL}/api/achievements${activeCategory !== 'all' ? `?category=${activeCategory}` : ''}`, {
           headers: { Authorization: `Bearer ${token}` },

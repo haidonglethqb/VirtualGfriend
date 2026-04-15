@@ -10,6 +10,14 @@ import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+function getAuthToken(): string | null {
+  try {
+    const stored = localStorage.getItem('vgfriend-auth');
+    if (stored) return JSON.parse(stored).state?.accessToken || null;
+  } catch { /* noop */ }
+  return null;
+}
+
 interface ArcQuest {
   id: string;
   title: string;
@@ -56,7 +64,7 @@ export default function ArcPage() {
   async function fetchArcs() {
     try {
       setError(null);
-      const token = localStorage.getItem('accessToken');
+      const token = getAuthToken();
       const res = await fetch(`${API_URL}/api/arcs`, {
         headers: { Authorization: `Bearer ${token}` },
       });
