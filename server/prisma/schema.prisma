@@ -33,6 +33,18 @@ model User {
   streak            Int       @default(0)       // Daily login streak
   lastActiveAt      DateTime?                   // Last activity for streak calculation
   lastLoginAt       DateTime?
+
+  // Energy / Stamina system (JRPG-style)
+  energy            Int       @default(100)     // Current energy points
+  maxEnergy         Int       @default(100)     // Maximum energy (VIP increases this)
+  energyRegenAt     DateTime?                   // When energy was last regenerated
+
+  // Social Stats (Persona-style)
+  charm             Int       @default(0)       // Duyên dáng — unlocks romantic options
+  knowledge         Int       @default(0)       // Hiểu biết — unlocks intellectual conversations
+  guts              Int       @default(0)       // Can đảm — unlocks bold actions
+  kindness          Int       @default(0)       // Tốt bụng — unlocks caring options
+  proficiency       Int       @default(0)       // Khéo léo — unlocks crafting/special gifts
   
   // User identity & preference for matching
   userGender        UserGender @default(NOT_SPECIFIED)  // How user identifies
@@ -63,6 +75,9 @@ model User {
   subscription      Subscription?
   paymentHistory    PaymentHistory[]
   conversationSummaries ConversationSummary[]
+  // Arc system
+  arcProgresses     ArcProgress[]
+  userTitles        UserTitle[]
 
   @@index([streak])               // Leaderboard: top by streak
   @@index([username])             // Search: find user by username
@@ -377,6 +392,16 @@ model Quest {
   isActive        Boolean   @default(true)
   startsAt        DateTime?
   endsAt          DateTime?
+
+  // Arc integration
+  arcId           String?
+  arc             Arc?      @relation(fields: [arcId], references: [id], onDelete: SetNull)
+
+  // Chain quests
+  prerequisiteQuestId String? @unique
+  prerequisiteQuest   Quest?  @relation("QuestChain", fields: [prerequisiteQuestId], references: [id], onDelete: SetNull)
+  nextQuest           Quest?  @relation("QuestChain")
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -688,6 +713,141 @@ model DailyReward {
   @@index([userId, claimedAt])
   @@index([userId, day])                  // Optimize day-specific reward queries
   @@map("daily_rewards")
+}
+
+// ============================================
+// STORY ARC SYSTEM (Japanese RPG-style)
+// ============================================
+
+model Arc {
+  id              String    @id @default(uuid())
+  name            String
+  description     String    @db.Text
+  iconEmoji       String    @default("📖")
+  minLevel        Int       @default(1)
+  maxLevel        Int       @default(5)
+  orderIndex      Int       @default(0)
+  requiredTier    PremiumTier @default(FREE)  // VIP requirement to access
+  backgroundImage String?   // Optional background image URL
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  quests          Quest[]
+  arcProgress     ArcProgress[]
+
+  @@unique([name])
+  @@index([isActive, orderIndex])
+  @@map("arcs")
+}
+
+model ArcProgress {
+  id              String   @id @default(uuid())
+  userId          String
+  arcId           String
+  completionPercent Int    @default(0)  // 0-100
+  currentQuestId  String?
+  unlockedAt      DateTime @default(now())
+  completedAt     DateTime?
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  arc             Arc      @relation(fields: [arcId], references: [id])
+
+  @@unique([userId, arcId])
+  @@index([userId, completionPercent])
+  @@index([userId, completedAt])
+  @@map("arc_progress")
+}
+
+// ============================================
+// TITLE / BADGE SYSTEM
+// ============================================
+
+model Title {
+  id              String    @id @default(uuid())
+  name            String
+  iconEmoji       String    @default("🏅")
+  description     String
+  category        String    // achievement, arc, vip, streak, milestone, event
+  requirement     Json      // { type: "achievement_points", value: 100 } or { type: "arc_complete", arcId: "..." }
+  color           String?   // Hex color for display
+  sortOrder       Int       @default(0)
+  isVipExclusive  Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  userTitles      UserTitle[]
+
+  @@unique([name])
+  @@index([category, isActive])
+  @@index([isVipExclusive, isActive])
+  @@map("titles")
+}
+
+model UserTitle {
+  id          String   @id @default(uuid())
+  userId      String
+  titleId     String
+  unlockedAt  DateTime @default(now())
+  isEquipped  Boolean  @default(false)  // Whether this title is currently displayed
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       Title    @relation(fields: [titleId], references: [id])
+
+  @@unique([userId, titleId])
+  @@index([userId, isEquipped])
+  @@index([userId, unlockedAt(sort: Desc)])
+  @@map("user_titles")
+}
+
+// ============================================
+// SPECIAL EVENTS CALENDAR
+// ============================================
+
+model Event {
+  id              String    @id @default(uuid())
+  name            String
+  description     String    @db.Text
+  type            String    // holiday, birthday, festival, seasonal, limited
+  iconEmoji       String    @default("🎉")
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  eventQuests     EventQuest[]
+  eventRewards    EventReward[]
+
+  @@index([isActive, startDate])
+  @@index([type, isActive])
+  @@map("events")
+}
+
+model EventQuest {
+  id          String   @id @default(uuid())
+  eventId     String
+  questId     String   // References existing quest
+  bonusMultiplier Float  @default(1.0)  // XP/coin multiplier during event
+
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, questId])
+  @@map("event_quests")
+}
+
+model EventReward {
+  id          String   @id @default(uuid())
+  eventId     String
+  rewardType  String   // coins, gems, gift, item, title
+  rewardValue Int
+  requirement Json     // { type: "quest_complete", count: 3 }
+
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("event_rewards")
 }
 
 // ============================================

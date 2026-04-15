@@ -6,7 +6,7 @@ import { getTierConfig } from '../admin/tier-config.service';
 
 export const questService = {
   async getAllQuests() {
-    return cache.getOrSet(
+    const allQuests = await cache.getOrSet(
       CacheKeys.quests(),
       () => prisma.quest.findMany({
         where: { isActive: true },
@@ -14,6 +14,17 @@ export const questService = {
       }),
       CacheTTL.QUESTS
     );
+
+    // Filter event quests by date
+    const now = new Date();
+    const filteredQuests = allQuests.filter(q => {
+      if (q.type !== 'EVENT') return true;
+      if ((q as any).startsAt && now < (q as any).startsAt) return false;
+      if ((q as any).endsAt && now > (q as any).endsAt) return false;
+      return true;
+    });
+
+    return filteredQuests;
   },
 
   async getAllQuestsWithProgress(userId: string) {
@@ -280,5 +291,67 @@ export const questService = {
     if (updates.length > 0) {
       await prisma.$transaction(updates);
     }
+  },
+
+  /**
+   * Auto-start weekly quests for the user at the beginning of each week
+   * Optimized: batch queries instead of per-quest DB calls
+   */
+  async autoStartWeeklyQuests(userId: string): Promise<void> {
+    const cacheKey = `weekly_quest_reset:${userId}`;
+    const now = new Date();
+    const weekKey = `${now.getFullYear()}-W${this.getWeekNumber(now)}`;
+
+    const alreadyReset = await cache.get(`${cacheKey}:${weekKey}`);
+    if (alreadyReset) return;
+
+    // Get all active weekly quests
+    const weeklyQuests = await prisma.quest.findMany({
+      where: { type: 'WEEKLY', isActive: true },
+    });
+
+    if (weeklyQuests.length === 0) {
+      await cache.set(`${cacheKey}:${weekKey}`, '1', 604800); // 7 days
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const quest of weeklyQuests) {
+        const existing = await tx.userQuest.findUnique({
+          where: { userId_questId: { userId, questId: quest.id } },
+        });
+
+        if (existing) {
+          // Reset progress
+          await tx.userQuest.update({
+            where: { id: existing.id },
+            data: { progress: 0, status: 'IN_PROGRESS', startedAt: new Date() },
+          });
+        } else {
+          // Create new
+          const requirements = quest.requirements as { count?: number };
+          await tx.userQuest.create({
+            data: {
+              userId,
+              questId: quest.id,
+              maxProgress: requirements.count ?? 1,
+            },
+          });
+        }
+      }
+    });
+
+    await cache.set(`${cacheKey}:${weekKey}`, '1', 604800); // 7 days
+  },
+
+  /**
+   * Get ISO week number for a date
+   */
+  getWeekNumber(date: Date): number {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   },
 };

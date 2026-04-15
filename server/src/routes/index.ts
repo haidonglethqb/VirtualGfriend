@@ -13,6 +13,12 @@ import { dmRouter } from '../modules/dm/dm.routes';
 import { leaderboardRouter } from '../modules/leaderboard/leaderboard.routes';
 import { adminRouter } from '../modules/admin';
 import { paymentRouter } from '../modules/payment/payment.routes';
+import { dailyRewardRoutes } from '../modules/daily-reward/daily-reward.routes';
+import { achievementRoutes } from '../modules/achievement/achievement.routes';
+import { arcRoutes } from '../modules/arc/arc.routes';
+import { energyRoutes } from '../modules/energy/energy.routes';
+import { socialStatsRoutes } from '../modules/social-stats/social-stats.routes';
+import { eventRoutes } from '../modules/event/event.routes';
 import { getAllTierConfigs } from '../modules/admin/tier-config.service';
 import { AppError } from '../middlewares/error.middleware';
 
@@ -34,6 +40,12 @@ router.use('/dm', dmRouter);
 router.use('/leaderboard', leaderboardRouter);
 router.use('/admin', adminRouter);
 router.use('/payment', paymentRouter);
+router.use('/daily-reward', dailyRewardRoutes);
+router.use('/achievements', achievementRoutes);
+router.use('/arcs', arcRoutes);
+router.use('/energy', energyRoutes);
+router.use('/social-stats', socialStatsRoutes);
+router.use('/events', eventRoutes);
 
 // Public config endpoint for frontend dynamic premium plans
 router.get('/config/tier-plans', async (_: Request, res: Response, next: (err: Error) => void) => {
@@ -65,6 +77,9 @@ router.get('/', (_: Request, res: Response) => {
       '/api/dm',
       '/api/leaderboard',
       '/api/admin',
+      '/api/daily-reward',
+      '/api/achievements',
+      '/api/arcs',
       '/api/config/tier-plans',
     ],
   });

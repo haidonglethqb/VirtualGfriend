@@ -100,6 +100,25 @@ export const gameEventService = {
       await this.autoClaimQuest(userId, completed.questId, _depth);
     }
 
+    // 3.5 Check achievements after quest auto-claim
+    try {
+      const { achievementService } = await import('../achievement/achievement.service');
+      const unlockedAchievements = await achievementService.checkAndUpdateAchievements(userId);
+
+      // Emit achievement unlocked event via Socket.IO
+      if (unlockedAchievements.length > 0) {
+        const { io } = await import('../../index');
+        for (const achievementName of unlockedAchievements) {
+          io.to(`user:${userId}`).emit('achievement:unlocked', {
+            name: achievementName,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (err) {
+      log.error('Achievement check failed:', err);
+    }
+
     // 4. Increment Redis milestone counters for relevant actions
     if (action === 'SEND_MESSAGE') {
       const key = `milestone_msg_count:${userId}`;
@@ -119,6 +138,21 @@ export const gameEventService = {
       const milestones = await this.checkMilestones(userId, characterId, action, metadata);
       result.milestonesUnlocked = milestones.unlocked;
       result.newMemories = milestones.memories;
+    }
+
+    // 5.5 Update arc progress for all arcs user has started
+    try {
+      const { arcService } = await import('../arc/arc.service');
+      const arcs = await prisma.arc.findMany({
+        where: { isActive: true },
+        select: { id: true },
+      });
+
+      for (const arc of arcs) {
+        await arcService.updateArcProgress(userId, arc.id);
+      }
+    } catch (err) {
+      log.error('Arc progress update failed:', err);
     }
 
     // 6. Update user stats

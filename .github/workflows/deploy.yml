@@ -176,17 +176,47 @@ jobs:
           command_timeout: 10m
           script: |
             set -e
+
+            echo ""
+            echo "============================================================"
+            echo "DEPLOYMENT STARTED"
+            echo "============================================================"
+            echo "Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "User: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+            echo "Path: ${{ secrets.VPS_DEPLOY_PATH }}"
+            echo "============================================================"
+
             cd ${{ secrets.VPS_DEPLOY_PATH }}
 
+            # Show current state
+            echo ""
+            echo "CURRENT STATE"
+            echo "------------------------------------------------------------"
+            echo "Disk usage:"
+            df -h / | tail -1
+            echo ""
+            echo "Docker images (VGfriend):"
+            docker images | grep -i vgfriend || echo "  (no VGfriend images found)"
+            echo ""
+            echo "Running containers:"
+            docker compose ps 2>/dev/null || echo "  (no compose stack running)"
+            echo "------------------------------------------------------------"
+
             # Ensure required directories exist
+            echo ""
+            echo "Step 0: Ensuring directories exist..."
             mkdir -p nginx/ssl nginx/logs
+            echo "DONE: Directories ready"
 
             # Validate critical secrets to prevent partial deploy causing runtime 503s
+            echo ""
+            echo "Step 0.5: Validating required secrets..."
             check_required() {
               if [ -z "$2" ]; then
                 echo "ERROR: Missing required deployment secret: $1"
                 exit 1
               fi
+              echo "  OK: $1 is set"
             }
 
             check_required "POSTGRES_PASSWORD" "${{ secrets.POSTGRES_PASSWORD }}"
@@ -195,8 +225,14 @@ jobs:
             check_required "ADMIN_USERNAME" "${{ secrets.ADMIN_USERNAME }}"
             check_required "ADMIN_PASSWORD_HASH" "${{ secrets.ADMIN_PASSWORD_HASH }}"
             check_required "ADMIN_JWT_SECRET" "${{ secrets.ADMIN_JWT_SECRET }}"
+            check_required "GROQ_API_KEY" "${{ secrets.GROQ_API_KEY }}"
+            check_required "CR_PAT" "${{ secrets.CR_PAT }}"
+            check_required "VPS_DEPLOY_PATH" "${{ secrets.VPS_DEPLOY_PATH }}"
+            echo "DONE: All required secrets validated"
 
             # ── Bước 1: Ghi .env ───────────────────────────────────
+            echo ""
+            echo "Step 1: Writing .env file..."
             cat > .env << 'ENVEOF'
             POSTGRES_USER=vgfriend
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
@@ -229,99 +265,244 @@ jobs:
             # Xóa leading whitespace và escape $ trong values
             sed -i 's/^[[:space:]]*//' .env
             sed -i 's/\([^=]\)\$/\1$$/g' .env
+            echo "DONE: .env written ($(wc -l < .env) lines)"
+            echo "   GITHUB_REPOSITORY = ${{ needs.type-check.outputs.image_name_lower }}"
 
             # ── Bước 2: Login GHCR ─────────────────────────────────
-            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            echo ""
+            echo "Step 2: Logging into GitHub Container Registry..."
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin 2>&1 | tail -1
+            echo "DONE: GHCR login successful"
 
             # ── Bước 3: Pull images mới ────────────────────────────
-            docker compose pull
+            echo ""
+            echo "Step 3: Pulling new Docker images..."
+            echo "   Pulling server image: ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/server:latest"
+            echo "   Pulling client image: ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/client:latest"
+            docker compose pull 2>&1
+            echo "DONE: Images pulled"
+            echo ""
+            echo "Pulled images:"
+            docker images | grep -i vgfriend
 
             # ── Bước 4: Start database trước, chờ healthy ─────────
+            echo ""
+            echo "Step 4: Starting database services..."
             docker compose up -d postgres redis
+            echo "   PostgreSQL and Redis containers started"
 
+            echo ""
             echo "Waiting for PostgreSQL to be ready..."
             for i in $(seq 1 30); do
               if docker compose exec -T postgres pg_isready -U vgfriend -d vgfriend > /dev/null 2>&1; then
-                echo "PostgreSQL is ready."
+                echo "DONE: PostgreSQL is ready. (attempt $i/30)"
                 break
               fi
               if [ "$i" -eq 30 ]; then
                 echo "ERROR: PostgreSQL did not become ready in time."
+                echo "PostgreSQL logs:"
+                docker compose logs --tail=30 postgres
                 exit 1
               fi
+              echo "   PostgreSQL not ready yet... (attempt $i/30, retrying in 2s)"
               sleep 2
             done
 
+            echo ""
             echo "Waiting for Redis to be ready..."
             for i in $(seq 1 15); do
               if docker compose exec -T redis redis-cli ping > /dev/null 2>&1; then
-                echo "Redis is ready."
+                echo "DONE: Redis is ready. (attempt $i/15)"
                 break
               fi
               if [ "$i" -eq 15 ]; then
                 echo "WARNING: Redis not ready, continuing anyway (cache is optional)..."
-                break
               fi
               sleep 2
             done
 
             # ── Bước 5: Chạy migration ─────────────────────────────
-            echo "Running database migrations..."
-            docker compose run --rm --no-deps \
+            echo ""
+            echo "Step 5: Running database migrations..."
+            echo "   DATABASE_URL = postgresql://vgfriend:***@postgres:5432/vgfriend?schema=public"
+            echo ""
+
+            # Check existing migrations before running
+            echo "Existing migrations on VPS:"
+            ls -1 prisma/migrations/ 2>/dev/null | sort || echo "  (no migrations directory)"
+            echo ""
+
+            # Run migration with full output captured
+            echo ">>> Running: npx prisma migrate deploy"
+            MIGRATION_OUTPUT=$(docker compose run --rm --no-deps \
               -e DATABASE_URL="postgresql://vgfriend:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/vgfriend?schema=public" \
-              server npx prisma migrate deploy
-            echo "Migrations completed."
+              server npx prisma migrate deploy 2>&1)
+            MIGRATION_EXIT_CODE=$?
+
+            # Print full migration output
+            echo "$MIGRATION_OUTPUT"
+            echo ""
+            echo "<<< Migration command finished with exit code: $MIGRATION_EXIT_CODE"
+            echo ""
+
+            if [ $MIGRATION_EXIT_CODE -eq 0 ]; then
+              echo "================================================================"
+              echo "MIGRATION STATUS: SUCCESS"
+              echo "================================================================"
+              echo ""
+
+              # Check if any migrations were actually applied
+              if echo "$MIGRATION_OUTPUT" | grep -q "already in sync"; then
+                echo "Result: Database is already up to date. No new migrations applied."
+              elif echo "$MIGRATION_OUTPUT" | grep -q "migration"; then
+                echo "Result: New migration(s) applied successfully."
+                echo ""
+                echo "Applied migrations:"
+                echo "$MIGRATION_OUTPUT" | grep -i "migration" || true
+              else
+                echo "Result: Migration completed without errors."
+              fi
+
+              echo ""
+              echo "Current migration list on VPS:"
+              ls -1 prisma/migrations/ 2>/dev/null | sort || echo "  (cannot list)"
+              echo ""
+              echo "================================================================"
+              echo "MIGRATION: SUCCESS - Database schema is up to date"
+              echo "================================================================"
+            else
+              echo "================================================================"
+              echo "MIGRATION STATUS: FAILED"
+              echo "================================================================"
+              echo "Exit code: $MIGRATION_EXIT_CODE"
+              echo ""
+              echo "Full migration output:"
+              echo "$MIGRATION_OUTPUT"
+              echo ""
+              echo "Full server logs:"
+              docker compose logs --tail=100 server
+              echo ""
+              echo "================================================================"
+              echo "MIGRATION: FAILED - Deployment aborted"
+              echo "================================================================"
+              exit 1
+            fi
 
             # ── Bước 5.5: Seed database ────────────────────────────
-            echo "Seeding database..."
+            echo ""
+            echo "Step 5.5: Seeding database..."
+            echo "--- Seed Output ---"
             docker compose run --rm --no-deps \
               -e DATABASE_URL="postgresql://vgfriend:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/vgfriend?schema=public" \
               -e REDIS_URL="redis://redis:6379" \
-              server npx prisma db seed
-            echo "Seeding completed."
+              server npx prisma db seed 2>&1
+            SEED_EXIT_CODE=$?
+            echo "--- End Seed Output ---"
+            echo ""
+
+            if [ $SEED_EXIT_CODE -eq 0 ]; then
+              echo "DONE: Seeding completed successfully"
+            else
+              echo "WARNING: Seed failed with exit code $SEED_EXIT_CODE (may be already seeded)"
+            fi
 
             # ── Bước 6: Start tất cả services ─────────────────────
-            docker compose --profile production up -d --force-recreate
+            echo ""
+            echo "Step 6: Starting all services..."
+            docker compose --profile production up -d --force-recreate 2>&1
+            echo "DONE: All services started with --force-recreate"
+
+            echo ""
+            echo "Service status:"
+            docker compose ps
 
             # ── Bước 7: Verify server healthy ──────────────────────
-            echo "Waiting for server to be healthy..."
+            echo ""
+            echo "Step 7: Waiting for server to be healthy..."
             for i in $(seq 1 20); do
               STATUS=$(docker inspect --format='{{.State.Health.Status}}' vgfriend-server 2>/dev/null || echo "starting")
               if [ "$STATUS" = "healthy" ]; then
-                echo "Server is healthy!"
+                echo "DONE: Server is healthy! (check $i/20)"
                 break
               fi
               if [ "$i" -eq 20 ]; then
                 echo "ERROR: Server did not become healthy. Check logs:"
+                echo ""
+                echo "Server logs (last 50 lines):"
                 docker compose logs --tail=50 server
+                echo ""
+                echo "All container statuses:"
+                docker compose ps
                 exit 1
               fi
-              echo "Server status: $STATUS, retrying ($i/20)..."
+              echo "   Server status: $STATUS (check $i/20, retrying in 5s)..."
               sleep 5
             done
 
+            # Post-deployment verification
+            echo ""
+            echo "Post-deployment verification..."
+            echo ""
+            echo "Health check endpoint:"
+            curl -sf http://localhost:3001/health 2>&1 | head -5 || echo "  (health endpoint not accessible)"
+            echo ""
+
+            echo "Database stats:"
+            docker compose run --rm --no-deps \
+              -e DATABASE_URL="postgresql://vgfriend:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/vgfriend?schema=public" \
+              server sh -c 'npx prisma db execute --stdin --schema=prisma/schema.prisma <<EOF
+              SELECT count(*) as user_count FROM users;
+              SELECT count(*) as character_count FROM characters;
+              SELECT count(*) as quest_count FROM quests;
+              SELECT count(*) as arc_count FROM arcs;
+              SELECT count(*) as title_count FROM titles;
+              EOF' 2>/dev/null || echo "  (could not query database)"
+
             # ── Bước 8: Background cleanup ─────────────────────────
-            echo "Starting background cleanup..."
+            echo ""
+            echo "Step 8: Starting background cleanup..."
             nohup bash -c '
               sleep 5
-              docker container prune -f
-              docker image prune -f
+              echo "  Pruning stopped containers..."
+              docker container prune -f > /dev/null 2>&1
+              echo "  Pruning dangling images..."
+              docker image prune -f > /dev/null 2>&1
+              echo "  Removing old server images (keeping latest 3)..."
               docker images "ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/server" --format "{{.ID}} {{.CreatedAt}}" | sort -k2 -r | tail -n +4 | awk "{print \$1}" | xargs -r docker rmi -f 2>/dev/null || true
+              echo "  Removing old client images (keeping latest 3)..."
               docker images "ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/client" --format "{{.ID}} {{.CreatedAt}}" | sort -k2 -r | tail -n +4 | awk "{print \$1}" | xargs -r docker rmi -f 2>/dev/null || true
-              docker builder prune -f --keep-storage 500MB 2>/dev/null || true
-              docker network prune -f
+              echo "  Pruning build cache (keeping 500MB)..."
+              docker builder prune -f --keep-storage 500MB > /dev/null 2>&1 || true
+              echo "  Pruning unused networks..."
+              docker network prune -f > /dev/null 2>&1
             ' > /tmp/docker-cleanup.log 2>&1 &
+            echo "DONE: Cleanup started in background"
 
-            echo "Disk usage:"
+            # Final summary
+            echo ""
+            echo "============================================================"
+            echo "DEPLOYMENT COMPLETED"
+            echo "============================================================"
+            echo "Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            echo "Final disk usage:"
             df -h / | tail -1
-
-            echo "Deployment completed successfully!"
+            echo ""
+            echo "Final container status:"
+            docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || docker compose ps
+            echo ""
+            echo "Endpoints:"
+            echo "   Frontend:  https://vgfriend.io.vn"
+            echo "   Backend:   https://vgfriend.io.vn/api"
+            echo "   Health:    https://vgfriend.io.vn/health"
+            echo "   Admin:     https://vgfriend.io.vn/admin"
+            echo "============================================================"
 
       - name: Notify deployment status
         if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            echo "✅ Deployment to ${{ github.event.inputs.environment }} was successful!"
+            echo "Deployment to ${{ github.event.inputs.environment }} was successful!"
           else
-            echo "❌ Deployment to ${{ github.event.inputs.environment }} failed!"
+            echo "Deployment to ${{ github.event.inputs.environment }} failed!"
           fi

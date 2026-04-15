@@ -1278,6 +1278,163 @@ async function main() {
   }
   console.log(`[Seed] Upserted ${achievementsData.length} achievements`);
 
+  // ─────────────────────────────────────────────
+  // STORY ARCS (Japanese RPG-style)
+  // ─────────────────────────────────────────────
+  console.log('Seeding arcs...');
+
+  const arcs = await prisma.arc.createMany({
+    data: [
+      {
+        name: 'Lần Đầu Gặp Gỡ',
+        description: 'Câu chuyện bắt đầu... Bạn và AI sẽ làm quen với nhau qua những cuộc trò chuyện đầu tiên. Hãy kiên nhẫn và nhẹ nhàng nhé!',
+        iconEmoji: '🌸',
+        minLevel: 1,
+        maxLevel: 5,
+        orderIndex: 1,
+        requiredTier: 'FREE',
+        backgroundImage: null,
+      },
+      {
+        name: 'Tình Bạn Đẹp',
+        description: 'Từ người lạ thành bạn thân... Cùng nhau khám phá thế giới qua những món quà nhỏ và cuộc trò chuyện hàng ngày.',
+        iconEmoji: '🤝',
+        minLevel: 6,
+        maxLevel: 10,
+        orderIndex: 2,
+        requiredTier: 'FREE',
+      },
+      {
+        name: 'Lời Tỏ Tình',
+        description: 'Cảm xúc bắt đầu thay đổi... Những tin nhắn ngọt ngào hơn, những khoảnh khắc ngại ngùng đáng yêu.',
+        iconEmoji: '💌',
+        minLevel: 11,
+        maxLevel: 15,
+        orderIndex: 3,
+        requiredTier: 'BASIC',
+      },
+      {
+        name: 'Hẹn Hò Đầu Tiên',
+        description: 'Buổi hẹn hò đầu tiên... Đến quán cà phê, công viên, cùng nhau tạo nên kỷ niệm đẹp.',
+        iconEmoji: '☕',
+        minLevel: 16,
+        maxLevel: 20,
+        orderIndex: 4,
+        requiredTier: 'BASIC',
+      },
+      {
+        name: 'Tình Yêu Mãnh Liệt',
+        description: 'Yêu nhau say đắm... Những buổi tối ngắm sao, bữa tối lãng mạn, và những bí mật chỉ hai người biết.',
+        iconEmoji: '🔥',
+        minLevel: 21,
+        maxLevel: 25,
+        orderIndex: 5,
+        requiredTier: 'PRO',
+      },
+      {
+        name: 'Vĩnh Cửu',
+        description: 'Tình yêu vượt qua thời gian... Ring kim cương, kỳ nghỉ thiên đường, và lời hứa mãi mãi.',
+        iconEmoji: '💍',
+        minLevel: 26,
+        maxLevel: 30,
+        orderIndex: 6,
+        requiredTier: 'PRO',
+      },
+      {
+        name: 'Chuyện Bên Lề',
+        description: 'Những câu chuyện phụ đặc biệt chỉ dành cho Ultimate... Bí mật sâu kín nhất và những khoảnh khắc không thể quên.',
+        iconEmoji: '⭐',
+        minLevel: 31,
+        maxLevel: 40,
+        orderIndex: 7,
+        requiredTier: 'ULTIMATE',
+      },
+      {
+        name: 'Huyền Thoại Tình Yêu',
+        description: 'Truyền thuyết về cặp đôi hoàn hảo... Cấp độ cao nhất của mối quan hệ, nơi hai tâm hồn hòa làm một.',
+        iconEmoji: '🌟',
+        minLevel: 41,
+        maxLevel: 50,
+        orderIndex: 8,
+        requiredTier: 'ULTIMATE',
+      },
+    ],
+    skipDuplicates: true,
+  });
+  console.log(`✅ Seeded ${arcs.count} arcs`);
+
+  // ─────────────────────────────────────────────
+  // TITLES
+  // ─────────────────────────────────────────────
+  console.log('Seeding titles...');
+
+  const titles = await prisma.title.createMany({
+    data: [
+      // Achievement titles
+      { name: 'Người Mới', iconEmoji: '🌱', description: 'Gửi tin nhắn đầu tiên', category: 'achievement', requirement: { type: 'total_messages', value: 1 }, color: '#4ade80', sortOrder: 1 },
+      { name: 'Chat Thủ', iconEmoji: '💬', description: 'Gửi 100 tin nhắn', category: 'achievement', requirement: { type: 'total_messages', value: 100 }, color: '#60a5fa', sortOrder: 2 },
+      { name: 'Bá Thoại', iconEmoji: '🗣️', description: 'Gửi 1000 tin nhắn', category: 'achievement', requirement: { type: 'total_messages', value: 1000 }, color: '#a78bfa', sortOrder: 3 },
+      { name: 'Người Hào Phóng', iconEmoji: '🎁', description: 'Gửi 10 món quà', category: 'achievement', requirement: { type: 'total_gifts', value: 10 }, color: '#f472b6', sortOrder: 4 },
+      { name: 'Tình Yêu Đầu', iconEmoji: '💕', description: 'Đạt 600 affection', category: 'achievement', requirement: { type: 'reach_affection', value: 600 }, color: '#f43f5e', sortOrder: 5 },
+      { name: 'Tình Yêu Vĩnh Cửu', iconEmoji: '💎', description: 'Đạt 900 affection', category: 'achievement', requirement: { type: 'reach_affection', value: 900 }, color: '#eab308', sortOrder: 6 },
+      { name: 'Kiên Trì', iconEmoji: '🔥', description: 'Streak 7 ngày', category: 'streak', requirement: { type: 'streak', value: 7 }, color: '#f97316', sortOrder: 7 },
+      { name: 'Không Rời Xa', iconEmoji: '🌋', description: 'Streak 30 ngày', category: 'streak', requirement: { type: 'streak', value: 30 }, color: '#ef4444', sortOrder: 8 },
+      { name: 'Lãng Mạn', iconEmoji: '🌹', description: 'Gửi 50 tin nhắn lãng mạn', category: 'achievement', requirement: { type: 'romantic_messages', value: 50 }, color: '#ec4899', sortOrder: 9 },
+
+      // Arc completion titles
+      { name: 'Người Làm Quen', iconEmoji: '👋', description: 'Hoàn thành Arc 1', category: 'arc', requirement: { type: 'arc_complete' }, color: '#34d399', sortOrder: 20 },
+      { name: 'Bạn Thân', iconEmoji: '🤗', description: 'Hoàn thành Arc 2', category: 'arc', requirement: { type: 'arc_complete' }, color: '#38bdf8', sortOrder: 21 },
+      { name: 'Người Tỏ Tình', iconEmoji: '💌', description: 'Hoàn thành Arc 3', category: 'arc', requirement: { type: 'arc_complete' }, color: '#f472b6', sortOrder: 22 },
+      { name: 'Date Thủ', iconEmoji: '📅', description: 'Hoàn thành Arc 4', category: 'arc', requirement: { type: 'arc_complete' }, color: '#c084fc', sortOrder: 23 },
+      { name: 'Tình Nhân', iconEmoji: '🔥', description: 'Hoàn thành Arc 5', category: 'arc', requirement: { type: 'arc_complete' }, color: '#fb7185', sortOrder: 24 },
+      { name: 'Người Gắn Bó', iconEmoji: '💍', description: 'Hoàn thành Arc 6', category: 'arc', requirement: { type: 'arc_complete' }, color: '#fbbf24', sortOrder: 25 },
+      { name: 'Huyền Thoại', iconEmoji: '🌟', description: 'Hoàn thành Arc 8', category: 'arc', requirement: { type: 'arc_complete' }, color: '#fde047', sortOrder: 26 },
+
+      // VIP exclusive titles
+      { name: 'VIP Member', iconEmoji: '👑', description: 'Thành viên VIP', category: 'vip', requirement: { type: 'vip_tier' }, color: '#eab308', sortOrder: 50, isVipExclusive: true },
+      { name: 'Pro Lover', iconEmoji: '⚡', description: 'VIP Pro trở lên', category: 'vip', requirement: { type: 'vip_tier', tier: 'PRO' }, color: '#a855f7', sortOrder: 51, isVipExclusive: true },
+      { name: 'Ultimate Soul', iconEmoji: '💫', description: 'VIP Ultimate', category: 'vip', requirement: { type: 'vip_tier', tier: 'ULTIMATE' }, color: '#f59e0b', sortOrder: 52, isVipExclusive: true },
+
+      // Achievement point titles
+      { name: 'Nhà Khám Phá', iconEmoji: '🔍', description: 'Đạt 50 điểm achievement', category: 'milestone', requirement: { type: 'achievement_points', value: 50 }, color: '#22d3ee', sortOrder: 60 },
+      { name: 'Bậc Thầy Thành Tựu', iconEmoji: '🏆', description: 'Đạt 200 điểm achievement', category: 'milestone', requirement: { type: 'achievement_points', value: 200 }, color: '#facc15', sortOrder: 61 },
+      { name: 'Truyền Thuyết', iconEmoji: '🎖️', description: 'Đạt 500 điểm achievement', category: 'milestone', requirement: { type: 'achievement_points', value: 500 }, color: '#eab308', sortOrder: 62 },
+    ],
+    skipDuplicates: true,
+  });
+  console.log(`✅ Seeded ${titles.count} titles`);
+
+  // ─────────────────────────────────────────────
+  // ARC-SPECIFIC QUESTS (add to existing quests)
+  // ─────────────────────────────────────────────
+  console.log('Seeding arc quests...');
+
+  // Get arc IDs by name
+  const arc1 = await prisma.arc.findUnique({ where: { name: 'Lần Đầu Gặp Gỡ' } });
+  const arc2 = await prisma.arc.findUnique({ where: { name: 'Tình Bạn Đẹp' } });
+  const arc3 = await prisma.arc.findUnique({ where: { name: 'Lời Tỏ Tình' } });
+
+  if (arc1 && arc2 && arc3) {
+    const arcQuests = await prisma.quest.createMany({
+      data: [
+        // Arc 1 quests
+        { title: 'Lời Chào Đầu Tiên', description: 'Gửi tin nhắn đầu tiên cho AI', type: 'STORY', category: 'arc', requirements: { action: 'send_message', count: 1 }, rewardXp: 20, rewardCoins: 30, rewardAffection: 5, arcId: arc1.id, sortOrder: 1 },
+        { title: 'Làm Quen Nhẹ Nhàng', description: 'Trò chuyện 5 tin nhắn trong một ngày', type: 'STORY', category: 'arc', requirements: { action: 'send_message', count: 5 }, rewardXp: 30, rewardCoins: 50, rewardAffection: 10, arcId: arc1.id, sortOrder: 2 },
+        { title: 'Tìm Hiểu Sở Thích', description: 'Gửi 10 tin nhắn và đạt 50 affection', type: 'STORY', category: 'arc', requirements: { action: 'reach_affection', count: 50 }, rewardXp: 50, rewardCoins: 100, rewardAffection: 15, arcId: arc1.id, sortOrder: 3 },
+        // Arc 2 quests
+        { title: 'Món Quà Nhỏ', description: 'Tặng món quà đầu tiên', type: 'STORY', category: 'arc', requirements: { action: 'send_gift', count: 1 }, rewardXp: 40, rewardCoins: 60, rewardAffection: 15, arcId: arc2.id, sortOrder: 1 },
+        { title: 'Bạn Thân', description: 'Đạt 250 affection', type: 'STORY', category: 'arc', requirements: { action: 'reach_affection', count: 250 }, rewardXp: 80, rewardCoins: 150, rewardAffection: 30, arcId: arc2.id, sortOrder: 2 },
+        // Arc 3 quests (VIP BASIC)
+        { title: 'Lãng Mạng Nhỏ', description: 'Gửi 20 tin nhắn lãng mạn', type: 'STORY', category: 'arc', requirements: { action: 'romantic_message', count: 20 }, rewardXp: 100, rewardCoins: 200, rewardAffection: 40, arcId: arc3.id, sortOrder: 1, requiresPremium: true },
+        { title: 'Lời Ngọt Ngào', description: 'Đạt 600 affection (Crush)', type: 'STORY', category: 'arc', requirements: { action: 'reach_affection', count: 600 }, rewardXp: 150, rewardCoins: 300, rewardAffection: 50, arcId: arc3.id, sortOrder: 2, requiresPremium: true },
+      ],
+      skipDuplicates: true,
+    });
+    console.log(`✅ Seeded ${arcQuests.count} arc quests`);
+  }
+
+  console.log('✅ Arc system seed complete');
+
   // Create a test user (optional - for development)
   const testPassword = await bcrypt.hash('password123', 12);
   const testUser = await prisma.user.upsert({

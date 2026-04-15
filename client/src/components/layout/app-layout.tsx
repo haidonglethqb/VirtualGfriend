@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Heart, MessageCircle, Gift, Target, ImageIcon,
-  Settings, Star, LogOut, Users, Trophy, Crown, Languages, Bell, X
+  Settings, Star, LogOut, Users, Trophy, Crown, Languages, Bell, X,
+  BookOpen, Calendar, BarChart3,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
@@ -28,7 +29,10 @@ const navItems = [
   { href: '/messages', icon: Users, key: 'messages' },
   { href: '/quests', icon: Target, key: 'quests' },
   { href: '/shop', icon: Gift, key: 'shop' },
-  { href: '/leaderboard', icon: Trophy, key: 'leaderboard' },
+  { href: '/arc', icon: BookOpen, key: 'arc' },
+  { href: '/achievements', icon: Trophy, key: 'achievements' },
+  { href: '/daily-rewards', icon: Calendar, key: 'dailyRewards' },
+  { href: '/leaderboard', icon: BarChart3, key: 'leaderboard' },
   { href: '/memories', icon: ImageIcon, key: 'memories' },
 ];
 
@@ -40,6 +44,9 @@ const APP_LAYOUT_I18N = {
       messages: 'Nhắn tin',
       quests: 'Nhiệm vụ',
       shop: 'Cửa hàng',
+      arc: 'Hành trình',
+      achievements: 'Thành tựu',
+      dailyRewards: 'Thưởng ngày',
       leaderboard: 'Xếp hạng',
       memories: 'Kỷ niệm',
     },
@@ -57,6 +64,9 @@ const APP_LAYOUT_I18N = {
       messages: 'Messages',
       quests: 'Quests',
       shop: 'Shop',
+      arc: 'Arcs',
+      achievements: 'Achievements',
+      dailyRewards: 'Daily Rewards',
       leaderboard: 'Leaderboard',
       memories: 'Memories',
     },
