@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, CheckCircle, Lock, Star, Crown, Zap } from 'lucide-react';
+import { BookOpen, CheckCircle, Lock, Star, Crown, Zap, AlertCircle } from 'lucide-react';
 import AppLayout from '@/components/layout/app-layout';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
@@ -43,20 +43,30 @@ export default function ArcPage() {
   const { isAuthenticated } = useAuthStore();
   const [arcs, setArcs] = useState<Arc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchArcs();
-  }, []);
+    if (isAuthenticated) {
+      fetchArcs();
+    } else {
+      setLoading(false);
+    }
+  }, [isAuthenticated]);
 
   async function fetchArcs() {
     try {
+      setError(null);
       const token = localStorage.getItem('accessToken');
       const res = await fetch(`${API_URL}/api/arcs`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) setArcs(await res.json());
-    } catch {
-      // Silently fail
+      if (!res.ok) {
+        throw new Error(isVi ? 'Không thể tải hành trình' : 'Failed to load arcs');
+      }
+      const data = await res.json();
+      setArcs(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -81,6 +91,24 @@ export default function ArcPage() {
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <AppLayout>
+        <div className="text-center py-20">
+          <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+          <h2 className="text-xl font-bold text-gray-300 mb-2">
+            {isVi ? 'Đăng nhập để xem hành trình' : 'Login to view arcs'}
+          </h2>
+          <Link href="/auth/login">
+            <button className="px-6 py-2 rounded-xl bg-love text-white font-medium mt-4">
+              {isVi ? 'Đăng nhập' : 'Login'}
+            </button>
+          </Link>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -92,13 +120,40 @@ export default function ArcPage() {
           </p>
         </motion.div>
 
-        {/* Arc Timeline */}
-        <div className="relative">
-          {/* Vertical connector line */}
-          <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-love/30 via-purple-500/20 to-transparent hidden md:block" />
+        {/* Error State */}
+        {error && (
+          <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <div>
+              <p className="text-red-300 font-medium">{error}</p>
+              <button onClick={fetchArcs} className="text-sm text-red-400 underline mt-1">
+                {isVi ? 'Thử lại' : 'Retry'}
+              </button>
+            </div>
+          </div>
+        )}
 
-          <div className="space-y-6">
-            {arcs.map((arc, idx) => (
+        {/* Empty State */}
+        {!error && arcs.length === 0 && (
+          <div className="text-center py-16">
+            <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+            <h2 className="text-xl font-bold text-gray-300 mb-2">
+              {isVi ? 'Chưa có chương truyện nào' : 'No arcs available yet'}
+            </h2>
+            <p className="text-gray-500">
+              {isVi ? 'Các chương truyện sẽ xuất hiện khi bạn tiến triển trong game.' : 'Arcs will appear as you progress in the game.'}
+            </p>
+          </div>
+        )}
+
+        {/* Arc Timeline */}
+        {!error && arcs.length > 0 && (
+          <div className="relative">
+            {/* Vertical connector line */}
+            <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-love/30 via-purple-500/20 to-transparent hidden md:block" />
+
+            <div className="space-y-6">
+              {arcs.map((arc, idx) => (
               <motion.div
                 key={arc.id}
                 initial={{ opacity: 0, x: -20 }}
@@ -186,6 +241,7 @@ export default function ArcPage() {
             ))}
           </div>
         </div>
+        )}
 
         {/* CTA */}
         {!isAuthenticated && (

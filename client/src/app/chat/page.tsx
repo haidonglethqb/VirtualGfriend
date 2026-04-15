@@ -610,7 +610,41 @@ export default function ChatPage() {
             {['Xin chào! 👋', 'Anh/Em nhớ em/anh 💕', 'Hôm nay thế nào?', 'Kể chuyện đi', 'Em đang làm gì?', 'Chúc em ngủ ngon 🌙'].map((text) => (
               <button
                 key={text}
-                onClick={() => setInputMessage(text)}
+                onClick={() => {
+                  setInputMessage(text);
+                  // Auto-send after setting text
+                  setTimeout(() => {
+                    const content = text.trim();
+                    if (content && !sendingRef.current && !isSending && character) {
+                      const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+                      setInputMessage('');
+                      setIsSending(true);
+                      sendingRef.current = true;
+
+                      const optimisticMessage = {
+                        id: clientId,
+                        role: 'USER' as const,
+                        content,
+                        messageType: 'TEXT',
+                        createdAt: new Date(),
+                        isOwn: true,
+                      };
+                      useChatStore.getState().addMessage(optimisticMessage);
+                      useChatStore.getState().setTyping(true);
+
+                      socketService.emit('message:send', {
+                        content,
+                        characterId: character.id,
+                        clientId,
+                      });
+
+                      setTimeout(() => {
+                        setIsSending(false);
+                        sendingRef.current = false;
+                      }, 500);
+                    }
+                  }, 0);
+                }}
                 className="bg-[#392830]/60 hover:bg-love/20 border border-[#4a3640] hover:border-love/50 px-4 py-2 rounded-full text-xs font-medium text-white/80 hover:text-white whitespace-nowrap transition-all shadow-sm"
               >
                 {text}

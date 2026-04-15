@@ -126,7 +126,8 @@ export const characterService = {
     const cached = await cache.get<any>(cacheKey);
     if (cached) return cached;
 
-    const character = await prisma.character.findFirst({
+    // Try full query with all includes first
+    let character = await prisma.character.findFirst({
       where: { userId, isActive: true },
       include: {
         template: true,
@@ -134,14 +135,23 @@ export const characterService = {
           orderBy: { importance: 'desc' },
           take: 20,
         },
-        scenes: {
-          include: { scene: true },
-        },
       },
     });
 
     if (!character) {
       throw new AppError('No active character found', 404, 'NO_CHARACTER');
+    }
+
+    // Try to load scenes separately to avoid cascading failure
+    let scenes: any[] = [];
+    try {
+      scenes = await prisma.characterScene.findMany({
+        where: { characterId: character.id },
+        include: { scene: true },
+      });
+    } catch (err) {
+      // Scenes query failed - continue without scenes
+      log.warn(`Failed to load scenes for character ${String(character.id)}: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     // Add unlocked features to response
@@ -151,6 +161,7 @@ export const characterService = {
 
     const result = {
       ...character,
+      scenes,
       unlockedFeatures,
       xpForNextLevel,
       progressPercent,
