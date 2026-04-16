@@ -119,6 +119,15 @@ class ApiClient {
           headers: { ...headers, 'X-Retry': '1' },
         });
       }
+      // Refresh failed — force logout to stop the retry loop
+      try {
+        const { useAuthStore } = await import('../store/auth-store');
+        await useAuthStore.getState().logout();
+      } catch {
+        // Fallback: clear storage manually
+        localStorage.removeItem('vgfriend-auth');
+        window.location.href = '/login';
+      }
     }
 
     // Safely parse JSON (server might return HTML on 502/503)
