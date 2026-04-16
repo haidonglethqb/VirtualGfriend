@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Heart, MessageCircle, Gift, Star, Target,
-  Calendar, Sparkles, ImageIcon
+  Calendar, Sparkles, ImageIcon, CheckCircle, Trophy, TrendingUp
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -14,7 +14,7 @@ import { AdBanner } from '@/components/ads/ad-banner';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
 import { useLanguageStore } from '@/store/language-store';
-import { formatNumber, getRelationshipLabel, getMoodEmoji } from '@/lib/utils';
+import { formatNumber, getRelationshipLabel } from '@/lib/utils';
 import api from '@/services/api';
 
 const DASHBOARD_I18N = {
@@ -221,10 +221,17 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#181114]">
         <div className="text-center">
-          <div className="animate-pulse mb-4">
-            <div className="w-20 h-20 rounded-full bg-love shadow-[0_0_30px_rgba(244,37,140,0.5)] mx-auto" />
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            {/* Outer pulsing ring */}
+            <span className="absolute inset-0 rounded-full bg-love/20 animate-ping" />
+            {/* Middle ring */}
+            <span className="absolute inset-2 rounded-full bg-love/30 animate-pulse" />
+            {/* Core */}
+            <div className="absolute inset-4 rounded-full bg-gradient-to-br from-love to-pink-600 shadow-[0_0_30px_rgba(244,37,140,0.6)] flex items-center justify-center">
+              <Heart className="w-5 h-5 text-white fill-white" />
+            </div>
           </div>
-          <p className="text-[#ba9cab]">
+          <p className="text-[#ba9cab] text-sm tracking-wide">
             {t.loading}
           </p>
         </div>
@@ -242,6 +249,7 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          className="pb-5 border-b border-white/[0.06]"
         >
           <h1 className="text-3xl font-bold mb-2">
             {greeting}, <span className="text-love">{user.username || (language === 'vi' ? 'bạn' : 'you')}!</span>
@@ -275,15 +283,28 @@ export default function DashboardPage() {
                         sizes="112px"
                       />
                     ) : (
-                      <div className="w-full h-full rounded-full bg-[#271b21] flex items-center justify-center text-5xl">
-                        {character?.name?.[0]?.toUpperCase() || '💕'}
+                      <div className="w-full h-full rounded-full bg-[#271b21] flex items-center justify-center">
+                        {character?.name?.[0]?.toUpperCase() ? (
+                          <span className="text-5xl font-bold text-love">
+                            {character.name[0].toUpperCase()}
+                          </span>
+                        ) : (
+                          <Heart className="w-8 h-8 text-love" />
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
                 {/* Mood indicator */}
-                <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-[#181114]/60 backdrop-blur-sm text-sm border border-white/10">
-                  {getMoodEmoji(character?.mood || 'neutral')} {character?.mood || 'happy'}
+                <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-[#181114]/60 backdrop-blur-sm text-sm border border-white/10 flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full inline-block flex-shrink-0 ${
+                    ['happy', 'excited', 'romantic'].includes(character?.mood || '')
+                      ? 'bg-green-400'
+                      : ['sad', 'angry'].includes(character?.mood || '')
+                      ? 'bg-red-400'
+                      : 'bg-gray-400'
+                  }`} />
+                  <span className="capitalize">{character?.mood || 'happy'}</span>
                 </div>
               </div>
 
@@ -357,19 +378,19 @@ export default function DashboardPage() {
                   icon={<MessageCircle className="w-5 h-5" />}
                   label={t.messagesToday}
                   value={stats.messagesToday}
-                  trend={`~ ${stats.messagesToday}`}
+                  trend={stats.messagesToday}
                 />
                 <StatCard
                   icon={<Calendar className="w-5 h-5" />}
                   label={t.streak}
                   value={stats.streak}
-                  trend={`~ ${t.day} ${stats.streak}`}
+                  trend={stats.streak}
                 />
                 <StatCard
                   icon={<Gift className="w-5 h-5" />}
                   label={t.giftsGiven}
                   value={stats.giftsGiven}
-                  trend={`~ ${stats.giftsGiven} ${t.gifts}`}
+                  trend={stats.giftsGiven}
                 />
               </div>
             </motion.div>
@@ -447,8 +468,13 @@ export default function DashboardPage() {
                       <Link href="/memories" key={memory.id}>
                         <div className="aspect-square rounded-xl bg-[#392830] flex items-center justify-center cursor-pointer hover:bg-[#392830]/80 transition-colors group">
                           <div className="text-center p-3">
-                            <div className="text-3xl mb-2">
-                              {memory.type === 'GIFT' ? '🎁' : memory.type === 'MILESTONE' ? '🏆' : '💬'}
+                            <div className="flex items-center justify-center mb-2">
+                              {memory.type === 'GIFT'
+                                ? <Gift className="w-8 h-8 text-love" />
+                                : memory.type === 'MILESTONE'
+                                ? <Trophy className="w-8 h-8 text-amber-400" />
+                                : <MessageCircle className="w-8 h-8 text-blue-400" />
+                              }
                             </div>
                             <p className="text-xs text-[#ba9cab] line-clamp-2 group-hover:text-white transition-colors">
                               {memory.title}
@@ -493,7 +519,7 @@ function StatCard({
   icon: React.ReactNode;
   label: string;
   value: string | number;
-  trend: string;
+  trend: number;
 }) {
   return (
     <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-5">
@@ -507,7 +533,14 @@ function StatCard({
         </div>
       </div>
       <div className="mt-3 flex items-center gap-1 text-xs text-green-400">
-        {trend}
+        {trend > 0 ? (
+          <>
+            <TrendingUp className="w-3 h-3" />
+            <span>{trend}</span>
+          </>
+        ) : (
+          <span className="text-[#ba9cab]">—</span>
+        )}
       </div>
     </div>
   );
@@ -530,9 +563,10 @@ function QuestItem({
     <div className={`p-4 rounded-xl ${completed ? 'bg-love/10 border border-love/20' : 'bg-[#392830]/30'}`}>
       <div className="flex items-start justify-between mb-2">
         <div>
-          <h4 className={`font-medium ${completed ? 'text-love' : 'text-white'}`}>
-            {completed && '✓ '}{title}
-          </h4>
+          <div className="flex items-center gap-2">
+            {completed && <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />}
+            <h4 className={`font-medium ${completed ? 'text-love' : 'text-white'}`}>{title}</h4>
+          </div>
           <p className="text-sm text-[#ba9cab]">{description}</p>
         </div>
         <div className="flex items-center gap-1 text-sm font-bold text-yellow-500">

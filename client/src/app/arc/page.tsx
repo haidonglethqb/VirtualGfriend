@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, CheckCircle, Lock, Star, Crown, Zap, AlertCircle } from 'lucide-react';
+import { BookOpen, CheckCircle, Lock, Star, Crown, Zap, AlertCircle, ChevronRight } from 'lucide-react';
 import AppLayout from '@/components/layout/app-layout';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
@@ -90,10 +90,15 @@ export default function ArcPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-20">
-          <div className="animate-spin text-love">
-            <BookOpen className="w-8 h-8" />
+        <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+          {/* Header skeleton */}
+          <div className="flex flex-col items-center gap-2 mb-8">
+            <div className="animate-pulse bg-white/[0.05] rounded-2xl h-24 w-full" />
           </div>
+          {/* Arc card skeletons */}
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="animate-pulse bg-white/[0.05] rounded-2xl h-32" />
+          ))}
         </div>
       </AppLayout>
     );
@@ -121,11 +126,18 @@ export default function ArcPage() {
     <AppLayout>
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">{isVi ? 'Hành Trình Câu Chuyện' : 'Story Arcs'}</h1>
-          <p className="text-gray-400">
-            {isVi ? 'Khám phá từng chương truyện và hoàn thành nhiệm vụ để tiến cấp' : 'Explore each chapter and complete quests to advance'}
-          </p>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <div className="rounded-2xl overflow-hidden">
+            <div className="bg-gradient-to-br from-purple-600/80 to-love/60 p-6 text-center">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <BookOpen className="w-6 h-6 text-white" />
+                <h1 className="text-3xl font-bold text-white">{isVi ? 'Hành Trình Câu Chuyện' : 'Story Arcs'}</h1>
+              </div>
+              <p className="text-white/80">
+                {isVi ? 'Khám phá từng chương truyện và hoàn thành nhiệm vụ để tiến cấp' : 'Explore each chapter and complete quests to advance'}
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Error State */}
@@ -177,7 +189,11 @@ export default function ArcPage() {
                 <div className="p-6">
                   <div className="flex items-start gap-4">
                     {/* Icon */}
-                    <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-br from-love/20 to-purple-500/20 flex items-center justify-center text-3xl border border-white/10">
+                    <div className={`flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center text-3xl border ${
+                      arc.isUnlocked
+                        ? 'bg-gradient-to-br from-love/20 to-purple-500/20 border-white/10 shadow-lg shadow-love/10'
+                        : 'bg-gray-900 border-white/5'
+                    }`}>
                       {arc.iconEmoji}
                     </div>
 
@@ -237,7 +253,7 @@ export default function ArcPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {arc.quests.map((quest) => (
                           <div key={quest.id} className="flex items-center gap-2 text-sm text-gray-400 p-2 rounded-lg bg-white/[0.02]">
-                            <div className="w-1.5 h-1.5 rounded-full bg-love/50" />
+                            <ChevronRight className="w-3 h-3 text-gray-600 flex-shrink-0" />
                             <span className="truncate">{quest.title}</span>
                           </div>
                         ))}

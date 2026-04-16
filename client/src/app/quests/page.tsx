@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Target, Star, Clock, CheckCircle, Gift,
-  Calendar, TrendingUp, Zap, Loader2
+  Calendar, TrendingUp, Zap, Loader2, Heart
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/app-layout';
@@ -24,7 +24,7 @@ const QUESTS_I18N = {
     achievements: 'Thành tích',
     error: 'Lỗi',
     loadError: 'Không thể tải danh sách nhiệm vụ',
-    startQuest: '🎯 Bắt đầu nhiệm vụ!',
+    startQuest: 'Bắt đầu nhiệm vụ!',
     completeQuest: 'Hoàn thành nhiệm vụ để nhận thưởng',
     startError: 'Không thể bắt đầu nhiệm vụ',
     claimSuccess: '🎉 Nhận thưởng thành công!',
@@ -51,7 +51,7 @@ const QUESTS_I18N = {
     achievements: 'Achievements',
     error: 'Error',
     loadError: 'Cannot load quest list',
-    startQuest: '🎯 Quest Started!',
+    startQuest: 'Quest Started!',
     completeQuest: 'Complete quest to earn rewards',
     startError: 'Cannot start quest',
     claimSuccess: '🎉 Reward Claimed!',
@@ -237,8 +237,26 @@ export default function QuestsPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-love" />
+          <div className="space-y-6">
+            {/* Header skeleton */}
+            <div className="space-y-2">
+              <div className="animate-pulse bg-white/[0.05] rounded-xl h-8 w-40" />
+              <div className="animate-pulse bg-white/[0.05] rounded-xl h-4 w-56" />
+            </div>
+            {/* Progress banner skeleton */}
+            <div className="animate-pulse bg-white/[0.05] rounded-2xl h-24" />
+            {/* Stat card skeletons */}
+            <div className="grid grid-cols-3 gap-4">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="animate-pulse bg-white/[0.05] rounded-2xl h-20" />
+              ))}
+            </div>
+            {/* Quest card skeletons */}
+            <div className="space-y-3">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse bg-white/[0.05] rounded-xl h-20" />
+              ))}
+            </div>
           </div>
         ) : (
             <>
@@ -370,7 +388,13 @@ function QuestCard({
   const isClaimed = quest.userProgress?.claimed || false;
 
   return (
-    <div className={`rounded-2xl bg-[#271b21] border ${isCompleted ? 'border-love/30' : 'border-[#392830]'} p-4`}>
+    <div className={`rounded-2xl bg-[#271b21] border p-4 ${
+      isCompleted
+        ? 'border-love/30'
+        : (isStarted && !isCompleted)
+          ? 'border-[#392830] border-l-2 border-l-love'
+          : 'border-[#392830]'
+    }`}>
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
@@ -397,7 +421,7 @@ function QuestCard({
           </div>
           {quest.rewardAffection > 0 && (
             <div className="flex items-center gap-1 text-xs text-love">
-              +{quest.rewardAffection} ❤️
+              <span className="flex items-center gap-1">+{quest.rewardAffection} <Heart className="w-3 h-3 text-red-400 fill-red-400" /></span>
             </div>
           )}
         </div>
@@ -411,7 +435,7 @@ function QuestCard({
                 <span>{t.progress}</span>
                 <span>{progress}/{target}</span>
               </div>
-              <div className="w-full bg-[#392830] rounded-full h-1.5 overflow-hidden">
+              <div className="w-full bg-[#392830] rounded-full h-2.5 overflow-hidden">
                 <div
                   className="bg-gradient-to-r from-love to-pink-400 h-full rounded-full transition-all"
                   style={{ width: `${progressPercent}%` }}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Gift, Calendar, Check, Crown, Zap, Star } from 'lucide-react';
+import { Gift, Check, Crown, Zap, Star, CircleDollarSign, Gem, PartyPopper, Loader2 } from 'lucide-react';
 import AppLayout from '@/components/layout/app-layout';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
@@ -37,15 +37,15 @@ interface ClaimResult {
   bonusMultiplier: number;
 }
 
-const REWARD_ICONS: Record<string, string> = {
-  coins: '🪙',
-  gems: '💎',
-};
-
 const REWARD_LABELS: Record<string, string> = {
   coins: 'Xu',
   gems: 'Ngọc',
 };
+
+function RewardIcon({ type, className }: { type: string; className?: string }) {
+  if (type === 'gems') return <Gem className={className ?? 'w-6 h-6 text-cyan-400'} />;
+  return <CircleDollarSign className={className ?? 'w-6 h-6 text-yellow-400'} />;
+}
 
 export default function DailyRewardsPage() {
   const { language } = useLanguageStore();
@@ -99,9 +99,21 @@ export default function DailyRewardsPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-20">
-          <div className="animate-spin text-love">
-            <Calendar className="w-8 h-8" />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          {/* Skeleton header */}
+          <div className="text-center mb-8 space-y-3">
+            <div className="h-9 w-56 bg-white/[0.06] rounded-xl mx-auto animate-pulse" />
+            <div className="h-4 w-72 bg-white/[0.04] rounded-lg mx-auto animate-pulse" />
+          </div>
+          {/* Skeleton grid */}
+          <div className="grid grid-cols-7 gap-3 mb-8">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 animate-pulse space-y-2">
+                <div className="h-3 w-full bg-white/[0.06] rounded" />
+                <div className="h-7 w-7 bg-white/[0.06] rounded-lg mx-auto" />
+                <div className="h-4 w-3/4 bg-white/[0.06] rounded mx-auto" />
+              </div>
+            ))}
           </div>
         </div>
       </AppLayout>
@@ -111,12 +123,19 @@ export default function DailyRewardsPage() {
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">{isVi ? 'Thưởng Hàng Ngày' : 'Daily Rewards'}</h1>
-          <p className="text-gray-400">
-            {isVi ? 'Đăng nhập mỗi ngày để nhận thưởng! VIP nhận nhiều hơn.' : 'Login daily to earn rewards! VIP gets more.'}
-          </p>
+        {/* Header with gradient banner */}
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="relative text-center mb-8 rounded-3xl overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-love/10 via-transparent to-purple-500/10 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(168,85,247,0.10),transparent_70%)] pointer-events-none" />
+          <div className="relative px-6 py-8">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <Gift className="w-8 h-8 text-love" />
+              <h1 className="text-3xl font-bold">{isVi ? 'Thưởng Hàng Ngày' : 'Daily Rewards'}</h1>
+            </div>
+            <p className="text-gray-400">
+              {isVi ? 'Đăng nhập mỗi ngày để nhận thưởng! VIP nhận nhiều hơn.' : 'Login daily to earn rewards! VIP gets more.'}
+            </p>
+          </div>
         </motion.div>
 
         {/* Claim Result Toast */}
@@ -126,11 +145,18 @@ export default function DailyRewardsPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 text-center"
           >
-            <p className="text-lg font-bold text-green-300">
-              🎉 {isVi ? 'Đã nhận thưởng!' : 'Reward claimed!'}
-            </p>
-            <p className="text-sm text-green-400">
-              {REWARD_ICONS[lastClaim.rewardType]} +{lastClaim.value.toLocaleString('vi-VN')} {REWARD_LABELS[lastClaim.rewardType]}
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <PartyPopper className="w-5 h-5 text-green-300" />
+              <p className="text-lg font-bold text-green-300">
+                {isVi ? 'Đã nhận thưởng!' : 'Reward claimed!'}
+              </p>
+            </div>
+            <p className="text-sm text-green-400 flex items-center justify-center gap-1.5">
+              <RewardIcon
+                type={lastClaim.rewardType}
+                className={`w-4 h-4 ${lastClaim.rewardType === 'gems' ? 'text-cyan-400' : 'text-yellow-400'}`}
+              />
+              +{lastClaim.value.toLocaleString('vi-VN')} {REWARD_LABELS[lastClaim.rewardType]}
               {lastClaim.bonusMultiplier > 1 && (
                 <span className="ml-1 text-amber-400">
                   (x{lastClaim.bonusMultiplier} VIP bonus!)
@@ -154,47 +180,60 @@ export default function DailyRewardsPage() {
                 return (
                   <motion.div
                     key={dayNum}
-                    whileHover={isClaimable ? { scale: 1.05 } : {}}
-                    className={`relative rounded-2xl p-4 text-center border transition-all ${
+                    whileHover={isClaimable ? { scale: 1.06, transition: { duration: 0.15 } } : {}}
+                    className={`relative rounded-2xl p-3 text-center border transition-all duration-200 ${
                       isClaimable
                         ? 'border-love/50 bg-gradient-to-br from-love/20 to-purple-500/10 shadow-lg shadow-love/20 cursor-pointer'
                         : isPastDay
-                        ? 'border-green-500/30 bg-green-500/5'
+                        ? 'border-green-500/30 bg-green-500/[0.06]'
                         : isBigReward
-                        ? 'border-amber-500/20 bg-amber-500/5'
-                        : 'border-white/5 bg-white/[0.02]'
+                        ? 'border-amber-500/25 bg-amber-500/[0.05]'
+                        : 'border-white/[0.06] bg-white/[0.02]'
                     }`}
                     onClick={isClaimable ? handleClaim : undefined}
                   >
-                    {/* Day number */}
-                    <div className="text-xs text-gray-500 mb-2">{isVi ? 'Ngày' : 'Day'} {dayNum}</div>
+                    {/* Day label */}
+                    <div className="text-[10px] text-gray-500 mb-1.5 font-medium">
+                      {isVi ? 'Ngày' : 'Day'} {dayNum}
+                    </div>
 
-                    {/* Reward icon */}
-                    <div className="text-2xl mb-1">{REWARD_ICONS[reward.type]}</div>
+                    {/* Reward icon — SVG Lucide component */}
+                    <div className="flex justify-center mb-1">
+                      <RewardIcon
+                        type={reward.type}
+                        className={`w-6 h-6 ${
+                          isPastDay
+                            ? 'opacity-40'
+                            : reward.type === 'gems'
+                            ? 'text-cyan-400'
+                            : 'text-yellow-400'
+                        }`}
+                      />
+                    </div>
 
                     {/* Reward value */}
-                    <div className={`text-sm font-bold ${isBigReward ? 'text-amber-400' : 'text-white'}`}>
+                    <div className={`text-xs font-bold ${isBigReward ? 'text-amber-400' : isPastDay ? 'text-gray-500' : 'text-white'}`}>
                       +{reward.value}
                     </div>
 
-                    {/* Checkmark for claimed */}
+                    {/* Claimed checkmark */}
                     {isPastDay && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                      <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shadow-md">
                         <Check className="w-3 h-3 text-white" />
                       </div>
                     )}
 
-                    {/* Claim button for current day */}
+                    {/* Pulse label for claimable */}
                     {isClaimable && (
-                      <div className="mt-2 text-xs font-bold text-love animate-pulse">
+                      <div className="mt-1.5 text-[10px] font-bold text-love animate-pulse">
                         {isVi ? 'Nhận!' : 'Claim!'}
                       </div>
                     )}
 
-                    {/* VIP badge for big reward */}
+                    {/* Day-7 VIP badge */}
                     {isBigReward && (
-                      <div className="absolute -top-2 left-1/2 -translate-x-1/2">
-                        <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 text-[10px] font-bold text-white flex items-center gap-0.5">
+                      <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                        <span className="px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 text-[9px] font-bold text-white flex items-center gap-0.5 shadow-sm">
                           <Star className="w-2.5 h-2.5 fill-white" />
                           VIP
                         </span>
@@ -205,7 +244,7 @@ export default function DailyRewardsPage() {
               })}
             </div>
 
-            {/* Streak Info */}
+            {/* Footer info */}
             <div className="text-center">
               <p className="text-sm text-gray-500 mb-4">
                 {isVi ? 'Đăng nhập liên tục để tiến tới ngày 7 với thưởng lớn!' : 'Login consecutively to reach Day 7 for big rewards!'}
@@ -228,17 +267,25 @@ export default function DailyRewardsPage() {
                 </span>
               </div>
 
-              {/* Claim button (alternative) */}
+              {/* Claim CTA */}
               {status.canClaim && (
                 <div className="mt-6">
                   <button
                     onClick={handleClaim}
                     disabled={claiming}
-                    className="px-8 py-3 rounded-xl bg-gradient-to-r from-love to-purple-500 text-white font-bold shadow-lg shadow-love/30 hover:shadow-love/40 transition-all disabled:opacity-50"
+                    className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-love to-purple-500 text-white font-bold shadow-lg shadow-love/30 hover:shadow-love/40 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:scale-100"
                   >
-                    {claiming
-                      ? (isVi ? 'Đang nhận...' : 'Claiming...')
-                      : (isVi ? `Nhận thưởng ngày ${status.currentDay}` : `Claim Day ${status.currentDay} reward`)}
+                    {claiming ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {isVi ? 'Đang nhận...' : 'Claiming...'}
+                      </>
+                    ) : (
+                      <>
+                        <Gift className="w-4 h-4" />
+                        {isVi ? `Nhận thưởng ngày ${status.currentDay}` : `Claim Day ${status.currentDay} reward`}
+                      </>
+                    )}
                   </button>
                 </div>
               )}
