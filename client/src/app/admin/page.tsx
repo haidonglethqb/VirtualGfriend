@@ -47,12 +47,20 @@ interface User {
   isEmailVerified: boolean;
   isPremium: boolean;
   premiumTier: string | null;
+  premiumExpiresAt: string | null;
   coins: number;
   gems: number;
   streak: number;
   createdAt: string;
   lastLoginAt: string | null;
 }
+
+const TIER_OPTIONS = [
+  { value: 'FREE',     label: 'Free',     Icon: Shield,   gradient: 'from-slate-600 to-slate-700',   ring: 'ring-slate-400/60',   glow: '',                    iconColor: 'text-slate-200'  },
+  { value: 'BASIC',    label: 'Basic',    Icon: Zap,      gradient: 'from-blue-600 to-cyan-600',     ring: 'ring-blue-400/70',    glow: 'shadow-blue-500/25',  iconColor: 'text-cyan-100'   },
+  { value: 'PRO',      label: 'Pro',      Icon: Sparkles, gradient: 'from-violet-600 to-purple-700', ring: 'ring-violet-400/70',  glow: 'shadow-violet-500/25', iconColor: 'text-violet-100' },
+  { value: 'ULTIMATE', label: 'Ultimate', Icon: Crown,    gradient: 'from-amber-500 to-orange-500',  ring: 'ring-amber-400/70',   glow: 'shadow-amber-500/30', iconColor: 'text-amber-100'  },
+];
 
 interface Character {
   id: string;
@@ -258,14 +266,16 @@ function PaginationControls({
 }
 
 // Modal Component
-function Modal({ 
-  title, 
-  onClose, 
-  children 
-}: { 
-  title: string; 
-  onClose: () => void; 
-  children: React.ReactNode 
+function Modal({
+  title,
+  onClose,
+  children,
+  size = 'md',
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  size?: 'md' | 'lg';
 }) {
   return (
     <motion.div
@@ -279,12 +289,12 @@ function Modal({
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-gray-800 rounded-2xl p-6 max-w-md w-full border border-gray-700"
+        className={`bg-gray-800 rounded-2xl p-6 w-full border border-gray-700 ${size === 'lg' ? 'max-w-lg' : 'max-w-md'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-bold">{title}</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-gray-700 rounded-lg cursor-pointer" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1187,7 +1197,14 @@ export default function AdminPage() {
                             <button
                               onClick={() => {
                                 setSelectedItem(user);
-                                setFormData({ coins: user.coins, gems: user.gems, isPremium: user.isPremium });
+                                setFormData({
+                                  coins: user.coins,
+                                  gems: user.gems,
+                                  isPremium: user.isPremium,
+                                  premiumTier: user.premiumTier || 'FREE',
+                                  premiumExpiresAt: user.premiumExpiresAt ? user.premiumExpiresAt.slice(0, 10) : '',
+                                  isEmailVerified: user.isEmailVerified,
+                                });
                                 setShowModal('editUser');
                               }}
                               className="p-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30"
@@ -1845,43 +1862,202 @@ export default function AdminPage() {
       {/* Modals */}
       <AnimatePresence>
         {showModal === 'editUser' && selectedItem && (
-          <Modal title={tr('Chỉnh sửa người dùng', 'Edit User')} onClose={() => setShowModal(null)}>
-            <p className="text-gray-400 mb-4">{selectedItem.email}</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">{tr('Xu', 'Coins')}</label>
-                <input
-                  type="number"
-                  value={formData.coins as number || 0}
-                  onChange={(e) => setFormData({ ...formData, coins: Number(e.target.value) })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                />
+          <Modal title={tr('Chỉnh sửa người dùng', 'Edit User')} size="lg" onClose={() => setShowModal(null)}>
+            {/* Profile Header */}
+            <div className="flex items-center gap-4 p-4 mb-4 rounded-2xl bg-gradient-to-r from-violet-900/40 to-purple-900/20 border border-violet-700/20">
+              <div className="w-16 h-16 shrink-0 bg-gradient-to-br from-violet-500 to-pink-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                {(selectedItem.displayName || selectedItem.username || 'U')[0].toUpperCase()}
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">{tr('Ngọc', 'Gems')}</label>
-                <input
-                  type="number"
-                  value={formData.gems as number || 0}
-                  onChange={(e) => setFormData({ ...formData, gems: Number(e.target.value) })}
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="isPremium"
-                  checked={formData.isPremium as boolean || false}
-                  onChange={(e) => setFormData({ ...formData, isPremium: e.target.checked })}
-                  className="w-5 h-5 rounded bg-gray-700 border-gray-600"
-                />
-                <label htmlFor="isPremium" className="text-gray-300">{tr('Trạng thái Premium', 'Premium Status')}</label>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                  <p className="font-bold text-white truncate">{selectedItem.displayName || selectedItem.username}</p>
+                  {(selectedItem as User).isEmailVerified && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-500/15 border border-green-500/30 text-green-400 text-[10px] rounded-md font-medium shrink-0">
+                      <Check className="w-3 h-3" />{tr('Đã xác minh', 'Verified')}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-400 truncate">@{(selectedItem as User).username}</p>
+                <p className="text-xs text-gray-500 truncate mt-0.5">{(selectedItem as User).email}</p>
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowModal(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
+
+            {/* Stats Row */}
+            <div className="grid grid-cols-3 gap-2 mb-5">
+              <div className="flex flex-col items-center gap-1 py-2.5 bg-gray-700/30 rounded-xl border border-gray-700/50">
+                <div className="flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="text-sm font-bold text-orange-400">{(selectedItem as User).streak ?? 0}</span>
+                </div>
+                <span className="text-[10px] text-gray-500 uppercase tracking-wide">Streak</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 py-2.5 bg-gray-700/30 rounded-xl border border-gray-700/50">
+                <div className="flex items-center gap-1.5">
+                  <Coins className="w-3.5 h-3.5 text-yellow-400" />
+                  <span className="text-sm font-bold text-yellow-400">{(selectedItem as User).coins ?? 0}</span>
+                </div>
+                <span className="text-[10px] text-gray-500 uppercase tracking-wide">{tr('Xu', 'Coins')}</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 py-2.5 bg-gray-700/30 rounded-xl border border-gray-700/50">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-sm font-bold text-purple-400">{(selectedItem as User).gems ?? 0}</span>
+                </div>
+                <span className="text-[10px] text-gray-500 uppercase tracking-wide">{tr('Ngọc', 'Gems')}</span>
+              </div>
+            </div>
+
+            <div className="space-y-5 max-h-[45vh] overflow-y-auto pr-1">
+              {/* Premium Tier */}
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                  {tr('Gói Premium', 'Premium Tier')}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {TIER_OPTIONS.map((tier) => {
+                    const isSelected = (formData.premiumTier as string || 'FREE') === tier.value;
+                    return (
+                      <button
+                        key={tier.value}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, premiumTier: tier.value, isPremium: tier.value !== 'FREE' })}
+                        className={`relative p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-200 text-left group ${
+                          isSelected
+                            ? `border-transparent ring-2 ${tier.ring} bg-gradient-to-br ${tier.gradient} shadow-lg ${tier.glow}`
+                            : 'border-gray-600/40 bg-gray-700/20 hover:border-gray-500/60 hover:bg-gray-700/40'
+                        }`}
+                        aria-pressed={isSelected}
+                        aria-label={`Select ${tier.label} tier`}
+                      >
+                        <div className="flex items-center gap-2.5 mb-1">
+                          <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-white/15' : 'bg-gray-600/50 group-hover:bg-gray-600/70'}`}>
+                            <tier.Icon className={`w-4 h-4 ${isSelected ? tier.iconColor : 'text-gray-400'}`} />
+                          </div>
+                          <span className={`font-semibold text-sm ${isSelected ? 'text-white' : 'text-gray-300'}`}>
+                            {tier.label}
+                          </span>
+                        </div>
+                        <p className={`text-xs leading-snug ${
+                          isSelected ? 'text-white/70' : 'text-gray-500'
+                        }`}>
+                          {tier.value === 'FREE'     && tr('Truy cập cơ bản', 'Basic access')}
+                          {tier.value === 'BASIC'    && tr('Nhiệm vụ & lịch sử', 'Quests & history')}
+                          {tier.value === 'PRO'      && tr('AI không giới hạn', 'Unlimited AI')}
+                          {tier.value === 'ULTIMATE' && tr('Tất cả tính năng', 'All features')}
+                        </p>
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-white/25 rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Premium Expiry */}
+              {(formData.premiumTier as string) !== 'FREE' && (
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
+                    {tr('Hết hạn Premium', 'Premium Expires')}
+                  </label>
+                  <div className="relative">
+                    <Clock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={(formData.premiumExpiresAt as string) || ''}
+                      onChange={(e) => setFormData({ ...formData, premiumExpiresAt: e.target.value || null })}
+                      className="w-full pl-10 pr-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all [color-scheme:dark]"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    {tr('Bỏ trống = không giới hạn', 'Leave empty = permanent')}
+                  </p>
+                </div>
+              )}
+
+              {/* Currency */}
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                  {tr('Chỉnh sửa tiền tệ', 'Adjust Currency')}
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="relative">
+                    <Coins className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-yellow-400 pointer-events-none" />
+                    <input
+                      type="number"
+                      value={formData.coins as number || 0}
+                      onChange={(e) => setFormData({ ...formData, coins: Number(e.target.value) })}
+                      className="w-full pl-10 pr-3 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500 transition-all"
+                      aria-label={tr('Xu', 'Coins')}
+                      placeholder={tr('Xu', 'Coins')}
+                    />
+                  </div>
+                  <div className="relative">
+                    <Sparkles className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 pointer-events-none" />
+                    <input
+                      type="number"
+                      value={formData.gems as number || 0}
+                      onChange={(e) => setFormData({ ...formData, gems: Number(e.target.value) })}
+                      className="w-full pl-10 pr-3 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
+                      aria-label={tr('Ngọc', 'Gems')}
+                      placeholder={tr('Ngọc', 'Gems')}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Account Settings */}
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                  {tr('Tài khoản', 'Account')}
+                </label>
+                <div className="flex items-center justify-between p-3.5 bg-gray-700/30 rounded-xl border border-gray-600/50 hover:border-gray-500/50 transition-colors duration-150">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-500/15 rounded-lg">
+                      <Shield className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-200 font-medium">{tr('Email đã xác minh', 'Email Verified')}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{tr('Bỏ qua bước xác minh email', 'Skip email verification step')}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, isEmailVerified: !formData.isEmailVerified })}
+                    className={`relative w-11 h-6 rounded-full cursor-pointer transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800 focus-visible:ring-blue-500 shrink-0 ${
+                      formData.isEmailVerified ? 'bg-blue-500' : 'bg-gray-600'
+                    }`}
+                    role="switch"
+                    aria-checked={!!(formData.isEmailVerified)}
+                    aria-label={tr('Bật/tắt xác minh email', 'Toggle email verification')}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                        formData.isEmailVerified ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Divider + Actions */}
+            <div className="h-px bg-gray-700/50 my-5" />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowModal(null)}
+                className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600 cursor-pointer transition-colors duration-150 font-medium"
+              >
                 {tr('Hủy', 'Cancel')}
               </button>
-              <button onClick={handleUpdateUser} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
+              <button
+                onClick={handleUpdateUser}
+                disabled={actionLoading}
+                className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold rounded-xl hover:from-violet-400 hover:to-purple-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 shadow-md shadow-violet-500/20"
+              >
                 {actionLoading ? tr('Đang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
               </button>
             </div>
