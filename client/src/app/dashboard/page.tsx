@@ -12,7 +12,7 @@ import Image from 'next/image';
 import AppLayout from '@/components/layout/app-layout';
 import { AdBanner } from '@/components/ads/ad-banner';
 import { useAuthStore } from '@/store/auth-store';
-import { useCharacterStore } from '@/store/character-store';
+import { useCharacterStore, getRankTitle, getXpProgress } from '@/store/character-store';
 import { useLanguageStore } from '@/store/language-store';
 import { formatNumber, getRelationshipLabel } from '@/lib/utils';
 import api from '@/services/api';
@@ -322,7 +322,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Affection progress */}
-                <div className="mb-6">
+                <div className="mb-4">
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-[#ba9cab]">{t.affection}</span>
                     <span className="font-bold flex items-center gap-1 text-love">
@@ -337,6 +337,30 @@ export default function DashboardPage() {
                     />
                   </div>
                 </div>
+
+                {/* Level & XP progress */}
+                {character && (() => {
+                  const xp = getXpProgress(character.level, character.experience);
+                  const rank = getRankTitle(character.level);
+                  return (
+                    <div className="mb-6 p-3 rounded-xl bg-[#181114] border border-[#392830]">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-yellow-400" />
+                          <span className="text-sm font-bold text-white">Lv.{character.level}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-love/20 text-love">{rank}</span>
+                        </div>
+                        <span className="text-xs text-[#8a7580]">{xp.current}/{xp.needed} XP</span>
+                      </div>
+                      <div className="w-full bg-[#392830] rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 transition-all duration-500"
+                          style={{ width: `${xp.percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Quick actions */}
                 <div className="grid grid-cols-2 gap-3">

@@ -336,7 +336,7 @@ export default function MessagesPage() {
     <AppLayout>
       <div className="flex h-[calc(100vh-12rem)] lg:h-[calc(100vh-10rem)] rounded-2xl overflow-hidden border border-[#392830]">
         {/* Conversation List */}
-        <div className={`${activeConvo ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 lg:w-96 border-r border-[#392830] bg-[#1a1016]`}>
+        <div className={`${activeConvo ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 lg:w-96 bg-[#1a1016]`}>
           {/* Header */}
           <div className="p-4 border-b border-[#392830] flex items-center justify-between">
             <h2 className="text-lg font-bold flex items-center gap-2">

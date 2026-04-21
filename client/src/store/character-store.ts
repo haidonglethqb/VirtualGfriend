@@ -1,6 +1,39 @@
 import { create } from 'zustand';
 import { api } from '@/services/api';
 
+// Rank titles mirroring server LEVEL_RANKS
+const LEVEL_RANKS = [
+  { maxLevel: 4, title: 'Người lạ' },
+  { maxLevel: 9, title: 'Quen biết' },
+  { maxLevel: 14, title: 'Bạn thân' },
+  { maxLevel: 19, title: 'Tri kỷ' },
+  { maxLevel: 24, title: 'Người thương' },
+  { maxLevel: 29, title: 'Tình nhân' },
+  { maxLevel: 39, title: 'Đồng hành' },
+  { maxLevel: 49, title: 'Linh hồn đôi' },
+  { maxLevel: 50, title: 'Huyền thoại tình yêu' },
+];
+
+export function getRankTitle(level: number): string {
+  for (const rank of LEVEL_RANKS) {
+    if (level <= rank.maxLevel) return rank.title;
+  }
+  return LEVEL_RANKS[LEVEL_RANKS.length - 1].title;
+}
+
+export function getXpRequiredForLevel(level: number): number {
+  return 100 + (level - 1) * 50;
+}
+
+export function getXpProgress(level: number, experience: number) {
+  const xpNeeded = getXpRequiredForLevel(level);
+  return {
+    current: experience,
+    needed: xpNeeded,
+    percent: Math.min(100, Math.round((experience / xpNeeded) * 100)),
+  };
+}
+
 export interface CharacterTemplate {
   id: string;
   name: string;

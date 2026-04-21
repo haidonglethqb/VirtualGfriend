@@ -246,7 +246,7 @@ export default function MemoriesPage() {
     <AppLayout>
       <div className="flex flex-1 relative w-full">
         {/* Sidebar Navigation for Memories */}
-        <aside className="hidden lg:flex flex-col w-64 sticky top-0 h-[calc(100vh-5rem)] p-6 overflow-y-auto border-r border-[#392830]/30 shrink-0">
+        <aside className="hidden lg:flex flex-col w-64 sticky top-0 h-[calc(100vh-5rem)] p-6 overflow-y-auto shrink-0">
           <div className="flex flex-col gap-6">
             <div>
               <h1 className="text-white text-lg font-bold mb-1">{tr('Dòng thời gian', 'Timeline')}</h1>

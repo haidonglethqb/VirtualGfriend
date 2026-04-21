@@ -3,14 +3,14 @@ import { PremiumTier } from '../../lib/prisma'
 export interface StripePricingTier {
   monthlyPrice: number       // VND
   yearlyPrice: number        // VND
+  stripeProductId: string    // Stripe Product ID (set manually or auto-saved after sync)
   stripePriceIdMonthly: string
   stripePriceIdYearly: string
   displayName: string
   description: string
-  // NEW fields
-  trialDays: number;            // Stripe free trial days
-  discountPercent: number;      // Yearly discount % (auto-computed)
-  stripeTrialPriceId: string;   // Stripe trial price ID
+  trialDays: number
+  discountPercent: number
+  stripeTrialPriceId: string
 }
 
 export type StripePricingConfig = Record<Exclude<PremiumTier, 'FREE'>, StripePricingTier>
@@ -20,8 +20,9 @@ export const CACHE_PRICING_KEY = 'stripe:pricing_config'
 
 export const DEFAULT_PRICING_CONFIG: StripePricingConfig = {
   BASIC: {
-    monthlyPrice: 99000,
+    monthlyPrice: 98000,
     yearlyPrice: 990000,
+    stripeProductId: '',
     stripePriceIdMonthly: '',
     stripePriceIdYearly: '',
     displayName: 'VIP Basic',
@@ -33,6 +34,7 @@ export const DEFAULT_PRICING_CONFIG: StripePricingConfig = {
   PRO: {
     monthlyPrice: 199000,
     yearlyPrice: 1990000,
+    stripeProductId: '',
     stripePriceIdMonthly: '',
     stripePriceIdYearly: '',
     displayName: 'VIP Pro',
@@ -44,6 +46,7 @@ export const DEFAULT_PRICING_CONFIG: StripePricingConfig = {
   ULTIMATE: {
     monthlyPrice: 299000,
     yearlyPrice: 2990000,
+    stripeProductId: '',
     stripePriceIdMonthly: '',
     stripePriceIdYearly: '',
     displayName: 'VIP Ultimate',

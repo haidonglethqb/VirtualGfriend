@@ -176,6 +176,51 @@ SMTP_FROM_NAME=VGfriend
 
 ---
 
+## Cấu hình Stripe (Thanh toán VIP)
+
+Stripe được dùng cho tính năng **mua gói VIP** (BASIC / PRO / ULTIMATE). Nếu không cấu hình, tính năng thanh toán bị tắt hoàn toàn — app vẫn chạy bình thường cho các tính năng khác.
+
+### Lấy API key
+
+1. Đăng ký tại [dashboard.stripe.com](https://dashboard.stripe.com)
+2. Vào **Developers → API keys**
+3. Copy **Secret key** (bắt đầu bằng `sk_test_` cho môi trường test)
+
+```env
+# server/.env
+STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxx   # cần cho webhook, để trống cũng chạy được local
+```
+
+### Thiết lập giá từ Admin Panel
+
+Sau khi có `STRIPE_SECRET_KEY`, mở Admin Panel → tab **Bảng giá**:
+
+1. Điền **giá hàng tháng** và **giá hàng năm** cho từng tier (đơn vị: VND)
+2. Nhấn **Sync lên Stripe** — server tự động:
+   - Tạo Stripe Product với metadata `vgfriend_tier`
+   - Tạo 2 Price (monthly + yearly) với currency `vnd`
+   - Lưu price ID vào database
+3. Từ đó checkout hoạt động luôn — không cần vào Stripe dashboard
+
+> VND là zero-decimal currency trong Stripe — `unit_amount` = số VND trực tiếp (không nhân 100).
+
+### Webhook (production)
+
+Cần webhook để Stripe thông báo khi thanh toán thành công:
+
+```bash
+# Cài Stripe CLI
+brew install stripe/stripe-cli/stripe
+
+# Forward webhook về localhost (dev)
+stripe listen --forward-to localhost:3001/api/payment/webhook
+```
+
+Copy `whsec_...` từ output vào `STRIPE_WEBHOOK_SECRET`.
+
+---
+
 ## Deploy lên VPS
 
 ### Yêu cầu VPS

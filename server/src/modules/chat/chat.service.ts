@@ -195,6 +195,9 @@ export const chatService = {
     });
     log.debug('User message saved:', userMessage.id);
 
+    // Keep cached daily count in sync for limit/bonus checks
+    await this.incrementDailyCount(userId);
+
     // Get recent messages for context
     const recentMessages = await prisma.message.findMany({
       where: { userId, characterId: data.characterId },
@@ -302,8 +305,16 @@ export const chatService = {
         .catch(err => log.error('Milestone memory error:', err));
     }
 
-    // Add XP for chatting
-    const xpResult = await characterService.addExperience(character.id, 1);
+    // Add XP for chatting (with bonuses)
+    const user2 = await prisma.user.findUnique({ where: { id: userId }, select: { streak: true } });
+    const todayMsgCount = await this.getDailyMessageCount(userId);
+    const isFirstMessageToday = todayMsgCount === 1;
+    const xpBonus = characterService.calculateMessageXpBonus(
+      sanitizedContent.length,
+      user2?.streak || 0,
+      isFirstMessageToday,
+    );
+    const xpResult = await characterService.addExperience(character.id, xpBonus.total, userId);
     if (xpResult.leveledUp) {
       levelUp = true;
       newLevel = xpResult.newLevel;
@@ -479,6 +490,17 @@ export const chatService = {
     const current = await cache.get<number>(cacheKey);
     if (current !== null) {
       await cache.set(cacheKey, current + 1, 300);
+      return;
     }
+
+    const count = await prisma.message.count({
+      where: {
+        userId,
+        role: 'USER',
+        createdAt: { gte: startOfToday },
+      },
+    });
+
+    await cache.set(cacheKey, count, 300);
   },
 };

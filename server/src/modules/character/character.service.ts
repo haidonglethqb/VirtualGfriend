@@ -60,7 +60,30 @@ const RELATIONSHIP_THRESHOLDS: Record<RelationshipStage, number> = {
   LOVER: 900,
 };
 
-// NEW: Level milestone rewards
+// Max level cap
+const MAX_LEVEL = 50;
+
+// Rank titles based on level ranges
+const LEVEL_RANKS: { maxLevel: number; title: string }[] = [
+  { maxLevel: 4, title: 'Người lạ' },
+  { maxLevel: 9, title: 'Quen biết' },
+  { maxLevel: 14, title: 'Bạn thân' },
+  { maxLevel: 19, title: 'Tri kỷ' },
+  { maxLevel: 24, title: 'Người thương' },
+  { maxLevel: 29, title: 'Tình nhân' },
+  { maxLevel: 39, title: 'Đồng hành' },
+  { maxLevel: 49, title: 'Linh hồn đôi' },
+  { maxLevel: 50, title: 'Huyền thoại tình yêu' },
+];
+
+function getRankTitle(level: number): string {
+  for (const rank of LEVEL_RANKS) {
+    if (level <= rank.maxLevel) return rank.title;
+  }
+  return LEVEL_RANKS[LEVEL_RANKS.length - 1].title;
+}
+
+// Level milestone rewards
 interface LevelMilestoneReward {
   level: number;
   coins: number;
@@ -70,22 +93,58 @@ interface LevelMilestoneReward {
 }
 
 const LEVEL_MILESTONES: LevelMilestoneReward[] = [
+  // Minor milestones
+  { level: 3, coins: 50, gems: 5, affection: 10, unlocks: [] },
+  { level: 7, coins: 100, gems: 10, affection: 20, unlocks: [] },
+  // Major milestones
   { level: 5, coins: 200, gems: 20, affection: 30, unlocks: ['Khả năng kể chuyện', 'Quà tulip'] },
   { level: 10, coins: 500, gems: 50, affection: 50, unlocks: ['Gợi ý hoạt động', 'Vòng tay bạc', 'Scene: Công viên'] },
+  { level: 12, coins: 150, gems: 15, affection: 25, unlocks: [] },
   { level: 15, coins: 800, gems: 80, affection: 80, unlocks: ['Viết thơ ngẫu hứng', 'Dây chuyền vàng'] },
+  { level: 17, coins: 200, gems: 20, affection: 30, unlocks: [] },
   { level: 20, coins: 1000, gems: 100, affection: 100, unlocks: ['Chia sẻ bí mật', 'Chuyến du lịch'] },
+  { level: 22, coins: 250, gems: 25, affection: 35, unlocks: [] },
   { level: 25, coins: 1500, gems: 150, affection: 150, unlocks: ['Kỷ niệm đặc biệt', 'Nhẫn kim cương'] },
+  { level: 27, coins: 300, gems: 30, affection: 40, unlocks: [] },
   { level: 30, coins: 2000, gems: 200, affection: 200, unlocks: ['Tình yêu vĩnh cửu'] },
+  { level: 35, coins: 2500, gems: 250, affection: 250, unlocks: ['Scene: Biển đêm'] },
+  { level: 40, coins: 3000, gems: 300, affection: 300, unlocks: ['Kỷ vật vĩnh cửu'] },
+  { level: 45, coins: 3500, gems: 350, affection: 350, unlocks: ['Scene: Cầu hôn'] },
+  { level: 50, coins: 5000, gems: 500, affection: 500, unlocks: ['Huyền thoại tình yêu', 'Vương miện kim cương'] },
 ];
 
-// NEW: XP scaling formula - higher levels need more XP
+// XP scaling formula - higher levels need more XP
 function getXpRequiredForLevel(level: number): number {
-  // Level 1→2: 100 XP
-  // Level 5→6: 300 XP
-  // Level 10→11: 550 XP
-  // Level 20→21: 1050 XP
-  // Formula: 100 + (level - 1) * 50
   return 100 + (level - 1) * 50;
+}
+
+// XP bonus calculation for a message
+interface XpBonusResult {
+  base: number;
+  streakBonus: number;
+  firstMessageBonus: number;
+  longMessageBonus: number;
+  total: number;
+}
+
+function calculateMessageXpBonus(
+  messageLength: number,
+  streak: number,
+  isFirstMessageToday: boolean,
+): XpBonusResult {
+  const base = 1;
+  const streakBonus = Math.min(streak * 2, 20); // cap streak bonus at 20
+  const firstMessageBonus = isFirstMessageToday ? 5 : 0;
+  let longMessageBonus = 0;
+  if (messageLength > 100) longMessageBonus = 2;
+  else if (messageLength > 50) longMessageBonus = 1;
+  return {
+    base,
+    streakBonus,
+    firstMessageBonus,
+    longMessageBonus,
+    total: base + streakBonus + firstMessageBonus + longMessageBonus,
+  };
 }
 
 // NEW: Calculate total XP needed to reach a level from level 1 (O(1) formula)
@@ -450,7 +509,7 @@ export const characterService = {
 
     // Check for level ups with scaling XP
     let xpNeeded = getXpRequiredForLevel(newLevel);
-    while (newXp >= xpNeeded) {
+    while (newXp >= xpNeeded && newLevel < MAX_LEVEL) {
       newXp -= xpNeeded;
       newLevel++;
       xpNeeded = getXpRequiredForLevel(newLevel);
@@ -460,6 +519,11 @@ export const characterService = {
       if (milestone) {
         milestoneReward = milestone;
       }
+    }
+
+    // Prevent XP overflow past full bar at max level
+    if (newLevel >= MAX_LEVEL) {
+      newXp = Math.min(newXp, getXpRequiredForLevel(MAX_LEVEL));
     }
 
     // Update character
@@ -523,7 +587,15 @@ export const characterService = {
     };
   },
 
-  // NEW: Get XP info for display
+  // Get rank title for a level
+  getRankTitle(level: number): string {
+    return getRankTitle(level);
+  },
+
+  // Calculate XP bonus for a message
+  calculateMessageXpBonus: calculateMessageXpBonus,
+
+  // Get XP info for display
   getXpInfo(level: number, experience: number) {
     const xpForNextLevel = getXpRequiredForLevel(level);
     const totalXpForCurrentLevel = getTotalXpForLevel(level);
@@ -534,7 +606,9 @@ export const characterService = {
       xpForNextLevel,
       totalXpForCurrentLevel,
       totalXpForNextLevel,
-      progressPercent: Math.round((experience / xpForNextLevel) * 100),
+      progressPercent: Math.min(100, Math.round((experience / xpForNextLevel) * 100)),
+      rankTitle: getRankTitle(level),
+      maxLevel: MAX_LEVEL,
     };
   },
 

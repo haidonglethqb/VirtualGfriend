@@ -1394,7 +1394,7 @@ function CTASection() {
       <motion.div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full border border-love/10"
         animate={prefersReducedMotion ? {} : { scale: [0.8, 1.2], opacity: [0.3, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'ease-out' }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeOut" }}
       />
 
       <motion.div

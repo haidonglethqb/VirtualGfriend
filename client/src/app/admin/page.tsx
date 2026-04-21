@@ -9,7 +9,8 @@ import {
   TrendingUp, Crown, Sparkles, LayoutDashboard, Settings,
   Target, Image as ImageIcon, Gift, Brain, Bell, Database, BarChart3,
   Plus, X, Check, AlertTriangle, Megaphone, Server, HardDrive,
-  Zap, Clock, Activity, Languages, Upload,
+  Zap, Clock, Activity, Languages, Upload, SendHorizonal, Info, ShieldAlert, CheckCircle2, Timer, UserCheck, Users2,
+  ChevronDown,
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -304,6 +305,237 @@ function Modal({
   );
 }
 
+// Broadcast Modal Component
+function BroadcastModal({
+  form,
+  setForm,
+  onSubmit,
+  onClose,
+  loading,
+  language,
+}: {
+  form: { title: string; message: string; type: 'info' | 'success' | 'warning'; durationMs: number; targetFilter: 'all' | 'free' | 'premium' };
+  setForm: (f: typeof form) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+  loading: boolean;
+  language: string;
+}) {
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+
+  const typeOptions = [
+    { value: 'info' as const, label: tr('Thông tin', 'Info'), Icon: Info, color: 'from-blue-500 to-cyan-500', ring: 'ring-blue-400/50', bg: 'bg-blue-500/15' },
+    { value: 'success' as const, label: tr('Thành công', 'Success'), Icon: CheckCircle2, color: 'from-emerald-500 to-green-500', ring: 'ring-emerald-400/50', bg: 'bg-emerald-500/15' },
+    { value: 'warning' as const, label: tr('Cảnh báo', 'Warning'), Icon: ShieldAlert, color: 'from-amber-500 to-orange-400', ring: 'ring-amber-400/50', bg: 'bg-amber-500/15' },
+  ];
+
+  const targetOptions = [
+    { value: 'all' as const, label: tr('Tất cả', 'All Users'), Icon: Users2, desc: tr('Gửi cho tất cả người dùng', 'Send to all users') },
+    { value: 'free' as const, label: 'Free', Icon: UserCheck, desc: tr('Chỉ tài khoản miễn phí', 'Free accounts only') },
+    { value: 'premium' as const, label: 'Premium', Icon: Crown, desc: tr('Chỉ tài khoản premium', 'Premium accounts only') },
+  ];
+
+  const durationOptions = [
+    { value: 3000, label: '3s' },
+    { value: 5000, label: '5s' },
+    { value: 8000, label: '8s' },
+    { value: 15000, label: '15s' },
+    { value: 30000, label: '30s' },
+  ];
+
+  const selectedType = typeOptions.find((o) => o.value === form.type) || typeOptions[0];
+  const isValid = form.title.trim().length > 0 && form.message.trim().length > 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="bg-gray-900 rounded-2xl w-full max-w-lg border border-gray-700/60 shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="relative px-6 pt-6 pb-4 border-b border-gray-700/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
+              <Megaphone className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">{tr('Gửi thông báo', 'Send Broadcast')}</h3>
+              <p className="text-xs text-gray-400">{tr('Gửi thông báo đến người dùng theo thời gian thực', 'Send real-time notifications to users')}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
+          {/* Notification Type */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{tr('Loại thông báo', 'Notification Type')}</label>
+            <div className="grid grid-cols-3 gap-2">
+              {typeOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setForm({ ...form, type: opt.value })}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all cursor-pointer ${
+                    form.type === opt.value
+                      ? `${opt.bg} border-opacity-60 ring-1 ${opt.ring} border-transparent`
+                      : 'bg-gray-800/50 border-gray-700/50 hover:border-gray-600'
+                  }`}
+                >
+                  <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${opt.color} flex items-center justify-center shadow-sm`}>
+                    <opt.Icon className="w-4 h-4 text-white" />
+                  </div>
+                  <span className={`text-xs font-medium ${form.type === opt.value ? 'text-white' : 'text-gray-400'}`}>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Title */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{tr('Tiêu đề', 'Title')} <span className="text-red-400">*</span></label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder={tr('Nhập tiêu đề thông báo...', 'Enter notification title...')}
+              maxLength={100}
+              className="w-full bg-gray-800/60 border border-gray-700/60 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
+            />
+            <p className="text-right text-[10px] text-gray-500">{form.title.length}/100</p>
+          </div>
+
+          {/* Message */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{tr('Nội dung', 'Message')} <span className="text-red-400">*</span></label>
+            <textarea
+              value={form.message}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
+              placeholder={tr('Nhập nội dung thông báo...', 'Enter notification message...')}
+              maxLength={500}
+              rows={3}
+              className="w-full bg-gray-800/60 border border-gray-700/60 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all resize-none"
+            />
+            <p className="text-right text-[10px] text-gray-500">{form.message.length}/500</p>
+          </div>
+
+          {/* Duration */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Timer className="w-3.5 h-3.5" />
+              {tr('Thời gian hiển thị', 'Display Duration')}
+            </label>
+            <div className="flex gap-2">
+              {durationOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setForm({ ...form, durationMs: opt.value })}
+                  className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    form.durationMs === opt.value
+                      ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
+                      : 'bg-gray-800/60 text-gray-400 border border-gray-700/50 hover:border-gray-600'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Target audience */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{tr('Đối tượng nhận', 'Target Audience')}</label>
+            <div className="space-y-2">
+              {targetOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setForm({ ...form, targetFilter: opt.value })}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer text-left ${
+                    form.targetFilter === opt.value
+                      ? 'bg-purple-500/15 border-purple-500/40 ring-1 ring-purple-400/30'
+                      : 'bg-gray-800/40 border-gray-700/50 hover:border-gray-600'
+                  }`}
+                >
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    form.targetFilter === opt.value ? 'bg-purple-500/30' : 'bg-gray-700/60'
+                  }`}>
+                    <opt.Icon className={`w-4 h-4 ${form.targetFilter === opt.value ? 'text-purple-300' : 'text-gray-400'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm font-semibold ${form.targetFilter === opt.value ? 'text-white' : 'text-gray-300'}`}>{opt.label}</div>
+                    <div className="text-xs text-gray-500">{opt.desc}</div>
+                  </div>
+                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                    form.targetFilter === opt.value ? 'border-purple-400 bg-purple-500' : 'border-gray-600'
+                  }`}>
+                    {form.targetFilter === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Preview */}
+          {(form.title || form.message) && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{tr('Xem trước', 'Preview')}</label>
+              <div className="bg-gray-800/80 border border-gray-700/50 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${selectedType.color} flex items-center justify-center flex-shrink-0 shadow`}>
+                    <selectedType.Icon className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white truncate">{form.title || tr('Tiêu đề...', 'Title...')}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{form.message || tr('Nội dung thông báo...', 'Notification message...')}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-700/50 flex items-center gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:border-gray-600 text-sm font-medium transition-all cursor-pointer"
+          >
+            {tr('Hủy', 'Cancel')}
+          </button>
+          <button
+            onClick={onSubmit}
+            disabled={!isValid || loading}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white text-sm font-semibold shadow-lg shadow-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+          >
+            {loading ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <SendHorizonal className="w-4 h-4" />
+            )}
+            {loading ? tr('Đang gửi...', 'Sending...') : tr('Gửi thông báo', 'Send Broadcast')}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function AdminPage() {
   const { language, toggleLanguage } = useLanguageStore();
   const t = ADMIN_I18N[language];
@@ -332,6 +564,16 @@ export default function AdminPage() {
   
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Broadcast modal
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastForm, setBroadcastForm] = useState({
+    title: '',
+    message: '',
+    type: 'info' as 'info' | 'success' | 'warning',
+    durationMs: 5000,
+    targetFilter: 'all' as 'all' | 'free' | 'premium',
+  });
 
   // Modal states
   const [showModal, setShowModal] = useState<string | null>(null);
@@ -820,32 +1062,35 @@ export default function AdminPage() {
     }
   };
 
-  const handleBroadcast = async () => {
-    const title = prompt(tr('Nhập tiêu đề thông báo:', 'Enter notification title:'));
-    const message = prompt(tr('Nhập nội dung thông báo:', 'Enter notification message:'));
-    const durationRaw = prompt(tr('Thời lượng hiển thị (ms, mặc định 5000):', 'Display duration (ms, default 5000):'), '5000');
-    const targetRaw = prompt(tr('Đối tượng nhận (all/free/premium):', 'Target audience (all/free/premium):'), 'all');
-    
-    if (!title || !message) return;
+  const handleBroadcast = () => {
+    setBroadcastForm({ title: '', message: '', type: 'info', durationMs: 5000, targetFilter: 'all' });
+    setShowBroadcastModal(true);
+  };
 
-    const durationMs = Number(durationRaw || 5000);
-    const targetFilter = ['all', 'free', 'premium'].includes((targetRaw || '').toLowerCase())
-      ? (targetRaw || 'all').toLowerCase()
-      : 'all';
-    
+  const handleBroadcastSubmit = async () => {
+    if (!broadcastForm.title.trim() || !broadcastForm.message.trim()) return;
     setActionLoading(true);
     try {
       const res = await apiCall('/broadcast', {
         method: 'POST',
-        body: JSON.stringify({ title, message, type: 'info', durationMs, targetFilter }),
+        body: JSON.stringify({
+          title: broadcastForm.title.trim(),
+          message: broadcastForm.message.trim(),
+          type: broadcastForm.type,
+          durationMs: broadcastForm.durationMs,
+          targetFilter: broadcastForm.targetFilter,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
+        setShowBroadcastModal(false);
         showToast(
           language === 'vi'
             ? `Đã gửi ${data.persisted || 0} thông báo (hiển thị ${data.durationMs || 5000}ms)`
             : `Sent ${data.persisted || 0} notifications (${data.durationMs || 5000}ms display)`
         );
+      } else {
+        showToast(tr('Gửi thông báo thất bại', 'Failed to send broadcast'), 'error');
       }
     } catch {
       showToast(tr('Gửi thông báo thất bại', 'Failed to send broadcast'), 'error');
@@ -2417,6 +2662,20 @@ export default function AdminPage() {
               </button>
             </div>
           </Modal>
+        )}
+      </AnimatePresence>
+
+      {/* Broadcast Modal */}
+      <AnimatePresence>
+        {showBroadcastModal && (
+          <BroadcastModal
+            form={broadcastForm}
+            setForm={setBroadcastForm}
+            onSubmit={handleBroadcastSubmit}
+            onClose={() => setShowBroadcastModal(false)}
+            loading={actionLoading}
+            language={language}
+          />
         )}
       </AnimatePresence>
     </div>

@@ -40,7 +40,11 @@ export async function updatePricingConfig(
   tier: Exclude<PremiumTier, 'FREE'>,
   patch: Partial<StripePricingConfig[typeof tier]>,
 ): Promise<StripePricingConfig> {
-  const current = await getPricingConfig()
+  // Read from DB directly to avoid stale cache overwriting live DB values
+  const row = await prisma.systemConfig.findUnique({ where: { key: DB_PRICING_KEY } })
+  const current = row?.value
+    ? mergeDefaults(row.value as Partial<StripePricingConfig>)
+    : DEFAULT_PRICING_CONFIG
   const updated: StripePricingConfig = {
     ...current,
     [tier]: { ...current[tier], ...patch },

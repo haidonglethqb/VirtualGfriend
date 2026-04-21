@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Gift, Star, Heart, ShoppingBag,
-  Sparkles, Clock, Check, X, Loader2
+  Sparkles, Clock, Check, X, Loader2,
+  Flower2, UtensilsCrossed, Gem, Gamepad2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,11 +27,11 @@ const SHOP_I18N = {
     inventory: 'Túi đồ',
     all: 'Tất cả',
     categories: {
-      flower: '🌸 Hoa',
-      food: '🍰 Đồ ăn',
-      jewelry: '💎 Trang sức',
-      toy: '🧸 Đồ chơi',
-      special: '✨ Đặc biệt',
+      flower: 'Hoa',
+      food: 'Đồ ăn',
+      jewelry: 'Trang sức',
+      toy: 'Đồ chơi',
+      special: 'Đặc biệt',
     },
     rarity: {
       COMMON: 'Thường',
@@ -63,11 +64,11 @@ const SHOP_I18N = {
     inventory: 'Inventory',
     all: 'All',
     categories: {
-      flower: '🌸 Flowers',
-      food: '🍰 Food',
-      jewelry: '💎 Jewelry',
-      toy: '🧸 Toys',
-      special: '✨ Special',
+      flower: 'Flowers',
+      food: 'Food',
+      jewelry: 'Jewelry',
+      toy: 'Toys',
+      special: 'Special',
     },
     rarity: {
       COMMON: 'Common',
@@ -264,11 +265,11 @@ export default function ShopPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full overflow-x-auto flex justify-start">
               <TabsTrigger value="all">{t.all}</TabsTrigger>
-              <TabsTrigger value="flower">{t.categories.flower}</TabsTrigger>
-              <TabsTrigger value="food">{t.categories.food}</TabsTrigger>
-              <TabsTrigger value="jewelry">{t.categories.jewelry}</TabsTrigger>
-              <TabsTrigger value="toy">{t.categories.toy}</TabsTrigger>
-              <TabsTrigger value="special">{t.categories.special}</TabsTrigger>
+              <TabsTrigger value="flower" className="flex items-center gap-1.5"><Flower2 className="w-3.5 h-3.5" />{t.categories.flower}</TabsTrigger>
+              <TabsTrigger value="food" className="flex items-center gap-1.5"><UtensilsCrossed className="w-3.5 h-3.5" />{t.categories.food}</TabsTrigger>
+              <TabsTrigger value="jewelry" className="flex items-center gap-1.5"><Gem className="w-3.5 h-3.5" />{t.categories.jewelry}</TabsTrigger>
+              <TabsTrigger value="toy" className="flex items-center gap-1.5"><Gamepad2 className="w-3.5 h-3.5" />{t.categories.toy}</TabsTrigger>
+              <TabsTrigger value="special" className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />{t.categories.special}</TabsTrigger>
             </TabsList>
 
             <TabsContent value={activeTab} className="mt-6">

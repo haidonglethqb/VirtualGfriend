@@ -79,7 +79,7 @@ export function SceneSelector({ isOpen, onClose, onSceneSelect }: SceneSelectorP
       case 'level':
         return `Cần Level ${scene.unlockValue}`;
       case 'purchase':
-        return `${scene.priceGems} 💎`;
+        return `${scene.priceGems} gems`;
       case 'event':
         return 'Sự kiện đặc biệt';
       default:

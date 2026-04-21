@@ -40,7 +40,7 @@ import {
   fixMissingAvatars,
 } from './admin.controller';
 import { getTierConfigs, updateTierConfigHandler } from './admin-tier-config.controller';
-import { getAdminPricing, updateAdminPricing } from './admin-pricing.controller';
+import { getAdminPricing, getStripeLivePricing, updateAdminPricing, syncStripePrice } from './admin-pricing.controller';
 
 const router = Router();
 
@@ -113,7 +113,9 @@ router.put('/tier-configs/:tier', updateTierConfigHandler);
 
 // Pricing management (Stripe)
 router.get('/pricing', getAdminPricing);
+router.get('/pricing/stripe-live', getStripeLivePricing); // must be before /:tier
 router.put('/pricing/:tier', updateAdminPricing);
+router.post('/pricing/:tier/sync-stripe', syncStripePrice);
 
 // File upload (DO Spaces)
 router.use('/upload', uploadRouter);

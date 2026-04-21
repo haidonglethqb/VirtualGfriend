@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Crown, Zap, Gem, Save, RefreshCw } from 'lucide-react';
+import { Crown, Zap, Gem, Save, RefreshCw, Sparkles } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -11,6 +11,7 @@ type Tier = 'BASIC' | 'PRO' | 'ULTIMATE';
 interface PricingTier {
   monthlyPrice: number;
   yearlyPrice: number;
+  stripeProductId: string;
   stripePriceIdMonthly: string;
   stripePriceIdYearly: string;
   displayName: string;
@@ -26,6 +27,7 @@ const DEFAULT_PRICING: PricingConfig = {
   BASIC: {
     monthlyPrice: 99000,
     yearlyPrice: 990000,
+    stripeProductId: '',
     stripePriceIdMonthly: '',
     stripePriceIdYearly: '',
     displayName: 'VIP Basic',
@@ -37,6 +39,7 @@ const DEFAULT_PRICING: PricingConfig = {
   PRO: {
     monthlyPrice: 199000,
     yearlyPrice: 1990000,
+    stripeProductId: '',
     stripePriceIdMonthly: '',
     stripePriceIdYearly: '',
     displayName: 'VIP Pro',
@@ -48,6 +51,7 @@ const DEFAULT_PRICING: PricingConfig = {
   ULTIMATE: {
     monthlyPrice: 299000,
     yearlyPrice: 2990000,
+    stripeProductId: '',
     stripePriceIdMonthly: '',
     stripePriceIdYearly: '',
     displayName: 'VIP Ultimate',
@@ -79,15 +83,16 @@ export function PricingTab({
 }) {
   const [pricing, setPricing] = useState<PricingConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<Tier | null>(null);
+  const [syncing, setSyncing] = useState<Tier | null>(null);
 
   const fetchPricing = useCallback(async () => {
     try {
-      const res = await apiCall('/pricing');
+      // stripe-live fetches from Stripe and writes back to DB, returns live prices
+      const res = await apiCall('/pricing/stripe-live');
       if (res.ok) {
-        const data = await res.json();
-        // Merge with defaults to handle any missing fields
-        const merged = { ...DEFAULT_PRICING, ...data };
+        const json = await res.json();
+        const data = json.data ?? json;
+        const merged = { ...DEFAULT_PRICING };
         for (const tier of ['BASIC', 'PRO', 'ULTIMATE'] as Tier[]) {
           merged[tier] = { ...DEFAULT_PRICING[tier], ...(data[tier] || {}) };
         }
@@ -104,24 +109,35 @@ export function PricingTab({
     fetchPricing();
   }, [fetchPricing]);
 
-  const handleSave = async (tier: Tier) => {
+  const handleSyncStripe = async (tier: Tier) => {
     if (!pricing) return;
-    setSaving(tier);
+    setSyncing(tier);
     try {
-      const res = await apiCall(`/pricing/${tier}`, {
+      // Step 1: save config (displayName, description, trialDays, prices) to DB
+      const saveRes = await apiCall(`/pricing/${tier}`, {
         method: 'PUT',
         body: JSON.stringify(pricing[tier]),
       });
+      if (!saveRes.ok) {
+        const saveData = await saveRes.json();
+        showToast(saveData.error?.message || 'Lưu thất bại', 'error');
+        return;
+      }
+
+      // Step 2: sync to Stripe (will reuse existing price if amount unchanged, or archive+create if changed)
+      const res = await apiCall(`/pricing/${tier}/sync-stripe`, { method: 'POST' });
+      const data = await res.json();
       if (res.ok) {
-        showToast(`Đã lưu bảng giá ${tier}`, 'success');
+        showToast(`Đã lưu & sync Stripe thành công cho ${tier}`, 'success');
+        // Reload from Stripe to show actual live price IDs
+        await fetchPricing();
       } else {
-        const data = await res.json();
-        showToast(data.error || 'Lưu thất bại', 'error');
+        showToast(data.error?.message || data.message || 'Sync thất bại', 'error');
       }
     } catch {
-      showToast('Lưu thất bại', 'error');
+      showToast('Lưu & sync thất bại', 'error');
     } finally {
-      setSaving(null);
+      setSyncing(null);
     }
   };
 
@@ -288,69 +304,45 @@ export function PricingTab({
                   </p>
                 </div>
 
-                {/* Stripe Price IDs */}
+                {/* Stripe Product ID — read-only, auto-detected by sync */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">Stripe Price ID (Monthly)</label>
-                  <input
-                    type="text"
-                    value={tierConfig.stripePriceIdMonthly}
-                    onChange={(e) =>
-                      setPricing((prev) =>
-                        prev
-                          ? { ...prev, [tier]: { ...prev[tier], stripePriceIdMonthly: e.target.value } }
-                          : prev,
-                      )
-                    }
-                    className="w-full px-3 py-2.5 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm font-mono focus:border-love/50 focus:outline-none"
-                    placeholder="price_xxx..."
-                  />
+                  <label className="block text-sm text-gray-400 mb-1.5">Stripe Product ID</label>
+                  <div className="w-full px-3 py-2.5 bg-gray-800/60 border border-gray-700 rounded-xl text-xs font-mono text-gray-400 select-all">
+                    {tierConfig.stripeProductId || <span className="text-gray-600 italic">Chưa có — sync sẽ tự tạo</span>}
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">Stripe Price ID (Yearly)</label>
-                  <input
-                    type="text"
-                    value={tierConfig.stripePriceIdYearly}
-                    onChange={(e) =>
-                      setPricing((prev) =>
-                        prev
-                          ? { ...prev, [tier]: { ...prev[tier], stripePriceIdYearly: e.target.value } }
-                          : prev,
-                      )
-                    }
-                    className="w-full px-3 py-2.5 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm font-mono focus:border-love/50 focus:outline-none"
-                    placeholder="price_xxx..."
-                  />
+                {/* Stripe Price IDs — read-only, auto-filled by Sync */}
+                <div className="rounded-xl border border-gray-700 bg-gray-900/40 p-3 space-y-2">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Stripe IDs (auto-sync)</p>
+                  {[
+                    { label: 'Monthly', value: tierConfig.stripePriceIdMonthly },
+                    { label: 'Yearly', value: tierConfig.stripePriceIdYearly },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-gray-500 w-14 shrink-0">{label}</span>
+                      {value ? (
+                        <span className="text-xs font-mono text-emerald-400 truncate">{value}</span>
+                      ) : (
+                        <span className="text-xs text-gray-600 italic">Chưa sync</span>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">Stripe Trial Price ID</label>
-                  <input
-                    type="text"
-                    value={tierConfig.stripeTrialPriceId}
-                    onChange={(e) =>
-                      setPricing((prev) =>
-                        prev
-                          ? { ...prev, [tier]: { ...prev[tier], stripeTrialPriceId: e.target.value } }
-                          : prev,
-                      )
-                    }
-                    className="w-full px-3 py-2.5 bg-gray-700/50 border border-gray-600 rounded-xl text-white text-sm font-mono focus:border-love/50 focus:outline-none"
-                    placeholder="price_trial_xxx..."
-                  />
-                </div>
-
-                {/* Save Button */}
+                {/* Save & Sync Stripe Button */}
                 <button
-                  onClick={() => handleSave(tier)}
-                  disabled={saving === tier}
-                  className="w-full flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-bold transition-all cursor-pointer disabled:opacity-50 text-white"
-                  style={{
-                    background: saving === tier ? `${color}80` : color,
-                  }}
+                  onClick={() => handleSyncStripe(tier)}
+                  disabled={syncing === tier}
+                  className="w-full flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-bold transition-all cursor-pointer disabled:opacity-50 text-white bg-emerald-600/80 hover:bg-emerald-600"
+                  title="Lưu giá vào DB rồi cập nhật lên Stripe"
                 >
-                  <Save className="w-4 h-4" />
-                  {saving === tier ? 'Đang lưu...' : 'Lưu'}
+                  {syncing === tier ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  {syncing === tier ? 'Đang lưu & sync...' : 'Lưu & Sync Stripe'}
                 </button>
               </div>
             </motion.div>

@@ -9,7 +9,7 @@ import {
   BookOpen, Calendar, BarChart3,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
-import { useCharacterStore } from '@/store/character-store';
+import { useCharacterStore, getRankTitle, getXpProgress } from '@/store/character-store';
 import { useLanguageStore } from '@/store/language-store';
 import { useNotificationStore } from '@/store/notification-store';
 import { formatNumber } from '@/lib/utils';
@@ -82,7 +82,7 @@ const APP_LAYOUT_I18N = {
 export default function AppLayout({ children, showSidebar = true }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout, isAuthenticated } = useAuthStore();
+  const { user, logout, isAuthenticated, accessToken } = useAuthStore();
   const { character } = useCharacterStore();
   const { language, toggleLanguage } = useLanguageStore();
   const { generalNotification, showGeneralNotification, hideGeneralNotification } = useNotificationStore();
@@ -119,6 +119,17 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
     const interval = setInterval(fetchBadgeCounts, 30000);
     return () => clearInterval(interval);
   }, [fetchBadgeCounts]);
+
+  // Connect socket when authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !accessToken) return;
+    
+    socketService.connect(accessToken);
+    
+    return () => {
+      // Don't disconnect on unmount - socket should persist across route changes
+    };
+  }, [isAuthenticated, accessToken]);
 
   // Listen for DM events to update badge
   useEffect(() => {
@@ -282,7 +293,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
       <div className="flex flex-1 relative max-w-[1600px] mx-auto w-full">
         {/* Sidebar Navigation */}
         {showSidebar && (
-          <aside className="hidden lg:flex flex-col w-64 sticky top-20 h-[calc(100vh-5rem)] p-6 overflow-y-auto border-r border-[#392830]/30">
+          <aside className="hidden lg:flex flex-col w-64 sticky top-20 h-[calc(100vh-5rem)] p-6 overflow-y-auto">
             <div className="flex flex-col gap-6">
               {/* User Profile in Sidebar */}
               <Link href="/subscription">
@@ -293,9 +304,23 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm truncate">{character?.name || (language === 'vi' ? 'Người yêu' : 'Companion')}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-xs text-[#ba9cab]">{t.level} {Math.floor((character?.affection || 0) / 100) + 1}</p>
+                        <p className="text-xs text-[#ba9cab]">{t.level} {character?.level || 1} · {getRankTitle(character?.level || 1)}</p>
                       <PremiumBadge tier={user?.premiumTier as PremiumTier} />
                     </div>
+                    {character && (() => {
+                      const xp = getXpProgress(character.level, character.experience);
+                      return (
+                        <div className="mt-1.5 w-full">
+                          <div className="h-1.5 rounded-full bg-[#392830] overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-love to-pink-500 transition-all duration-500"
+                              style={{ width: `${xp.percent}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-[#8a7580] mt-0.5">{xp.current}/{xp.needed} XP</p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </Link>
@@ -310,22 +335,22 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                   const isActive = pathname === item.href;
                   const badge = badgeCounts[item.href] || 0;
                   return (
-                    <Link key={item.href} href={item.href}>
-                      <button 
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group relative ${
-                          isActive 
-                            ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]' 
-                            : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
-                        }`}
-                      >
-                        <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-                        <span className={`text-sm flex-1 ${isActive ? 'font-bold' : 'font-medium'}`}>{t.nav[item.key as keyof typeof t.nav]}</span>
-                        {badge > 0 && (
-                          <span className="min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full bg-love text-white text-[10px] font-bold shadow-[0_0_8px_rgba(173,43,238,0.4)]">
-                            {badge > 99 ? '99+' : badge}
-                          </span>
-                        )}
-                      </button>
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group relative ${
+                        isActive 
+                          ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]' 
+                          : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
+                      }`}
+                    >
+                      <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+                      <span className={`text-sm flex-1 ${isActive ? 'font-bold' : 'font-medium'}`}>{t.nav[item.key as keyof typeof t.nav]}</span>
+                      {badge > 0 && (
+                        <span className="min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full bg-love text-white text-[10px] font-bold shadow-[0_0_8px_rgba(173,43,238,0.4)]">
+                          {badge > 99 ? '99+' : badge}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -333,29 +358,27 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
 
               {/* Settings & Logout */}
               <div className="mt-4 pt-4 border-t border-[#392830]">
-                <Link href="/subscription">
-                  <button
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group ${
-                      pathname === '/subscription'
-                        ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]'
-                        : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
-                    }`}
-                  >
-                    <Crown className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-                    <span className="text-sm font-medium">{t.subscription}</span>
-                  </button>
+                <Link
+                  href="/subscription"
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group ${
+                    pathname === '/subscription'
+                      ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]'
+                      : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
+                  }`}
+                >
+                  <Crown className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+                  <span className="text-sm font-medium">{t.subscription}</span>
                 </Link>
-                <Link href="/settings">
-                  <button
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group ${
-                      pathname === '/settings'
-                        ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]'
-                        : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
-                    }`}
-                  >
-                    <Settings className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
-                    <span className="text-sm font-medium">{t.settings}</span>
-                  </button>
+                <Link
+                  href="/settings"
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group ${
+                    pathname === '/settings'
+                      ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]'
+                      : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
+                  }`}
+                >
+                  <Settings className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+                  <span className="text-sm font-medium">{t.settings}</span>
                 </Link>
                 <button 
                   onClick={handleLogout}

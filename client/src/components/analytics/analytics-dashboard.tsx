@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Heart, MessageCircle, Gift, Calendar, Flame, TrendingUp, Award,
-  ChevronRight
+  ChevronRight, User, HeartHandshake, Briefcase, Home, FileText, MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import api from '@/services/api';
@@ -265,12 +265,21 @@ export function AnalyticsDashboard() {
   }
 
   const TOPIC_LABELS: Record<string, string> = {
-    personal: '👤 Cá nhân',
-    preference: '💕 Sở thích',
-    relationship: '❤️ Quan hệ',
-    work: '💼 Công việc',
-    life: '🏠 Cuộc sống',
-    other: '📝 Khác',
+    personal: tr('Cá nhân', 'Personal'),
+    preference: tr('Sở thích', 'Preferences'),
+    relationship: tr('Quan hệ', 'Relationship'),
+    work: tr('Công việc', 'Work'),
+    life: tr('Cuộc sống', 'Life'),
+    other: tr('Khác', 'Other'),
+  };
+
+  const TOPIC_ICONS: Record<string, React.ReactNode> = {
+    personal: <User className="w-3.5 h-3.5" />,
+    preference: <Heart className="w-3.5 h-3.5" />,
+    relationship: <HeartHandshake className="w-3.5 h-3.5" />,
+    work: <Briefcase className="w-3.5 h-3.5" />,
+    life: <Home className="w-3.5 h-3.5" />,
+    other: <FileText className="w-3.5 h-3.5" />,
   };
 
   return (
@@ -340,8 +349,9 @@ export function AnalyticsDashboard() {
       {/* Topics */}
       {data.conversationTopics.length > 0 && (
         <div className="bg-[#271b21] rounded-xl border border-[#392830] p-4">
-          <h3 className="text-sm font-medium text-white/80 mb-3">
-            {tr('💬 Chủ đề thường nói', '💬 Top conversation topics')}
+        <h3 className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-pink-400" />
+            {tr('Chủ đề thường nói', 'Top conversation topics')}
           </h3>
           <div className="space-y-2">
             {data.conversationTopics.slice(0, 5).map((topic, i) => {
@@ -355,7 +365,8 @@ export function AnalyticsDashboard() {
                     style={{ width: `${percentage}%` }}
                   />
                   <div className="relative flex items-center justify-between p-2">
-                    <span className="text-sm text-white">
+                    <span className="text-sm text-white flex items-center gap-1.5">
+                      {TOPIC_ICONS[topic.topic]}
                       {TOPIC_LABELS[topic.topic] || topic.topic}
                     </span>
                     <span className="text-xs text-white/60">{topic.count}</span>
