@@ -170,8 +170,6 @@ export default function ArcPage() {
         {/* Arc Timeline */}
         {!error && arcs.length > 0 && (
           <div className="relative">
-            {/* Vertical connector line */}
-            <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-love/30 via-purple-500/20 to-transparent hidden md:block" />
 
             <div className="space-y-6">
               {arcs.map((arc, idx) => (
@@ -235,14 +233,16 @@ export default function ArcPage() {
 
                   {/* Progress bar */}
                   <div className="mt-4 h-2 bg-gray-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        arc.completionPercent >= 100
-                          ? 'bg-gradient-to-r from-green-500 to-emerald-400'
-                          : 'bg-gradient-to-r from-love to-purple-500'
-                      }`}
-                      style={{ width: `${arc.completionPercent}%` }}
-                    />
+                    {arc.completionPercent > 0 && (
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          arc.completionPercent >= 100
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-400'
+                            : 'bg-gradient-to-r from-love to-purple-500'
+                        }`}
+                        style={{ width: `${arc.completionPercent}%` }}
+                      />
+                    )}
                   </div>
 
                   {/* Quest list */}
