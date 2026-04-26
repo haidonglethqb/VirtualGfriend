@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, Sparkles, X } from 'lucide-react'
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon'
 
 interface RelationshipUpgradeModalProps {
   isOpen: boolean
@@ -96,7 +97,7 @@ export function RelationshipUpgradeModal({
                 }}
                 className={`w-28 h-28 rounded-full bg-gradient-to-br ${newInfo.color} flex items-center justify-center shadow-[0_0_50px_rgba(244,37,140,0.5)]`}
               >
-                <span className="text-5xl">{newInfo.emoji}</span>
+                <EmojiSvgIcon emoji={newInfo.emoji} className="w-12 h-12 text-white" />
               </motion.div>
             </div>
 
@@ -130,7 +131,7 @@ export function RelationshipUpgradeModal({
                 className="flex items-center justify-center gap-4 mb-4"
               >
                 <div className="flex flex-col items-center">
-                  <span className="text-3xl mb-1">{prevInfo.emoji}</span>
+                  <EmojiSvgIcon emoji={prevInfo.emoji} className="w-8 h-8 mb-1" />
                   <span className="text-xs text-[#ba9cab]">{prevInfo.label}</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -139,7 +140,7 @@ export function RelationshipUpgradeModal({
                   <div className="w-8 h-0.5 bg-love" />
                 </div>
                 <div className="flex flex-col items-center">
-                  <span className="text-3xl mb-1">{newInfo.emoji}</span>
+                  <EmojiSvgIcon emoji={newInfo.emoji} className="w-8 h-8 mb-1" />
                   <span className="text-xs text-white font-bold">{newInfo.label}</span>
                 </div>
               </motion.div>

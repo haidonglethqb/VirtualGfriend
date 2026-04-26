@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Heart, Sparkles, Globe, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { StaticPageLayout } from '@/components/layout/static-page-layout';
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 import { useLanguageStore } from '@/store/language-store';
 
 export default function AboutPage() {
@@ -146,7 +147,9 @@ export default function AboutPage() {
             viewport={{ once: true }}
             className="text-center p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] hover:-translate-y-1 transition-all duration-500 group"
           >
-            <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">{m.avatar}</div>
+            <div className="mb-3 group-hover:scale-110 transition-transform duration-300 flex justify-center">
+              <EmojiSvgIcon emoji={m.avatar} className="w-8 h-8 text-white/90" />
+            </div>
             <p className="font-bold text-white">{m.name}</p>
             <p className="text-xs text-gray-500">{m.role}</p>
           </motion.div>

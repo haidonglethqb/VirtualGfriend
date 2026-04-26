@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/services/api';
 import { useLanguageStore } from '@/store/language-store';
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 
 // User gender options
 const USER_GENDERS = [
@@ -285,7 +286,9 @@ export default function OnboardingPage() {
                                                     : 'border-[#392830] bg-[#392830]/30 hover:border-[#4a3640]'
                                             }`}
                                         >
-                                            <div className="text-3xl mb-2">{gender.emoji}</div>
+                                            <div className="mb-2 flex justify-center">
+                                                <EmojiSvgIcon emoji={gender.emoji} className="w-8 h-8" />
+                                            </div>
                                             <div className="font-medium">{gender.label}</div>
                                         </button>
                                     ))}
@@ -314,7 +317,7 @@ export default function OnboardingPage() {
                                                     : 'border-[#392830] bg-[#392830]/30 hover:border-[#4a3640]'
                                             }`}
                                         >
-                                            <div className="text-3xl">{pref.emoji}</div>
+                                            <EmojiSvgIcon emoji={pref.emoji} className="w-8 h-8" />
                                             <div>
                                                 <div className="font-bold">{pref.label}</div>
                                                 <div className="text-sm text-[#ba9cab]">{pref.description}</div>
@@ -476,7 +479,9 @@ export default function OnboardingPage() {
                                                     : 'border-[#392830] bg-[#392830]/30 hover:border-[#4a3640]'
                                                 }`}
                                         >
-                                            <div className="text-3xl mb-2">{occ.emoji}</div>
+                                            <div className="mb-2 flex justify-start">
+                                                <EmojiSvgIcon emoji={occ.emoji} className="w-8 h-8" />
+                                            </div>
                                             <div className="font-medium">{occ.label}</div>
                                         </button>
                                     ))}

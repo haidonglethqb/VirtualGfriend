@@ -126,7 +126,7 @@ export default function AppearanceSettingsPage() {
             </div>
           </div>
           <p className="text-sm text-[#ba9cab] mt-4">
-            {tr('💡 Tùy chỉnh màu sắc sẽ được thêm vào trong phiên bản tương lai.', '💡 Color customization will be added in a future release.')}
+            {tr('Tùy chỉnh màu sắc sẽ được thêm vào trong phiên bản tương lai.', 'Color customization will be added in a future release.')}
           </p>
         </motion.div>
       </div>

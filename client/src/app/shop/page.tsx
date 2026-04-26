@@ -17,6 +17,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore } from '@/store/character-store';
 import { useLanguageStore } from '@/store/language-store';
 import { useToast } from '@/hooks/use-toast';
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 import { formatNumber } from '@/lib/utils';
 import api from '@/services/api';
 
@@ -46,7 +47,7 @@ const SHOP_I18N = {
     buyToInventory: 'Mua vào túi đồ',
     purchasing: 'Đang mua...',
     purchaseSuccess: 'Mua thành công!',
-    addedToInventory: 'đã được thêm vào túi đồ của bạn! 🎁',
+    addedToInventory: 'đã được thêm vào túi đồ của bạn!',
     giftInChat: 'Vào Chat để tặng quà cho',
     insufficientCoins: 'Không đủ xu',
     insufficientGems: 'Không đủ sao',
@@ -83,7 +84,7 @@ const SHOP_I18N = {
     buyToInventory: 'Buy to Inventory',
     purchasing: 'Purchasing...',
     purchaseSuccess: 'Purchase Successful!',
-    addedToInventory: 'has been added to your inventory! 🎁',
+    addedToInventory: 'has been added to your inventory!',
     giftInChat: 'Go to Chat to give gifts to',
     insufficientCoins: 'Insufficient Coins',
     insufficientGems: 'Insufficient Gems',
@@ -289,7 +290,9 @@ export default function ShopPage() {
                       onClick={() => setSelectedItem(item)}
                     >
                       <CardContent className="p-4 text-center">
-                        <div className="text-5xl mb-3">{item.emoji}</div>
+                        <div className="mb-3 flex justify-center">
+                          <EmojiSvgIcon emoji={item.emoji} className="w-12 h-12" />
+                        </div>
                         <h3 className="font-semibold mb-1">{item.name}</h3>
                         <p className="text-xs text-muted-foreground mb-3">{item.description}</p>
                         
@@ -382,7 +385,9 @@ export default function ShopPage() {
                       <X className="w-5 h-5 text-[#ba9cab]" />
                     </button>
 
-                    <div className="text-7xl mb-4">{selectedItem.emoji}</div>
+                    <div className="mb-4 flex justify-center">
+                      <EmojiSvgIcon emoji={selectedItem.emoji} className="w-16 h-16" />
+                    </div>
                     <h3 className="text-xl font-bold mb-2">{selectedItem.name}</h3>
                     <p className="text-[#ba9cab] mb-4">{selectedItem.description}</p>
 

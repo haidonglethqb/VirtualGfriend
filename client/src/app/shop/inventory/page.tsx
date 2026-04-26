@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 import api from '@/services/api';
 import { useLanguageStore } from '@/store/language-store';
 
@@ -140,7 +141,9 @@ export default function InventoryPage() {
                       x{item.quantity}
                     </div>
                     
-                    <div className="text-5xl mb-3">{item.gift.emoji}</div>
+                    <div className="mb-3 flex justify-center">
+                      <EmojiSvgIcon emoji={item.gift.emoji} className="w-12 h-12" />
+                    </div>
                     <h3 className="font-semibold mb-1">{item.gift.name}</h3>
                     <p className="text-xs text-[#ba9cab] mb-3">{item.gift.description}</p>
                     

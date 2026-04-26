@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Lock, Gem, Check, ChevronDown } from 'lucide-react';
+import { X, Lock, Gem, Check, ChevronDown, ImageIcon } from 'lucide-react';
 import { Button } from './button';
 import { useSceneStore, Scene } from '@/store/scene-store';
 import { cn } from '@/lib/utils';
@@ -118,7 +118,10 @@ export function SceneSelector({ isOpen, onClose, onSceneSelect }: SceneSelectorP
             <div className="sticky top-0 z-10 px-6 py-4 bg-gradient-to-b from-gray-900/95 to-gray-900/80 backdrop-blur-md border-b border-white/5">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
-                  🎬 Chọn Scene
+                  <span className="flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-pink-300" />
+                    <span>Chọn Scene</span>
+                  </span>
                 </h2>
                 <Button
                   variant="ghost"

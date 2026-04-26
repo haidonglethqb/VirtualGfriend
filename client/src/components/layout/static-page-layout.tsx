@@ -181,7 +181,7 @@ export function StaticPageLayout({ children, title, subtitle }: StaticPageLayout
                 <Heart className="w-3.5 h-3.5 fill-white" />
               </div>
               <p className="text-xs text-gray-600">
-                &copy; 2026 Amoura. Được tạo với 💕 tại Việt Nam.
+                &copy; 2026 Amoura. Được tạo với <Heart className="inline-block w-3.5 h-3.5 text-love align-[-2px]" /> tại Việt Nam.
               </p>
             </div>
             <div className="flex gap-4">

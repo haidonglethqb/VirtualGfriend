@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, CheckCircle, Lock, Star, Crown, Zap, AlertCircle, ChevronRight } from 'lucide-react';
 import AppLayout from '@/components/layout/app-layout';
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 import { useLanguageStore } from '@/store/language-store';
 import { useAuthStore } from '@/store/auth-store';
 import Link from 'next/link';
@@ -189,12 +190,12 @@ export default function ArcPage() {
                 <div className="p-6">
                   <div className="flex items-start gap-4">
                     {/* Icon */}
-                    <div className={`flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center text-3xl border ${
+                    <div className={`flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center border ${
                       arc.isUnlocked
                         ? 'bg-gradient-to-br from-love/20 to-purple-500/20 border-white/10 shadow-lg shadow-love/10'
                         : 'bg-gray-900 border-white/5'
                     }`}>
-                      {arc.iconEmoji}
+                      <EmojiSvgIcon emoji={arc.iconEmoji} className="w-8 h-8" />
                     </div>
 
                     {/* Info */}

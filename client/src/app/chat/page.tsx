@@ -20,6 +20,7 @@ import Image from 'next/image'
 import api from '@/services/api'
 import { AffectionPopup, LevelUpModal, RelationshipUpgradeModal, ProactiveNotification } from '@/components/ui/notifications'
 import { SceneSelector } from '@/components/ui/scene-selector'
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon'
 import { usePremiumAccess } from '@/components/PremiumGate'
 import { useSceneStore } from '@/store/scene-store'
 import { useLanguageStore } from '@/store/language-store'
@@ -353,7 +354,11 @@ export default function ChatPage() {
                     sizes="128px"
                   />
                 ) : (
-                  <span className="text-6xl">{character?.name?.[0]?.toUpperCase() || '💕'}</span>
+                  <span className="text-6xl leading-none">
+                    {character?.name?.[0]?.toUpperCase() || (
+                      <EmojiSvgIcon emoji="💕" className="w-12 h-12 text-white" />
+                    )}
+                  </span>
                 )}
               </div>
               <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 border-3 border-[#271b21] rounded-full" />
@@ -362,7 +367,7 @@ export default function ChatPage() {
             <h2 className="text-xl font-bold mb-1">{character?.name || t.lover}</h2>
             <p className="text-sm text-green-400 flex items-center gap-1 mb-4">
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              {t.online} • {getMoodEmoji(character?.mood || 'neutral')} {t.happy}
+              {t.online} • <EmojiSvgIcon emoji={getMoodEmoji(character?.mood || 'neutral')} className="w-4 h-4" /> {t.happy}
             </p>
 
             {/* Affection Level */}
@@ -422,7 +427,11 @@ export default function ChatPage() {
                       sizes="44px"
                     />
                   ) : (
-                    <span>{character?.name?.[0]?.toUpperCase() || '💕'}</span>
+                    <span className="leading-none">
+                      {character?.name?.[0]?.toUpperCase() || (
+                        <EmojiSvgIcon emoji="💕" className="w-5 h-5 text-white" />
+                      )}
+                    </span>
                   )}
                 </div>
                 <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#271b21] rounded-full animate-pulse" />
@@ -540,7 +549,11 @@ export default function ChatPage() {
                             sizes="32px"
                           />
                         ) : (
-                          <span>{character?.name?.[0]?.toUpperCase() || '💕'}</span>
+                          <span className="leading-none">
+                            {character?.name?.[0]?.toUpperCase() || (
+                              <EmojiSvgIcon emoji="💕" className="w-4 h-4 text-white" />
+                            )}
+                          </span>
                         )}
                       </div>
                     )}
@@ -585,7 +598,11 @@ export default function ChatPage() {
                     sizes="32px"
                   />
                 ) : (
-                  <span>{character?.name?.[0]?.toUpperCase() || '💕'}</span>
+                  <span className="leading-none">
+                    {character?.name?.[0]?.toUpperCase() || (
+                      <EmojiSvgIcon emoji="💕" className="w-4 h-4 text-white" />
+                    )}
+                  </span>
                 )}
               </div>
               <div className="bg-[#271b21]/90 backdrop-blur-md px-4 py-3 rounded-2xl rounded-bl-sm border border-white/10 shadow-lg">
@@ -669,7 +686,7 @@ export default function ChatPage() {
               <button
                 onClick={() => hasFeatureAccess('sendImages')
                   ? toast({ title: t.comingSoon, description: t.imageFeature })
-                  : toast({ title: '👑 VIP Feature', description: language === 'vi' ? 'Nâng cấp VIP để gửi ảnh & video' : 'Upgrade to VIP to send images & videos' })
+                  : toast({ title: 'VIP Feature', description: language === 'vi' ? 'Nâng cấp VIP để gửi ảnh & video' : 'Upgrade to VIP to send images & videos' })
                 }
                 className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
                 title={t.sendImage}
@@ -679,7 +696,7 @@ export default function ChatPage() {
               <button
                 onClick={() => hasFeatureAccess('voiceMessages')
                   ? toast({ title: t.comingSoon, description: t.voiceMessageFeature })
-                  : toast({ title: '👑 VIP Feature', description: language === 'vi' ? 'Nâng cấp VIP để ghi âm giọng nói' : 'Upgrade to VIP for voice messages' })
+                  : toast({ title: 'VIP Feature', description: language === 'vi' ? 'Nâng cấp VIP để ghi âm giọng nói' : 'Upgrade to VIP for voice messages' })
                 }
                 className="p-2 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
                 title={t.voiceMessage}
@@ -776,7 +793,9 @@ export default function ChatPage() {
                                 : 'bg-[#392830]/50 hover:bg-[#392830]'
                             }`}
                           >
-                            <div className="text-3xl mb-1">{item.gift.emoji}</div>
+                            <div className="mb-1 flex justify-center">
+                              <EmojiSvgIcon emoji={item.gift.emoji} className="w-8 h-8" />
+                            </div>
                             <p className="text-xs font-medium truncate">{item.gift.name}</p>
                             <p className="text-xs text-[#ba9cab]">x{item.quantity}</p>
                           </div>
@@ -786,7 +805,7 @@ export default function ChatPage() {
                       {selectedGift && (
                         <div className="border-t border-[#392830] pt-4">
                           <div className="flex items-center gap-3 mb-3">
-                            <div className="text-4xl">{selectedGift.gift.emoji}</div>
+                            <EmojiSvgIcon emoji={selectedGift.gift.emoji} className="w-10 h-10" />
                             <div className="flex-1">
                               <p className="font-semibold">{selectedGift.gift.name}</p>
                               <p className="text-xs text-love flex items-center gap-1">

@@ -17,6 +17,7 @@ import {
   isVipTier,
   TIER_INFO
 } from '@/lib/premium';
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 import Link from 'next/link';
 
 function getTierDisplayName(tier: PremiumTier, isVi: boolean): string {
@@ -131,7 +132,10 @@ export function PremiumGate({
           
           <p className="text-[#ba9cab] text-sm mb-4">
             {isVi ? 'Nâng cấp lên gói ' : 'Upgrade to '}
-            <span className={tierInfo.color}>{tierInfo.icon} {tierDisplayName}</span>
+            <span className={`inline-flex items-center gap-1 ${tierInfo.color}`}>
+              <EmojiSvgIcon emoji={tierInfo.icon} className="w-3.5 h-3.5" />
+              {tierDisplayName}
+            </span>
             {isVi ? ' để mở khóa' : ' to unlock this feature'}
           </p>
           
@@ -166,7 +170,7 @@ export function PremiumBadge({ tier, showFree = false }: { tier?: PremiumTier; s
 
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${info.color} ${bgColor}`}>
-      <span>{info.icon}</span>
+      <EmojiSvgIcon emoji={info.icon} className="w-3.5 h-3.5" />
       <span>{displayName}</span>
     </span>
   );

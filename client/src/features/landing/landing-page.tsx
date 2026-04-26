@@ -9,6 +9,7 @@ import {
   Play, Quote, Users, TrendingUp, Award,
 } from 'lucide-react';
 import Link from 'next/link';
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 
 /* ──────────────────── REDUCED MOTION HOOK ──────────────────── */
 function usePrefersReducedMotion() {
@@ -501,7 +502,7 @@ function HeroSection() {
                     <div className="flex items-center gap-3 px-5 py-4 border-b border-white/5 bg-gradient-to-r from-love/5 to-transparent">
                       <div className="relative">
                         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-love to-purple-600 flex items-center justify-center text-lg shadow-lg shadow-love/30">
-                          😊
+                          <EmojiSvgIcon emoji="😊" className="w-6 h-6 text-white" />
                         </div>
                         <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[#0d0618]" />
                       </div>
@@ -526,7 +527,10 @@ function HeroSection() {
                         Em ăn rồi nè! Anh ơi cuối tuần này mình đi chơi nha 🎉
                       </ChatBubble>
                       <ChatBubble side="right" delay={2.0}>
-                        <span className="flex items-center gap-1.5">🌹 Tặng em bó hoa hồng nè <Heart className="w-3 h-3 fill-love text-love inline" /></span>
+                        <span className="flex items-center gap-1.5">
+                          <EmojiSvgIcon emoji="🌹" className="w-3.5 h-3.5 text-love" />
+                          Tặng em bó hoa hồng nè <Heart className="w-3 h-3 fill-love text-love inline" />
+                        </span>
                       </ChatBubble>
                       <ChatBubble side="left" delay={2.5}>
                         Aaaa dễ thương quá! Em yêu anh nhiều lắm! 😍✨
@@ -564,7 +568,10 @@ function HeroSection() {
                 >
                   <div className="flex items-center gap-2">
                     <Gift className="w-4 h-4 text-purple-400" />
-                    <span className="text-xs font-bold text-purple-300">🌹 Quà tặng mới!</span>
+                    <span className="text-xs font-bold text-purple-300 inline-flex items-center gap-1.5">
+                      <EmojiSvgIcon emoji="🌹" className="w-3.5 h-3.5 text-purple-300" />
+                      Quà tặng mới!
+                    </span>
                   </div>
                 </motion.div>
               </TiltCard>
@@ -921,12 +928,12 @@ function ChatDemoSection() {
               <div className="relative rounded-3xl border border-white/[0.08] bg-gradient-to-b from-[#0d0618]/95 to-[#080312]/95 backdrop-blur-xl shadow-2xl shadow-purple-500/10 overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.05] bg-gradient-to-r from-purple-500/5 to-love/5">
-                  <div className="relative">
-                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-love to-purple-600 flex items-center justify-center text-lg shadow-lg shadow-love/30">
-                      😊
+                    <div className="relative">
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-love to-purple-600 flex items-center justify-center text-lg shadow-lg shadow-love/30">
+                        <EmojiSvgIcon emoji="😊" className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[#0d0618]" />
                     </div>
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[#0d0618]" />
-                  </div>
                   <div className="flex-1">
                     <p className="font-bold text-sm text-white">Mai — Demo Chat</p>
                     <p className="text-[11px] text-green-400 flex items-center gap-1">
@@ -1151,7 +1158,7 @@ function TestimonialsSection() {
                   <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="size-12 rounded-full bg-gradient-to-br from-love/20 to-purple-600/20 flex items-center justify-center text-2xl border border-white/10 ring-2 ring-white/5">
-                        {t.avatar}
+                        <EmojiSvgIcon emoji={t.avatar} className="w-7 h-7" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -1525,7 +1532,7 @@ function Footer() {
 
         <div className="pt-8 border-t border-white/[0.03] flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-gray-600">
-            &copy; 2026 Amoura. Được tạo với 💕 tại Việt Nam.
+            &copy; 2026 Amoura. Được tạo với <Heart className="inline-block w-3.5 h-3.5 text-love align-[-2px]" /> tại Việt Nam.
           </p>
           <div className="flex gap-4">
             {[

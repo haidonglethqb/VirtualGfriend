@@ -185,7 +185,7 @@ export default function PrivacySettingsPage() {
           className="mt-6 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20"
         >
           <p className="text-sm text-yellow-200">
-            {tr('💡 Mẹo: Bạn có thể thay đổi các cài đặt này bất kỳ lúc nào.', '💡 Tip: You can change these settings at any time.')}
+            {tr('Mẹo: Bạn có thể thay đổi các cài đặt này bất kỳ lúc nào.', 'Tip: You can change these settings at any time.')}
           </p>
         </motion.div>
       </div>

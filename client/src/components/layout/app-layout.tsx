@@ -16,6 +16,7 @@ import { formatNumber } from '@/lib/utils';
 import api from '@/services/api';
 import { socketService } from '@/services/socket';
 import { PremiumBadge } from '@/components/PremiumGate';
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 import { PremiumTier } from '@/lib/premium';
 
 interface AppLayoutProps {
@@ -299,7 +300,10 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
               <Link href="/subscription">
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-[#271b21] border border-[#392830] hover:border-love/30 transition-colors cursor-pointer">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl border-2 border-love/30">
-                    {character?.gender === 'FEMALE' ? '👩' : '👨'}
+                    <EmojiSvgIcon
+                      emoji={character?.gender === 'FEMALE' ? '👩' : '👨'}
+                      className="w-6 h-6 text-white"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm truncate">{character?.name || (language === 'vi' ? 'Người yêu' : 'Companion')}</p>
