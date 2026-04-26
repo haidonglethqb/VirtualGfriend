@@ -20,7 +20,7 @@ function usePrefersReducedMotion() {
 /* ──────────────────── FLOATING PARTICLES ──────────────────── */
 function FloatingParticles() {
   const prefersReducedMotion = usePrefersReducedMotion();
-  const particleCount = prefersReducedMotion ? 5 : 12;
+  const particleCount = prefersReducedMotion ? 3 : 6;
 
   const particles = useMemo(() =>
     Array.from({ length: particleCount }, (_, i) => ({
@@ -74,9 +74,8 @@ function MorphingBlobs() {
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
       <motion.div
         className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(244,37,140,0.12) 0%, rgba(168,85,247,0.06) 40%, transparent 70%)', filter: 'blur(60px)' }}
+        style={{ background: 'radial-gradient(circle, rgba(244,37,140,0.12) 0%, rgba(168,85,247,0.06) 40%, transparent 70%)', filter: 'blur(60px)', willChange: 'transform' }}
         animate={prefersReducedMotion ? {} : {
-          scale: [1, 1.15, 0.95, 1],
           x: [0, 40, -20, 0],
           y: [0, -30, 20, 0],
         }}
@@ -84,9 +83,8 @@ function MorphingBlobs() {
       />
       <motion.div
         className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.1) 0%, rgba(59,130,246,0.05) 40%, transparent 70%)', filter: 'blur(60px)' }}
+        style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.1) 0%, rgba(59,130,246,0.05) 40%, transparent 70%)', filter: 'blur(60px)', willChange: 'transform' }}
         animate={prefersReducedMotion ? {} : {
-          scale: [1, 1.1, 0.9, 1],
           x: [0, -30, 20, 0],
           y: [0, 20, -30, 0],
         }}
@@ -94,9 +92,8 @@ function MorphingBlobs() {
       />
       <motion.div
         className="absolute top-[40%] right-[20%] w-[350px] h-[350px] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 60%)', filter: 'blur(40px)' }}
+        style={{ background: 'radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 60%)', filter: 'blur(40px)', willChange: 'transform' }}
         animate={prefersReducedMotion ? {} : {
-          scale: [1, 1.2, 1],
           x: [0, 25, 0],
         }}
         transition={prefersReducedMotion ? {} : { duration: 15, repeat: Infinity, ease: 'easeInOut' }}
@@ -405,7 +402,7 @@ function HeroSection() {
       {/* Gradient line from top */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-32 bg-gradient-to-b from-transparent via-love/50 to-transparent" />
 
-      <motion.div style={prefersReducedMotion ? {} : { y, opacity }} className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+      <motion.div style={prefersReducedMotion ? {} : { y, opacity, willChange: 'transform, opacity' }} className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
           {/* Left — text */}
           <div className="flex-1 flex flex-col gap-8 text-center lg:text-left">
@@ -1335,20 +1332,21 @@ function PricingSection() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: i * 0.08 }}
               viewport={{ once: true }}
+              className="relative"
             >
+              {/* Popular badge — outside overflow-hidden so it's not clipped */}
+              {t.highlight && (
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-love text-white text-xs font-bold shadow-lg shadow-purple-500/30">
+                    <Star className="w-3 h-3 fill-white" />
+                    {t.badge}
+                  </span>
+                </div>
+              )}
               <TiltCard className="group h-full" glowColor={t.glowColor} intensity={t.highlight ? 8 : 6}>
-                <div className={`relative h-full flex flex-col p-6 rounded-2xl border ${t.borderClass} ${t.bgClass} backdrop-blur-sm transition-all duration-500 overflow-hidden`}>
-                  {/* Popular badge with glow */}
+                <div className={`relative h-full flex flex-col p-6 rounded-2xl border ${t.borderClass} ${t.bgClass} backdrop-blur-sm transition-all duration-500 overflow-hidden ${t.highlight ? 'pt-8' : ''}`}>
                   {t.highlight && (
-                    <>
-                      <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-[80px] pointer-events-none" />
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-love text-white text-xs font-bold shadow-lg shadow-purple-500/30">
-                          <Star className="w-3 h-3 fill-white" />
-                          {t.badge}
-                        </span>
-                      </div>
-                    </>
+                    <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-[80px] pointer-events-none" />
                   )}
 
                   <div className="relative z-10">
