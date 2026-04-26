@@ -107,7 +107,7 @@ function SectionDivider({ className = '' }: { className?: string }) {
   return (
     <div className={`relative h-px w-full overflow-hidden ${className}`}>
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-love/10 to-transparent animate-pulse" style={{ animationDuration: '4s' }} />
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-love/10 to-transparent" />
     </div>
   );
 }
@@ -1398,7 +1398,8 @@ function CTASection() {
       {/* Animated spotlight ring */}
       <motion.div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full border border-love/10"
-        animate={prefersReducedMotion ? {} : { scale: [0.8, 1.2], opacity: [0.3, 0] }}
+        style={{ willChange: 'transform, opacity' }}
+        animate={prefersReducedMotion ? {} : { opacity: [0.3, 0] }}
         transition={{ duration: 3, repeat: Infinity, ease: "easeOut" }}
       />
 

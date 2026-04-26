@@ -133,9 +133,9 @@ export default function LoginPage() {
             {/* Background gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-love/20 via-purple-900/30 to-[#030014]" />
             
-            {/* Animated orbs */}
-            <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-love/20 rounded-full blur-[120px] animate-pulse" />
-            <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+            {/* Background orbs */}
+            <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-love/20 rounded-full blur-[120px]" />
+            <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[100px]" />
             
             {/* Grid pattern */}
             <div
