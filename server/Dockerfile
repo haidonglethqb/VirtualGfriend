@@ -10,8 +10,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies (including devDependencies for tsx to run seed)
-RUN npm ci
+# Install dependencies without postinstall hooks; Prisma client is generated explicitly below
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY . .

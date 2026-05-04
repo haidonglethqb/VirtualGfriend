@@ -21,11 +21,13 @@ runs-on: ubuntu-latest
 steps:
   - checkout
   - setup-node (Node 20)
-  - npm ci
+  - npm ci --ignore-scripts
   - prisma generate
   - tsc --noEmit
 ```
 Output: `image_name_lower` for downstream jobs.
+
+`--ignore-scripts` is intentional here because the workflow only needs a deterministic install for Prisma generation and TypeScript checks; it avoids transient postinstall failures from transitive tooling like `tsx`/`esbuild`.
 
 ### 2a. Build & Push Server (Parallel)
 ```yaml

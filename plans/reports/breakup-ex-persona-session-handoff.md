@@ -32,6 +32,7 @@
 - Tightened explicit chat routing so only verified ex-persona ids can reopen through `/chat?characterId=...`
 - Added cross-tab/local deletion invalidation so open ex chat tabs clear and redirect when that ex persona is deleted elsewhere
 - Blocked ended non-ex characters from explicit chat history and send paths on the backend
+- Fixed deploy pipeline install path for server by switching workflow and Docker builder installs to `npm ci --ignore-scripts`, then validating `prisma generate`, `tsc --noEmit`, and `npm run build`
 - Updated minimal docs in `docs/system/backend/routes.md`, `docs/system/ai-engine/memory-system.md`, `docs/system/data-flows/chat-flow.md`
 
 ## Files Changed
@@ -45,7 +46,9 @@
 - `server/src/modules/ai/proactive-notification.service.ts`
 - `server/src/modules/users/users.controller.ts`
 - `server/src/modules/users/users.service.ts`
+- `server/Dockerfile`
 - `docs/system/backend/routes.md`
+- `docs/system/deployment/ci-cd.md`
 - `docs/system/ai-engine/memory-system.md`
 - `docs/system/data-flows/chat-flow.md`
 - `CHANGELOG.md`
@@ -67,6 +70,10 @@
 - `server npm run typecheck` ⚠️ failed due existing baseline dependency issues unrelated to this feature
 - `server npx tsc --noEmit --pretty false --incremental false` ⚠️ same baseline failure
 - `client npm run typecheck` ✅
+- `server npm ci --ignore-scripts` ✅
+- `server npx prisma generate` ✅
+- `server npx tsc --noEmit` ✅
+- `server npm run build` ✅
 - `server npm run typecheck` ⚠️ still fails only on known Stripe/S3 baseline issues; new ex-persona management files stayed diagnostics-clean
 - `code-reviewer` final re-review ✅ no findings
 - `tester` focused validation ✅ compile clean, but manual QA still required because no automated breakup/ex-persona coverage exists
