@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -33,22 +33,13 @@ export default function ExPersonaSettingsPage() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
   const { language } = useLanguageStore();
-  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+  const tr = useCallback((vi: string, en: string) => (language === 'vi' ? vi : en), [language]);
   const [isLoading, setIsLoading] = useState(true);
   const [toggleId, setToggleId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [exPersonas, setExPersonas] = useState<ExPersonaItem[]>([]);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth/login');
-      return;
-    }
-
-    void fetchExPersonas();
-  }, [isAuthenticated, router]);
-
-  const fetchExPersonas = async () => {
+  const fetchExPersonas = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await api.get<ExPersonaItem[]>('/character/relationship/history');
@@ -65,7 +56,16 @@ export default function ExPersonaSettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast, tr]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+
+    void fetchExPersonas();
+  }, [fetchExPersonas, isAuthenticated, router]);
 
   const handleOpenChat = (characterId: string) => {
     router.push(`/chat?characterId=${encodeURIComponent(characterId)}`);

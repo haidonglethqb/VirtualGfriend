@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { Suspense, useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -134,7 +134,17 @@ const CHAT_I18N = {
   },
 } as const;
 
-export default function ChatPage() {
+function ChatPageFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#1a0f13] px-6">
+      <div className="rounded-2xl border border-[#392830] bg-[#271b21] p-4 text-[#ba9cab]">
+        <Loader2 className="h-5 w-5 animate-spin text-love" />
+      </div>
+    </div>
+  )
+}
+
+function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -1062,4 +1072,12 @@ export default function ChatPage() {
       </div>
     </AppLayout>
   );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<ChatPageFallback />}>
+      <ChatPageContent />
+    </Suspense>
+  )
 }

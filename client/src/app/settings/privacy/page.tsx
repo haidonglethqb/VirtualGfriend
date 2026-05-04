@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Loader2, Check, Lock, Eye, EyeOff } from 'lucide-react';
@@ -25,15 +25,7 @@ export default function PrivacySettingsPage() {
     allowExPersonaMessages: true,
   });
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth/login');
-      return;
-    }
-    fetchPrivacySettings();
-  }, [isAuthenticated, router]);
-
-  const fetchPrivacySettings = async () => {
+  const fetchPrivacySettings = useCallback(async () => {
     try {
       const response = await api.get('/users/privacy');
       if (response.success && response.data) {
@@ -42,7 +34,15 @@ export default function PrivacySettingsPage() {
     } catch (error) {
       console.error('Failed to fetch privacy settings:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+    void fetchPrivacySettings();
+  }, [fetchPrivacySettings, isAuthenticated, router]);
 
   const handleToggle = async (key: keyof typeof privacySettings) => {
     const newValue = !privacySettings[key];

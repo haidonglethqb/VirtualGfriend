@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -48,15 +48,7 @@ export default function SettingsPage() {
     language: 'vi',
   });
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth/login');
-      return;
-    }
-    fetchSettings();
-  }, [isAuthenticated, router]);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await api.get<UserSettings>('/users/settings');
@@ -77,7 +69,15 @@ export default function SettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [setLanguage]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+    void fetchSettings();
+  }, [fetchSettings, isAuthenticated, router]);
 
   const handleLogout = () => {
     logout();
