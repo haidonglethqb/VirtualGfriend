@@ -5,6 +5,7 @@
 ## Tính năng
 
 - **Chat AI thông minh** - Trò chuyện tự nhiên, AI ghi nhớ ngữ cảnh và học hỏi về bạn
+- **Chế độ người cũ AI** - Sau chia tay, hệ thống có thể tự tạo phiên bản "người cũ" để nhắn lại và tiếp tục cuộc trò chuyện
 - **Hệ thống độ thân mật** - Xây dựng mối quan hệ theo thời gian
 - **Tặng quà** - Shop quà tặng với nhiều mức hiếm
 - **Nhiệm vụ** - Hoàn thành nhiệm vụ hàng ngày/tuần để nhận thưởng

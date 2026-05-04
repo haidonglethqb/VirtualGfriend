@@ -53,10 +53,15 @@ addMessageIfUnique(message: Message)
 mergeMessages(newMessages: Message[])
 
 // Server authoritative: replaces local state entirely
-fetchMessages() → API call → setMessages()
+fetchMessages(characterId?) → API call → setMessages()
 ```
 
 `MAX_PERSISTED_MESSAGES = 100` — trims oldest on every mutation.
+
+## Ex-Persona Notes
+
+- `chat-store.fetchMessages(characterId?)` can now load active-chat history or explicit character history for ex-persona conversations.
+- `notification-store.proactiveNotification` already carries `characterId`, which the chat page now uses to route replies into character-specific chat sessions.
 
 ## Cross-Tab Synchronization
 

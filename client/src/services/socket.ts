@@ -13,6 +13,13 @@ interface ExternalListener {
   callback: EventCallback
 }
 
+type ChatCharacterUpdateDetail = {
+  characterId: string
+  mood?: string
+  newAffection?: number
+  newLevel?: number
+}
+
 class SocketService {
   private socket: Socket | null = null
   private reconnectAttempts = 0
@@ -20,6 +27,25 @@ class SocketService {
   private socketId: string | null = null
   private currentToken: string | null = null
   private externalListeners: ExternalListener[] = []
+
+  private isCurrentConversation(characterId?: string | null) {
+    const activeCharacterId = useChatStore.getState().currentCharacterId
+    if (!activeCharacterId || !characterId) {
+      return true
+    }
+
+    return activeCharacterId === characterId
+  }
+
+  private dispatchChatCharacterUpdate(detail: ChatCharacterUpdateDetail) {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    window.dispatchEvent(new CustomEvent<ChatCharacterUpdateDetail>('vgfriend:chat-character-update', {
+      detail,
+    }))
+  }
 
   connect(token: string) {
     // If already connected with the same token, do nothing
@@ -82,7 +108,8 @@ class SocketService {
       this.reconnectAttempts = 0
       
       // On reconnect, fetch latest messages to ensure we're in sync
-      useChatStore.getState().fetchMessages()
+      const currentCharacterId = useChatStore.getState().currentCharacterId
+      useChatStore.getState().fetchMessages(currentCharacterId || undefined)
     })
 
     this.socket.on('disconnect', () => {
@@ -95,7 +122,11 @@ class SocketService {
 
     // Chat events - Socket.io room broadcast handles cross-tab sync
     // DO NOT broadcast via BroadcastChannel here - socket room already syncs all tabs
-    this.socket.on('message:receive', (message: Message & { sourceSocketId?: string; clientId?: string; isOwn?: boolean }) => {
+    this.socket.on('message:receive', (message: Message & { characterId?: string; sourceSocketId?: string; clientId?: string; isOwn?: boolean }) => {
+      if (!this.isCurrentConversation(message.characterId)) {
+        return
+      }
+
       const processedMessage = {
         ...message,
         createdAt: new Date(message.createdAt),
@@ -115,18 +146,35 @@ class SocketService {
     })
 
     this.socket.on('character:typing', (data: { characterId: string; sourceSocketId?: string }) => {
+      if (!this.isCurrentConversation(data.characterId)) {
+        return
+      }
+
       useChatStore.getState().setTyping(true)
       // Safety timeout: auto-clear typing if AI response never arrives
       setTimeout(() => useChatStore.getState().setTyping(false), 30000)
       // NO BroadcastChannel here - socket room already syncs all tabs
     })
 
-    this.socket.on('character:mood_change', (data: { mood: string; sourceSocketId?: string }) => {
-      useCharacterStore.getState().updateMood(data.mood)
+    this.socket.on('character:mood_change', (data: { characterId: string; mood: string; sourceSocketId?: string }) => {
+      if (!this.isCurrentConversation(data.characterId)) {
+        return
+      }
+
+      if (useCharacterStore.getState().character?.id === data.characterId) {
+        useCharacterStore.getState().updateMood(data.mood)
+      } else {
+        this.dispatchChatCharacterUpdate({
+          characterId: data.characterId,
+          mood: data.mood,
+        })
+      }
+
       // NO BroadcastChannel here - socket room already syncs all tabs
     })
 
     this.socket.on('character:affection_change', (data: { 
+      characterId: string
       change: number
       newAffection: number
       newLevel?: number
@@ -138,8 +186,20 @@ class SocketService {
       rewards?: { coins?: number; gems?: number; affection?: number }
       sourceSocketId?: string
     }) => {
-      // Update affection - use newAffection directly instead of change to prevent double updates
-      useCharacterStore.getState().setAffection(data.newAffection)
+      if (!this.isCurrentConversation(data.characterId)) {
+        return
+      }
+
+      if (useCharacterStore.getState().character?.id === data.characterId) {
+        // Update affection - use newAffection directly instead of change to prevent double updates
+        useCharacterStore.getState().setAffection(data.newAffection)
+      } else {
+        this.dispatchChatCharacterUpdate({
+          characterId: data.characterId,
+          newAffection: data.newAffection,
+          newLevel: data.newLevel,
+        })
+      }
       
       // Show affection popup
       useNotificationStore.getState().showAffectionChange(data.change)
@@ -188,7 +248,18 @@ class SocketService {
       factors: string[]
       sourceSocketId?: string
     }) => {
-      useCharacterStore.getState().setMoodInfo(data)
+      if (!this.isCurrentConversation(data.characterId)) {
+        return
+      }
+
+      if (useCharacterStore.getState().character?.id === data.characterId) {
+        useCharacterStore.getState().setMoodInfo(data)
+      } else {
+        this.dispatchChatCharacterUpdate({
+          characterId: data.characterId,
+          mood: data.mood,
+        })
+      }
     })
 
     // Quest completed notification
@@ -254,10 +325,12 @@ class SocketService {
       if (this.socket && data.requestingSocketId !== this.socketId) {
         const messages = useChatStore.getState().messages
         const typing = useChatStore.getState().isTyping
+        const currentCharacterId = useChatStore.getState().currentCharacterId
         this.socket.emit('sync:response', {
           targetSocketId: data.requestingSocketId,
           messages,
           typing,
+          currentCharacterId,
         })
       }
     })
@@ -265,8 +338,13 @@ class SocketService {
     this.socket.on('sync:state_receive', (data: { 
       messages: Message[]
       typing: boolean
+      currentCharacterId?: string | null
       sourceSocketId: string 
     }) => {
+      if (!this.isCurrentConversation(data.currentCharacterId)) {
+        return
+      }
+
       // Received state from another tab
       useChatStore.getState().mergeMessages(data.messages)
       useChatStore.getState().setTyping(data.typing)

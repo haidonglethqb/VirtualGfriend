@@ -40,6 +40,7 @@ const BOOLEAN_FIELDS: BooleanField[] = [
   'prioritySupport',
   'earlyAccess',
   'exclusiveContent',
+  'canCreateExPersonaOnBreakup',
 ];
 
 const FIELD_LABELS: Record<keyof PremiumFeatures, string> = {
@@ -62,6 +63,7 @@ const FIELD_LABELS: Record<keyof PremiumFeatures, string> = {
   prioritySupport: 'Hỗ trợ ưu tiên',
   earlyAccess: 'Truy cập sớm',
   exclusiveContent: 'Nội dung độc quyền',
+  canCreateExPersonaOnBreakup: 'Tự tạo người cũ sau chia tay',
 };
 
 const FIELD_LABELS_EN: Record<keyof PremiumFeatures, string> = {
@@ -84,6 +86,7 @@ const FIELD_LABELS_EN: Record<keyof PremiumFeatures, string> = {
   prioritySupport: 'Priority support',
   earlyAccess: 'Early access',
   exclusiveContent: 'Exclusive content',
+  canCreateExPersonaOnBreakup: 'Auto-create ex persona after breakup',
 };
 
 function getDefaultTierConfig(): TierConfigs {
@@ -108,6 +111,7 @@ function getDefaultTierConfig(): TierConfigs {
       freeTrialDays: 0,
       exclusiveContent: false,
       maxScenes: 3,
+      canCreateExPersonaOnBreakup: false,
     },
     BASIC: {
       maxCharacters: 5,
@@ -129,6 +133,7 @@ function getDefaultTierConfig(): TierConfigs {
       freeTrialDays: 7,
       exclusiveContent: false,
       maxScenes: -1,
+      canCreateExPersonaOnBreakup: true,
     },
     PRO: {
       maxCharacters: 5,
@@ -150,6 +155,7 @@ function getDefaultTierConfig(): TierConfigs {
       freeTrialDays: 7,
       exclusiveContent: true,
       maxScenes: -1,
+      canCreateExPersonaOnBreakup: true,
     },
     ULTIMATE: {
       maxCharacters: -1,
@@ -171,6 +177,7 @@ function getDefaultTierConfig(): TierConfigs {
       freeTrialDays: 14,
       exclusiveContent: true,
       maxScenes: -1,
+      canCreateExPersonaOnBreakup: true,
     },
   };
 }

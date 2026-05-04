@@ -4,6 +4,8 @@ import { AppError } from '../../middlewares/error.middleware'
 import { RelationshipStage, RelationshipEventType } from '@prisma/client'
 import { createModuleLogger } from '../../lib/logger'
 import { RELATIONSHIP_THRESHOLDS, SCENE_PROGRESSION } from '../../lib/constants'
+import { exPersonaService } from './ex-persona.service'
+import type { PremiumTier } from '../admin/tier-config.service'
 
 const log = createModuleLogger('Relationship')
 
@@ -171,7 +173,14 @@ export const relationshipService = {
   /**
    * End relationship with current character (breakup)
    */
-  async endRelationship(userId: string, reason?: string) {
+  async endRelationship(
+    userId: string,
+    options?: {
+      reason?: string
+      exPersonaConsent?: boolean
+      premiumTier?: PremiumTier
+    }
+  ) {
     const character = await prisma.character.findFirst({
       where: { userId, isActive: true, isEnded: false },
     })
@@ -183,7 +192,7 @@ export const relationshipService = {
     // Record breakup event
     await this.recordEvent(userId, character.id, 'BREAKUP', {
       fromStage: character.relationshipStage,
-      note: reason || 'Kết thúc mối quan hệ',
+      note: options?.reason || 'Kết thúc mối quan hệ',
       metadata: { affectionAtBreakup: character.affection, levelAtBreakup: character.level },
     })
 
@@ -194,18 +203,41 @@ export const relationshipService = {
         isActive: false,
         isEnded: true,
         endedAt: new Date(),
-        endReason: reason || 'user_choice',
+        endReason: options?.reason || 'user_choice',
       },
     })
 
-    // Invalidate caches
-    await cache.del(CacheKeys.character(userId))
+    let exPersona = null
+    try {
+      exPersona = await exPersonaService.maybeCreateFromBreakup({
+        userId,
+        sourceCharacterId: character.id,
+        premiumTier: options?.premiumTier || 'FREE',
+        consentGiven: options?.exPersonaConsent,
+      })
+    } catch (error) {
+      log.error('Failed to auto-create ex persona after breakup', error)
+    }
 
-    log.info('Relationship ended', { userId, characterId: character.id, reason })
+    // Invalidate caches
+    await cache.del(
+      CacheKeys.character(userId),
+      CacheKeys.characterById(character.id),
+      CacheKeys.characterWithFacts(character.id)
+    )
+
+    log.info('Relationship ended', {
+      userId,
+      characterId: character.id,
+      reason: options?.reason,
+      exPersonaCreated: !!exPersona,
+    })
 
     return {
       message: 'Mối quan hệ đã kết thúc',
       character: updated,
+      exPersonaCreated: !!exPersona,
+      exPersonaId: exPersona?.id,
     }
   },
 
@@ -224,7 +256,14 @@ export const relationshipService = {
       },
     })
 
-    return characters.map(char => ({
+    return characters.map(char => {
+      const mappedCharacter = char as typeof char & {
+        isExPersona: boolean
+        exPersonaSourceId: string | null
+        exMessagingEnabled: boolean
+      }
+
+      return ({
       id: char.id,
       name: char.name,
       avatarUrl: char.avatarUrl || char.template?.avatarUrl,
@@ -240,7 +279,11 @@ export const relationshipService = {
       endedAt: char.endedAt,
       endReason: char.endReason,
       stats: char._count,
-    }))
+      isExPersona: mappedCharacter.isExPersona,
+      exPersonaSourceId: mappedCharacter.exPersonaSourceId,
+      exMessagingEnabled: mappedCharacter.exMessagingEnabled,
+    })
+    })
   },
 
   /**
@@ -274,7 +317,7 @@ export const relationshipService = {
    */
   async reconcileRelationship(userId: string, characterId: string) {
     const character = await prisma.character.findFirst({
-      where: { id: characterId, userId, isEnded: true },
+      where: { id: characterId, userId, isEnded: true, isExPersona: false },
     })
 
     if (!character) {
@@ -301,6 +344,8 @@ export const relationshipService = {
 
     // Wrap all DB operations in transaction for atomicity
     await prisma.$transaction(async (tx) => {
+      await exPersonaService.archiveForSource(tx, userId, character.id, 'source_relationship_reconciled')
+
       // Deactivate any current active relationships
       await tx.character.updateMany({
         where: { userId, isActive: true },
@@ -342,11 +387,88 @@ export const relationshipService = {
     })
 
     // Invalidate cache
-    await cache.del(CacheKeys.character(userId))
+    await cache.del(
+      CacheKeys.character(userId),
+      CacheKeys.characterById(character.id),
+      CacheKeys.characterWithFacts(character.id)
+    )
 
     return {
       message: `Đã quay lại với ${character.name}`,
       affectionPenalty: character.affection - newAffection,
+    }
+  },
+
+  /**
+   * Update ex persona settings controlled by the user.
+   */
+  async updateExPersonaSettings(
+    userId: string,
+    characterId: string,
+    input: { exMessagingEnabled: boolean }
+  ) {
+    const character = await prisma.character.findFirst({
+      where: { id: characterId, userId, isExPersona: true },
+      select: { id: true, name: true, exMessagingEnabled: true },
+    })
+
+    if (!character) {
+      throw new AppError('Ex persona not found', 404, 'CHARACTER_NOT_FOUND')
+    }
+
+    const updatedCharacter = await prisma.character.update({
+      where: { id: character.id },
+      data: { exMessagingEnabled: input.exMessagingEnabled },
+      select: {
+        id: true,
+        name: true,
+        exMessagingEnabled: true,
+      },
+    })
+
+    await cache.del(CacheKeys.character(userId))
+
+    return {
+      message: input.exMessagingEnabled
+        ? `Đã bật tin nhắn comeback cho ${updatedCharacter.name}`
+        : `Đã tắt tin nhắn comeback cho ${updatedCharacter.name}`,
+      character: updatedCharacter,
+    }
+  },
+
+  /**
+   * Permanently delete an ex persona and its character-bound history.
+   */
+  async deleteExPersona(userId: string, characterId: string) {
+    const character = await prisma.character.findFirst({
+      where: { id: characterId, userId, isExPersona: true },
+      select: { id: true, name: true },
+    })
+
+    if (!character) {
+      throw new AppError('Ex persona not found', 404, 'CHARACTER_NOT_FOUND')
+    }
+
+    await prisma.$transaction([
+      prisma.message.deleteMany({ where: { characterId: character.id } }),
+      prisma.memory.deleteMany({ where: { characterId: character.id } }),
+      prisma.characterFact.deleteMany({ where: { characterId: character.id } }),
+      prisma.characterScene.deleteMany({ where: { characterId: character.id } }),
+      prisma.giftHistory.deleteMany({ where: { characterId: character.id } }),
+      prisma.conversationSummary.deleteMany({ where: { characterId: character.id } }),
+      prisma.relationshipHistory.deleteMany({ where: { characterId: character.id } }),
+      prisma.character.delete({ where: { id: character.id } }),
+    ])
+
+    await cache.del(
+      CacheKeys.character(userId),
+      CacheKeys.characterById(character.id),
+      CacheKeys.characterWithFacts(character.id)
+    )
+
+    return {
+      message: `Đã xoá ${character.name}`,
+      deletedCharacterId: character.id,
     }
   },
 }

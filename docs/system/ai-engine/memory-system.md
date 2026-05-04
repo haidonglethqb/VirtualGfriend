@@ -110,6 +110,16 @@ THÔNG TIN ĐÃ NHỚ VỀ {userName}:
 - món_ăn_yêu_thích: phở
 ```
 
+## Ex-Persona Snapshot Foundation
+
+Breakup flow can now auto-create an ended `Character` flagged as `isExPersona=true` for premium users who consent during breakup.
+
+- Source: active relationship history of the same character
+- Snapshot copied now: top `CharacterFact` rows + last 3 `ConversationSummary` rows
+- Provenance fields on `Character`: `isExPersona`, `exPersonaSourceId`, `exPersonaGeneratedAt`, `exMessagingEnabled`
+- Messaging control: `UserSettings.allowExPersonaMessages`
+- Current status: backend foundation exists; frontend breakup UX and dedicated ex-chat entry are still pending
+
 ## Related
 
 - [System Prompt](./system-prompt.md)

@@ -106,6 +106,10 @@ export const chatService = {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
+    if (character.isEnded && !character.isExPersona) {
+      throw new AppError('Character is not available for chat', 403, 'CHARACTER_UNAVAILABLE');
+    }
+
     const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
 
     // Use createdAt-based cursor instead of UUID (UUIDs are not sequential)
@@ -175,6 +179,10 @@ export const chatService = {
 
     if (!character) {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
+    }
+
+    if (character.isEnded && !character.isExPersona) {
+      throw new AppError('Character is not available for chat', 403, 'CHARACTER_UNAVAILABLE');
     }
 
     log.debug('=== SEND MESSAGE START ===');

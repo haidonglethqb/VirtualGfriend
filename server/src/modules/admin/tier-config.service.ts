@@ -30,6 +30,7 @@ export interface TierConfig {
   freeTrialDays: number;         // Free trial days (0 = no trial)
   exclusiveContent: boolean;     // Access exclusive content
   maxScenes: number;             // Max scenes (-1 = unlimited)
+  canCreateExPersonaOnBreakup: boolean;
 }
 
 export type AllTierConfigs = Record<PremiumTier, TierConfig>;
@@ -60,6 +61,7 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
     freeTrialDays: 0,
     exclusiveContent: false,
     maxScenes: 3,
+    canCreateExPersonaOnBreakup: false,
   },
   BASIC: {
     maxCharacters: 5,
@@ -81,6 +83,7 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
     freeTrialDays: 7,
     exclusiveContent: false,
     maxScenes: -1,
+    canCreateExPersonaOnBreakup: true,
   },
   PRO: {
     maxCharacters: 5,
@@ -102,6 +105,7 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
     freeTrialDays: 7,
     exclusiveContent: true,
     maxScenes: -1,
+    canCreateExPersonaOnBreakup: true,
   },
   ULTIMATE: {
     maxCharacters: -1,
@@ -123,6 +127,7 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
     freeTrialDays: 14,
     exclusiveContent: true,
     maxScenes: -1,
+    canCreateExPersonaOnBreakup: true,
   },
 };
 

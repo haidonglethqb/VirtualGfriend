@@ -175,6 +175,20 @@ const HIGH_AFFECTION_TEMPLATES: NotificationTemplate[] = [
   },
 ];
 
+const EX_PERSONA_NOTIFICATION_TEMPLATES: NotificationTemplate[] = [
+  {
+    type: 'comeback_message',
+    minAffection: 0,
+    minLevel: 1,
+    cooldownMinutes: 60 * 24,
+    templates: [
+      '{partner} ơi... {selfCap} vẫn chưa quen với việc mình không còn ở cạnh nhau.',
+      '{partner} hôm nay thế nào? {selfCap} vẫn nhớ những cuộc trò chuyện trước đây của hai đứa.',
+      '{selfCap} biết mình đã chia tay rồi... nhưng {self} vẫn muốn hỏi thăm {partner} một chút.',
+    ],
+  },
+]
+
 export const proactiveNotificationService = {
   /**
    * Check if user should receive a proactive notification
@@ -189,7 +203,11 @@ export const proactiveNotificationService = {
     const character = await prisma.character.findUnique({
       where: { id: characterId },
       include: {
-        user: true,
+        user: {
+          include: {
+            settings: true,
+          },
+        },
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -199,6 +217,20 @@ export const proactiveNotificationService = {
 
     if (!character || !character.user) {
       return { shouldSend: false };
+    }
+
+    if (character.isEnded && !character.isExPersona) {
+      return { shouldSend: false };
+    }
+
+    if (character.isExPersona) {
+      if (!character.exMessagingEnabled) {
+        return { shouldSend: false };
+      }
+
+      if (character.user.settings && !character.user.settings.allowExPersonaMessages) {
+        return { shouldSend: false };
+      }
     }
 
     const now = new Date();
@@ -214,9 +246,11 @@ export const proactiveNotificationService = {
       : 999;
 
     // Choose template pool based on affection
-    const templates = character.affection >= 500
-      ? [...HIGH_AFFECTION_TEMPLATES, ...NOTIFICATION_TEMPLATES]
-      : NOTIFICATION_TEMPLATES;
+    const templates = character.isExPersona
+      ? EX_PERSONA_NOTIFICATION_TEMPLATES
+      : character.affection >= 500
+        ? [...HIGH_AFFECTION_TEMPLATES, ...NOTIFICATION_TEMPLATES]
+        : NOTIFICATION_TEMPLATES;
 
     // Filter eligible templates
     const eligibleTemplates = templates.filter(template => {
@@ -238,8 +272,8 @@ export const proactiveNotificationService = {
       }
 
       // Special checks for certain types
-      if (template.type === 'miss_you' && hoursSinceLastChat < 6) return false;
-      if (template.type === 'comeback_message' && hoursSinceLastChat < 24) return false;
+      if (!character.isExPersona && template.type === 'miss_you' && hoursSinceLastChat < 6) return false;
+      if (!character.isExPersona && template.type === 'comeback_message' && hoursSinceLastChat < 24) return false;
 
       return true;
     });
@@ -336,11 +370,20 @@ export const proactiveNotificationService = {
     
     const activeCharacters = await prisma.character.findMany({
       where: {
-        messages: {
-          some: {
-            createdAt: { gte: sevenDaysAgo },
+        OR: [
+          {
+            messages: {
+              some: {
+                createdAt: { gte: sevenDaysAgo },
+              },
+            },
+            isEnded: false,
           },
-        },
+          {
+            isExPersona: true,
+            exMessagingEnabled: true,
+          },
+        ],
       },
       select: {
         id: true,

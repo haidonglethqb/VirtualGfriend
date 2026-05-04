@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Heart, Send, Mic, Smile, Paperclip,
@@ -37,6 +37,24 @@ interface InventoryItem {
   };
 }
 
+interface ChatCharacterSummary {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  affection: number;
+  level: number;
+  mood?: string;
+  isEnded?: boolean;
+  isExPersona?: boolean;
+}
+
+interface ChatCharacterUpdateDetail {
+  characterId: string;
+  mood?: string;
+  newAffection?: number;
+  newLevel?: number;
+}
+
 const CHAT_I18N = {
   vi: {
     lover: 'Người yêu',
@@ -55,6 +73,8 @@ const CHAT_I18N = {
     imageFeature: 'Tính năng gửi ảnh sẽ có trong bản cập nhật tới!',
     voiceMessageFeature: 'Tính năng ghi âm sẽ có trong bản cập nhật tới!',
     loadingMessages: 'Đang tải tin nhắn...',
+    missingCharacter: 'Không tìm thấy người cũ AI',
+    missingCharacterDesc: 'Liên kết này không còn hợp lệ hoặc người cũ AI đã bị xoá.',
     startConversation: 'Bắt đầu cuộc trò chuyện!',
     startConversationDesc: 'Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện với {name} của bạn 💕',
     sendImage: 'Gửi ảnh (VIP)',
@@ -91,6 +111,8 @@ const CHAT_I18N = {
     imageFeature: 'Image sending feature will be available in the next update!',
     voiceMessageFeature: 'Voice recording feature will be available in the next update!',
     loadingMessages: 'Loading messages...',
+    missingCharacter: 'AI ex not found',
+    missingCharacterDesc: 'This link is no longer valid or the AI ex has already been deleted.',
     startConversation: 'Start a conversation!',
     startConversationDesc: 'Send your first message to start chatting with your {name} 💕',
     sendImage: 'Send Image (VIP)',
@@ -114,6 +136,7 @@ const CHAT_I18N = {
 
 export default function ChatPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { language } = useLanguageStore();
   const t = CHAT_I18N[language];
@@ -148,6 +171,7 @@ export default function ChatPage() {
   // Scene store
   const { activeSceneId, getActiveScene, fetchScenes } = useSceneStore();
   const { hasFeatureAccess } = usePremiumAccess();
+  const requestedCharacterId = searchParams.get('characterId');
 
   const [inputMessage, setInputMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -162,11 +186,78 @@ export default function ChatPage() {
   const [selectedGift, setSelectedGift] = useState<InventoryItem | null>(null);
   const [isSendingGift, setIsSendingGift] = useState(false)
   const [giftSuccess, setGiftSuccess] = useState(false)
+  const [chatCharacter, setChatCharacter] = useState<ChatCharacterSummary | null>(null)
+  const previousRequestedCharacterIdRef = useRef<string | null>(null)
+  const handledMissingCharacterIdRef = useRef<string | null>(null)
+
+  const activeChatCharacter = requestedCharacterId ? chatCharacter : character;
+  const activeChatCharacterId = requestedCharacterId ? chatCharacter?.id : character?.id;
 
   // Memoize fetchMessages for useCallback
   const handleFetchMessages = useCallback(() => {
-    fetchMessages()
-  }, [fetchMessages])
+    return fetchMessages(requestedCharacterId || undefined)
+  }, [fetchMessages, requestedCharacterId])
+
+  const handleMissingRequestedCharacter = useCallback(() => {
+    if (!requestedCharacterId || handledMissingCharacterIdRef.current === requestedCharacterId) {
+      return
+    }
+
+    handledMissingCharacterIdRef.current = requestedCharacterId
+    useChatStore.getState().clearMessages()
+    useChatStore.getState().setActiveCharacterId(null)
+    setChatCharacter(null)
+    toast({
+      title: t.missingCharacter,
+      description: t.missingCharacterDesc,
+      variant: 'destructive',
+    })
+    router.replace('/settings/ex-personas')
+  }, [requestedCharacterId, router, t.missingCharacter, t.missingCharacterDesc, toast])
+
+  const loadRequestedCharacter = useCallback(async () => {
+    if (!requestedCharacterId) {
+      setChatCharacter(null)
+      return
+    }
+
+    if (character?.id === requestedCharacterId) {
+      setChatCharacter(null)
+      return
+    }
+
+    try {
+      const response = await api.get<ChatCharacterSummary[]>('/character/relationship/history')
+      const matchedCharacter = response.data?.find((item) => item.id === requestedCharacterId)
+
+      if (matchedCharacter?.isExPersona) {
+        setChatCharacter({
+          ...matchedCharacter,
+          mood: matchedCharacter.mood || 'sad',
+        })
+        return
+      }
+    } catch {
+      // Redirect below once we know the explicit character cannot be resolved.
+    }
+
+    handleMissingRequestedCharacter()
+  }, [character?.id, handleMissingRequestedCharacter, requestedCharacterId])
+
+  useEffect(() => {
+    void loadRequestedCharacter()
+  }, [loadRequestedCharacter])
+
+  useEffect(() => {
+    const previousCharacterId = previousRequestedCharacterIdRef.current
+    if (previousCharacterId !== requestedCharacterId) {
+      handledMissingCharacterIdRef.current = null
+      useChatStore.getState().clearMessages()
+      setChatCharacter(null)
+    }
+
+    previousRequestedCharacterIdRef.current = requestedCharacterId
+  }, [requestedCharacterId])
 
   // Initialize cross-tab sync
   useEffect(() => {
@@ -178,6 +269,9 @@ export default function ChatPage() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        if (requestedCharacterId) {
+          void loadRequestedCharacter()
+        }
         // Tab became active, request sync from other tabs
         crossTabSync.requestStateFromOtherTabs()
         // Also fetch from server to ensure we have latest
@@ -190,7 +284,33 @@ export default function ChatPage() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [handleFetchMessages])
+  }, [handleFetchMessages, loadRequestedCharacter, requestedCharacterId])
+
+  useEffect(() => {
+    if (!requestedCharacterId) {
+      return
+    }
+
+    const handleDeletedCharacter = (event: StorageEvent) => {
+      if (event.key !== 'vgfriend:deleted-character' || !event.newValue) {
+        return
+      }
+
+      try {
+        const payload = JSON.parse(event.newValue) as { characterId?: string }
+        if (payload.characterId === requestedCharacterId) {
+          handleMissingRequestedCharacter()
+        }
+      } catch {
+        // Ignore malformed storage payloads.
+      }
+    }
+
+    window.addEventListener('storage', handleDeletedCharacter)
+    return () => {
+      window.removeEventListener('storage', handleDeletedCharacter)
+    }
+  }, [handleMissingRequestedCharacter, requestedCharacterId])
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -198,20 +318,66 @@ export default function ChatPage() {
       return
     }
 
-    if (needsCreation) {
+    if (!requestedCharacterId && needsCreation) {
       router.push('/dashboard')
       return
     }
 
-    if (!character && !characterLoading) {
+    if (!requestedCharacterId && !character && !characterLoading) {
       fetchCharacter()
     }
     
-    fetchMessages()
+    fetchMessages(requestedCharacterId || undefined)
     fetchScenes() // Load scenes for background selector
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, router, fetchMessages, needsCreation])
+  }, [isAuthenticated, router, fetchMessages, fetchScenes, fetchCharacter, character, characterLoading, needsCreation, requestedCharacterId])
+
+  useEffect(() => {
+    useChatStore.getState().setActiveCharacterId(activeChatCharacterId || null)
+  }, [activeChatCharacterId])
+
+  useEffect(() => {
+    const currentConversationId = activeChatCharacterId
+    if (!currentConversationId) {
+      return
+    }
+
+    if (useChatStore.getState().messages.length === 0) {
+      crossTabSync.requestStateFromOtherTabs()
+    }
+  }, [activeChatCharacterId, requestedCharacterId])
+
+  useEffect(() => {
+    if (!requestedCharacterId) {
+      return
+    }
+
+    const handleChatCharacterUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<ChatCharacterUpdateDetail>).detail
+      if (!detail || detail.characterId !== requestedCharacterId) {
+        return
+      }
+
+      setChatCharacter((prev) => {
+        if (!prev) {
+          return prev
+        }
+
+        return {
+          ...prev,
+          mood: detail.mood ?? prev.mood,
+          affection: detail.newAffection ?? prev.affection,
+          level: detail.newLevel ?? prev.level,
+        }
+      })
+    }
+
+    window.addEventListener('vgfriend:chat-character-update', handleChatCharacterUpdate as EventListener)
+    return () => {
+      window.removeEventListener('vgfriend:chat-character-update', handleChatCharacterUpdate as EventListener)
+    }
+  }, [requestedCharacterId])
 
   // Connect socket when accessToken is available — separate effect to avoid re-running fetchMessages
   useEffect(() => {
@@ -227,7 +393,7 @@ export default function ChatPage() {
   const sendingRef = useRef(false)
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || sendingRef.current || isSending || !character) return;
+    if (!inputMessage.trim() || sendingRef.current || isSending || !activeChatCharacterId) return;
 
     const content = inputMessage.trim();
     const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -250,7 +416,7 @@ export default function ChatPage() {
 
     socketService.emit('message:send', {
       content,
-      characterId: character.id,
+      characterId: activeChatCharacterId,
       clientId,
     });
 
@@ -289,18 +455,23 @@ export default function ChatPage() {
   };
 
   const handleSendGift = async () => {
-    if (!selectedGift || !character) return;
+    if (!selectedGift || !activeChatCharacterId) return;
     
     setIsSendingGift(true);
     try {
       const response = await api.post<{ newAffection: number; reaction: string }>('/shop/send', {
-        characterId: character.id,
+        characterId: activeChatCharacterId,
         giftId: selectedGift.gift.id,
       });
 
       if (response.success) {
-        updateAffection(response.data.newAffection - character.affection);
-        await fetchMessages();
+        if (chatCharacter) {
+          setChatCharacter((prev) => prev ? { ...prev, affection: response.data.newAffection } : prev)
+        } else if (character) {
+          updateAffection(response.data.newAffection - character.affection);
+        }
+
+        await fetchMessages(activeChatCharacterId);
         setGiftSuccess(true);
         
         setInventory(prev => prev.map(item => 
@@ -330,7 +501,9 @@ export default function ChatPage() {
     return null;
   }
 
-  const affectionLevel = Math.floor((character?.affection || 0) / 100) + 1;
+  const displayCharacter = activeChatCharacter;
+  const displayCharacterName = displayCharacter?.name || t.lover;
+  const affectionLevel = Math.floor((displayCharacter?.affection || 0) / 100) + 1;
   const activeScene = getActiveScene();
 
   return (
@@ -343,10 +516,10 @@ export default function ChatPage() {
             {/* Avatar */}
             <div className="relative mb-4">
               <div className="w-32 h-32 rounded-full border-4 border-love/30 shadow-[0_0_40px_rgba(244,37,140,0.3)] overflow-hidden bg-gradient-to-br from-love to-pink-600 flex items-center justify-center">
-                {character?.avatarUrl ? (
+                {displayCharacter?.avatarUrl ? (
                   <Image
-                    src={character.avatarUrl}
-                    alt={character.name || 'Avatar'}
+                    src={displayCharacter.avatarUrl}
+                    alt={displayCharacterName || 'Avatar'}
                     width={128}
                     height={128}
                     className="w-full h-full object-cover"
@@ -355,7 +528,7 @@ export default function ChatPage() {
                   />
                 ) : (
                   <span className="text-6xl leading-none">
-                    {character?.name?.[0]?.toUpperCase() || (
+                    {displayCharacter?.name?.[0]?.toUpperCase() || (
                       <EmojiSvgIcon emoji="💕" className="w-12 h-12 text-white" />
                     )}
                   </span>
@@ -364,10 +537,10 @@ export default function ChatPage() {
               <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 border-3 border-[#271b21] rounded-full" />
             </div>
 
-            <h2 className="text-xl font-bold mb-1">{character?.name || t.lover}</h2>
+            <h2 className="text-xl font-bold mb-1">{displayCharacterName}</h2>
             <p className="text-sm text-green-400 flex items-center gap-1 mb-4">
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              {t.online} • <EmojiSvgIcon emoji={getMoodEmoji(character?.mood || 'neutral')} className="w-4 h-4" /> {t.happy}
+              {t.online} • <EmojiSvgIcon emoji={getMoodEmoji(displayCharacter?.mood || 'neutral')} className="w-4 h-4" /> {t.happy}
             </p>
 
             {/* Affection Level */}
@@ -379,7 +552,7 @@ export default function ChatPage() {
               <div className="h-2 bg-[#392830] rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-love to-pink-500 rounded-full transition-all"
-                  style={{ width: `${(character?.affection || 0) % 100 || (character?.affection ? 100 : 0)}%` }}
+                  style={{ width: `${(displayCharacter?.affection || 0) % 100 || (displayCharacter?.affection ? 100 : 0)}%` }}
                 />
               </div>
             </div>
@@ -417,10 +590,10 @@ export default function ChatPage() {
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="w-11 h-11 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(244,37,140,0.3)] overflow-hidden">
-                  {character?.avatarUrl ? (
+                  {displayCharacter?.avatarUrl ? (
                     <Image
-                      src={character.avatarUrl}
-                      alt={character.name || 'Avatar'}
+                      src={displayCharacter.avatarUrl}
+                      alt={displayCharacterName || 'Avatar'}
                       width={44}
                       height={44}
                       className="w-full h-full object-cover"
@@ -428,7 +601,7 @@ export default function ChatPage() {
                     />
                   ) : (
                     <span className="leading-none">
-                      {character?.name?.[0]?.toUpperCase() || (
+                      {displayCharacter?.name?.[0]?.toUpperCase() || (
                         <EmojiSvgIcon emoji="💕" className="w-5 h-5 text-white" />
                       )}
                     </span>
@@ -437,7 +610,7 @@ export default function ChatPage() {
                 <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#271b21] rounded-full animate-pulse" />
               </div>
               <div>
-                <h3 className="font-bold text-base">{character?.name || t.lover}</h3>
+                <h3 className="font-bold text-base">{displayCharacterName}</h3>
                 <p className="text-xs text-green-400 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
                   {t.online}
@@ -499,7 +672,7 @@ export default function ChatPage() {
               </div>
               <h2 className="text-xl font-semibold mb-2">{t.startConversation}</h2>
               <p className="text-white/50 max-w-sm">
-                {t.startConversationDesc.replace('{name}', character?.name || t.lover.toLowerCase())}
+                {t.startConversationDesc.replace('{name}', displayCharacterName)}
               </p>
             </div>
           )}
@@ -539,10 +712,10 @@ export default function ChatPage() {
                   >
                     {!isUser && (
                       <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1 shadow-lg overflow-hidden">
-                        {character?.avatarUrl ? (
+                        {displayCharacter?.avatarUrl ? (
                           <Image
-                            src={character.avatarUrl}
-                            alt={character.name || 'Avatar'}
+                            src={displayCharacter.avatarUrl}
+                            alt={displayCharacterName || 'Avatar'}
                             width={32}
                             height={32}
                             className="w-full h-full object-cover"
@@ -550,7 +723,7 @@ export default function ChatPage() {
                           />
                         ) : (
                           <span className="leading-none">
-                            {character?.name?.[0]?.toUpperCase() || (
+                            {displayCharacter?.name?.[0]?.toUpperCase() || (
                               <EmojiSvgIcon emoji="💕" className="w-4 h-4 text-white" />
                             )}
                           </span>
@@ -588,10 +761,10 @@ export default function ChatPage() {
               className="relative z-10 flex gap-4 items-end"
             >
               <div className="w-8 h-8 rounded-full gradient-love flex items-center justify-center text-sm shrink-0 mb-1 shadow-lg overflow-hidden">
-                {character?.avatarUrl ? (
+                {displayCharacter?.avatarUrl ? (
                   <Image
-                    src={character.avatarUrl}
-                    alt={character?.name || 'Avatar'}
+                    src={displayCharacter.avatarUrl}
+                    alt={displayCharacterName || 'Avatar'}
                     width={32}
                     height={32}
                     className="w-full h-full object-cover"
@@ -599,7 +772,7 @@ export default function ChatPage() {
                   />
                 ) : (
                   <span className="leading-none">
-                    {character?.name?.[0]?.toUpperCase() || (
+                    {displayCharacter?.name?.[0]?.toUpperCase() || (
                       <EmojiSvgIcon emoji="💕" className="w-4 h-4 text-white" />
                     )}
                   </span>
@@ -630,7 +803,7 @@ export default function ChatPage() {
                   // Auto-send after setting text
                   setTimeout(() => {
                     const content = text.trim();
-                    if (content && !sendingRef.current && !isSending && character) {
+                    if (content && !sendingRef.current && !isSending && activeChatCharacterId) {
                       const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
                       setInputMessage('');
                       setIsSending(true);
@@ -649,7 +822,7 @@ export default function ChatPage() {
 
                       socketService.emit('message:send', {
                         content,
-                        characterId: character.id,
+                        characterId: activeChatCharacterId,
                         clientId,
                       });
 
@@ -675,7 +848,7 @@ export default function ChatPage() {
               onKeyDown={handleKeyPress}
               disabled={isSending}
               className="w-full bg-[#392830]/40 hover:bg-[#392830]/60 focus:bg-[#392830]/60 border border-[#4a3640] focus:border-love/50 text-white placeholder-white/40 rounded-full py-4 pl-6 pr-40 outline-none transition-all shadow-lg backdrop-blur-md"
-              placeholder={t.typeMessage.replace('{name}', character?.name || t.lover.toLowerCase())}
+              placeholder={t.typeMessage.replace('{name}', displayCharacterName)}
               type="text"
             />
             {/* Input Actions */}
@@ -747,7 +920,7 @@ export default function ChatPage() {
                   </motion.div>
                   <h3 className="text-lg font-bold mb-2">{t.giftSuccess}</h3>
                   <p className="text-[#ba9cab]">
-                    {t.giftSuccessDesc.replace('{name}', character?.name || t.lover)}
+                    {t.giftSuccessDesc.replace('{name}', displayCharacterName)}
                   </p>
                 </div>
               ) : (
@@ -755,7 +928,7 @@ export default function ChatPage() {
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold flex items-center gap-2">
                       <Gift className="w-5 h-5 text-love" />
-                      {t.giftModalTitle.replace('{name}', character?.name || t.lover)}
+                      {t.giftModalTitle.replace('{name}', displayCharacterName)}
                     </h3>
                     <button 
                       onClick={() => setShowGiftModal(false)}
@@ -827,7 +1000,7 @@ export default function ChatPage() {
                             ) : (
                               <>
                                 <Gift className="w-4 h-4" />
-                                {t.giftTo.replace('{name}', character?.name || t.lover)}
+                                {t.giftTo.replace('{name}', displayCharacterName)}
                               </>
                             )}
                           </button>
@@ -853,7 +1026,7 @@ export default function ChatPage() {
         isOpen={showLevelUpModal}
         onClose={hideLevelUp}
         newLevel={newLevel}
-        characterName={character?.name || 'Người yêu'}
+        characterName={displayCharacterName || 'Người yêu'}
         unlocks={levelUpUnlocks}
         rewards={levelUpRewards}
       />
@@ -864,16 +1037,20 @@ export default function ChatPage() {
         onClose={hideRelationshipUpgrade}
         previousStage={previousStage}
         newStage={newStage}
-        characterName={character?.name || 'Người yêu'}
+        characterName={displayCharacterName || 'Người yêu'}
       />
 
       {/* Proactive AI Notification */}
       <ProactiveNotification
         notification={proactiveNotification}
         onDismiss={hideProactiveNotification}
-        onReply={() => {
+        onReply={(characterId) => {
           hideProactiveNotification();
-          inputRef.current?.focus();
+          const params = new URLSearchParams({ characterId });
+          if (proactiveNotification?.characterName) {
+            params.set('characterName', proactiveNotification.characterName);
+          }
+          router.push(`/chat?${params.toString()}`);
         }}
       />
 

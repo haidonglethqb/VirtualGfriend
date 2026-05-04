@@ -29,6 +29,7 @@ const updatePrivacySchema = z.object({
   profilePublic: z.boolean().optional(),
   showActivity: z.boolean().optional(),
   allowMessages: z.boolean().optional(),
+  allowExPersonaMessages: z.boolean().optional(),
 });
 
 export const userController = {
@@ -187,6 +188,7 @@ export const userController = {
             canAccessPremiumQuests: features?.canAccessPremiumQuests ?? false,
             prioritySupport: features?.prioritySupport ?? false,
             earlyAccess: features?.earlyAccess ?? false,
+            canCreateExPersonaOnBreakup: features?.canCreateExPersonaOnBreakup ?? false,
           },
 
           // Current usage

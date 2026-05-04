@@ -71,6 +71,13 @@ class CrossTabSyncService {
   private handleSyncMessage(type: SyncEventType, data: unknown) {
     switch (type) {
       case 'state:request': {
+        const requestData = data as { currentCharacterId?: string | null }
+        const currentCharacterId = useChatStore.getState().currentCharacterId
+
+        if ((requestData.currentCharacterId || null) !== (currentCharacterId || null)) {
+          break
+        }
+
         // Another tab is requesting state, send our current state
         // Only respond if we have messages (to avoid sending empty state)
         const messages = useChatStore.getState().messages
@@ -83,12 +90,19 @@ class CrossTabSyncService {
       case 'state:response': {
         // Only accept first response to avoid multiple merges
         if (this.hasReceivedState) return
-        this.hasReceivedState = true
 
         const stateData = data as { 
           messages: Message[]
           isTyping: boolean 
+          currentCharacterId?: string | null
         }
+
+        const currentCharacterId = useChatStore.getState().currentCharacterId
+        if ((stateData.currentCharacterId || null) !== (currentCharacterId || null)) {
+          return
+        }
+
+        this.hasReceivedState = true
         
         // Only merge if we received more messages than we have
         const currentMessages = useChatStore.getState().messages
@@ -150,14 +164,17 @@ class CrossTabSyncService {
    */
   requestStateFromOtherTabs() {
     this.hasReceivedState = false // Reset flag to accept new response
-    this.broadcast('state:request', {})
+    this.broadcast('state:request', {
+      currentCharacterId: useChatStore.getState().currentCharacterId,
+    })
   }
 
   private sendStateResponse() {
     const messages = useChatStore.getState().messages
     const isTyping = useChatStore.getState().isTyping
+    const currentCharacterId = useChatStore.getState().currentCharacterId
     
-    this.broadcast('state:response', { messages, isTyping })
+    this.broadcast('state:response', { messages, isTyping, currentCharacterId })
   }
 
   getTabId(): string {

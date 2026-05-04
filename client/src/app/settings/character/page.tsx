@@ -3,27 +3,41 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Loader2, Check, Heart, User, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, Heart, User, RefreshCw, AlertTriangle, MessageCircleHeart, Lock } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore, CharacterTemplate } from '@/store/character-store';
+import { useChatStore } from '@/store/chat-store';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
 import { useLanguageStore } from '@/store/language-store';
+import { usePremiumAccess } from '@/components/PremiumGate';
+
+interface EndRelationshipResponse {
+  message: string;
+  exPersonaCreated: boolean;
+  exPersonaId?: string;
+}
 
 export default function CharacterSettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
   const { character } = useCharacterStore();
+  const { clearMessages } = useChatStore();
   const { language } = useLanguageStore();
+  const { hasFeatureAccess } = usePremiumAccess();
   const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+  const canCreateExPersonaOnBreakup = hasFeatureAccess('canCreateExPersonaOnBreakup');
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isEndingRelationship, setIsEndingRelationship] = useState(false);
   const [templates, setTemplates] = useState<CharacterTemplate[]>([]);
   const [showTemplateGrid, setShowTemplateGrid] = useState(false);
+  const [breakupReason, setBreakupReason] = useState('');
+  const [wantsExPersona, setWantsExPersona] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     bio: '',
@@ -123,6 +137,62 @@ export default function CharacterSettingsPage() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleEndRelationship = async () => {
+    if (!character) {
+      return;
+    }
+
+    try {
+      setIsEndingRelationship(true);
+
+      const response = await api.post<EndRelationshipResponse>('/character/relationship/end', {
+        reason: breakupReason.trim() || undefined,
+        exPersonaConsent: canCreateExPersonaOnBreakup ? wantsExPersona : false,
+      });
+
+      clearMessages();
+      useCharacterStore.setState({
+        character: null,
+        isLoading: false,
+        needsCreation: true,
+        moodInfo: null,
+      });
+
+      if (response.data?.exPersonaCreated && response.data.exPersonaId) {
+        toast({
+          title: tr('Đã chia tay', 'Breakup complete'),
+          description: tr(
+            'Hệ thống đã tạo phiên bản người cũ và mở lại đoạn chat của hai người.',
+            'The system created the ex persona and reopened your chat.'
+          ),
+        });
+        router.push(`/chat?characterId=${encodeURIComponent(response.data.exPersonaId)}`);
+        return;
+      }
+
+      toast({
+        title: tr('Đã chia tay', 'Breakup complete'),
+        description: tr(
+          'Mối quan hệ hiện tại đã kết thúc.',
+          'The current relationship has been ended.'
+        ),
+      });
+      router.push('/dashboard');
+    } catch (error) {
+      const description = error instanceof Error
+        ? error.message
+        : tr('Không thể kết thúc mối quan hệ lúc này.', 'Unable to end the relationship right now.');
+
+      toast({
+        title: tr('Lỗi', 'Error'),
+        description,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsEndingRelationship(false);
     }
   };
 
@@ -317,6 +387,117 @@ export default function CharacterSettingsPage() {
             </button>
           </div>
         </motion.div>
+
+        {character && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="rounded-2xl bg-[#271b21] border border-rose-500/20 p-6 mt-6 space-y-5"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-300" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">{tr('Kết thúc mối quan hệ', 'End relationship')}</h2>
+                <p className="text-sm text-[#ba9cab] mt-1">
+                  {tr(
+                    'Thao tác này sẽ kết thúc mối quan hệ hiện tại với nhân vật đang hoạt động.',
+                    'This will end the current relationship with your active character.'
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#ba9cab] mb-2">
+                {tr('Lý do chia tay (tuỳ chọn)', 'Breakup reason (optional)')}
+              </label>
+              <textarea
+                value={breakupReason}
+                onChange={(e) => setBreakupReason(e.target.value)}
+                placeholder={tr('Ví dụ: em cần khoảng lặng một thời gian...', 'Example: I need some distance for a while...')}
+                className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#8f7380] px-4 py-3 focus:outline-none focus:border-rose-400 transition-colors resize-none h-24"
+              />
+            </div>
+
+            {canCreateExPersonaOnBreakup ? (
+              <label className="flex items-start gap-3 rounded-xl border border-love/20 bg-love/5 p-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={wantsExPersona}
+                  onChange={(e) => setWantsExPersona(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-[#4a3640] bg-[#181114] text-love focus:ring-love"
+                />
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <MessageCircleHeart className="w-4 h-4 text-love" />
+                    {tr('Tiếp tục bằng chế độ người cũ AI', 'Continue with AI ex mode')}
+                  </div>
+                  <p className="text-sm text-[#ba9cab] mt-1">
+                    {tr(
+                      'Nếu đồng ý, hệ thống sẽ tự tạo phiên bản người cũ từ lịch sử vừa có và để họ chủ động nhắn lại sau chia tay.',
+                      'If you consent, the system will automatically create an ex persona from your recent history and let them message you after the breakup.'
+                    )}
+                  </p>
+                </div>
+              </label>
+            ) : (
+              <div className="rounded-xl border border-[#4a3640] bg-[#181114] p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#271b21] border border-[#392830] flex items-center justify-center flex-shrink-0">
+                    <Lock className="w-4 h-4 text-[#ba9cab]" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-white">
+                      {tr('Chế độ người cũ AI là tính năng VIP', 'AI ex mode is a premium feature')}
+                    </p>
+                    <p className="text-sm text-[#ba9cab] mt-1">
+                      {tr(
+                        'Bạn vẫn có thể chia tay bình thường. Nâng cấp gói để hệ thống tự tạo người cũ và nhắn lại sau này.',
+                        'You can still break up normally. Upgrade to let the system auto-create an ex persona that messages you later.'
+                      )}
+                    </p>
+                    <Link
+                      href="/subscription"
+                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-lg bg-love text-white hover:bg-love/90 transition-colors text-sm font-medium"
+                    >
+                      <Lock className="w-4 h-4" />
+                      {tr('Xem gói VIP', 'View premium plans')}
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-[#8f7380]">
+              {tr('Bạn có thể tắt các tin nhắn comeback này bất cứ lúc nào trong ', 'You can mute these comeback messages later in ')}
+              <Link href="/settings/privacy" className="text-love hover:underline">
+                {tr('Quyền riêng tư', 'Privacy settings')}
+              </Link>
+              .
+            </p>
+
+            <button
+              onClick={handleEndRelationship}
+              disabled={isLoading || isEndingRelationship}
+              className="w-full h-12 rounded-lg bg-rose-500/90 hover:bg-rose-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+            >
+              {isEndingRelationship ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>{tr('Đang chia tay...', 'Ending relationship...')}</span>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-5 h-5" />
+                  <span>{tr('Chia tay với nhân vật này', 'Break up with this character')}</span>
+                </>
+              )}
+            </button>
+          </motion.div>
+        )}
       </div>
     </AppLayout>
   );

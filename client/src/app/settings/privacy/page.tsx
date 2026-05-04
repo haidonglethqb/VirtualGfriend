@@ -22,6 +22,7 @@ export default function PrivacySettingsPage() {
     profilePublic: false,
     showActivity: false,
     allowMessages: true,
+    allowExPersonaMessages: true,
   });
 
   useEffect(() => {
@@ -158,6 +159,33 @@ export default function PrivacySettingsPage() {
                 <span
                   className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
                     privacySettings.allowMessages ? 'left-6' : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="text-lg font-bold mb-2">{tr('Tin nhắn từ người cũ AI', 'AI ex messages')}</h3>
+                <p className="text-[#ba9cab]">
+                  {tr(
+                    'Cho phép hệ thống gửi lại tin nhắn comeback từ phiên bản người cũ sau khi chia tay.',
+                    'Allow comeback messages from the ex-persona after a breakup.'
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => handleToggle('allowExPersonaMessages')}
+                disabled={isLoading}
+                className={`w-12 h-7 rounded-full transition-colors relative ${
+                  privacySettings.allowExPersonaMessages ? 'bg-gradient-to-r from-love to-pink-600' : 'bg-[#392830]'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                    privacySettings.allowExPersonaMessages ? 'left-6' : 'left-1'
                   }`}
                 />
               </button>

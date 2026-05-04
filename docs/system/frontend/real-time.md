@@ -41,7 +41,7 @@ reconnectWithNewToken(newToken: string) { /* After token refresh */ }
 | `character:mood_change` | `character-store` | Update mood |
 | `character:mood_update` | `character-store` | Full mood info (score, emoji, factors) |
 | `character:affection_change` | `character-store` | Update affection + level-up/relationship modals |
-| `notification:proactive` | `notification-store` | AI-initiated (morning, night, miss_you) |
+| `notification:proactive` | `notification-store` | AI-initiated (morning, night, miss_you, comeback_message) |
 | `quest:completed` | `notification-store` | Quest completion toast |
 | `milestone:unlocked` | `notification-store` | Milestone unlocked modal |
 | `sync:state_request` | Emit `sync:response` | Share state with requesting tab |
@@ -98,6 +98,11 @@ private reRegisterExternalListeners() {
   this.externalListeners.forEach(({ event, callback }) => this.socket?.on(event, callback));
 }
 ```
+
+## Ex-Persona Routing
+
+- `comeback_message` notifications can deep-link the user to `/chat?characterId=...`.
+- The chat page now treats query-param `characterId` as the source of truth for history + sends, so an ended ex-persona can still be opened even when there is no active relationship.
 
 ## Related
 

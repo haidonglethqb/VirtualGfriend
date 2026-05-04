@@ -24,6 +24,7 @@ export interface PremiumFeatures {
   freeTrialDays: number;
   exclusiveContent: boolean;
   maxScenes: number;
+  canCreateExPersonaOnBreakup: boolean;
 }
 
 export type PremiumBooleanFeature = {
@@ -55,6 +56,7 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
     freeTrialDays: 0,
     exclusiveContent: false,
     maxScenes: 3,
+    canCreateExPersonaOnBreakup: false,
   },
   BASIC: {
     maxMessagesPerDay: -1,
@@ -76,6 +78,7 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
     freeTrialDays: 7,
     exclusiveContent: false,
     maxScenes: -1,
+    canCreateExPersonaOnBreakup: true,
   },
   PRO: {
     maxMessagesPerDay: -1,
@@ -97,6 +100,7 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
     freeTrialDays: 7,
     exclusiveContent: true,
     maxScenes: -1,
+    canCreateExPersonaOnBreakup: true,
   },
   ULTIMATE: {
     maxMessagesPerDay: -1,
@@ -118,6 +122,7 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
     freeTrialDays: 14,
     exclusiveContent: true,
     maxScenes: -1,
+    canCreateExPersonaOnBreakup: true,
   },
 };
 

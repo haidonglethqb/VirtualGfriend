@@ -139,6 +139,7 @@ model UserSettings {
   profilePublic         Boolean  @default(false)
   showActivity          Boolean  @default(false)
   allowMessages         Boolean  @default(true)
+  allowExPersonaMessages Boolean @default(true)
 
   // Active scene
   activeSceneId         String?   @unique
@@ -221,6 +222,10 @@ model Character {
   isEnded           Boolean         @default(false)  // If relationship was ended/broken up
   endedAt           DateTime?       // When relationship ended
   endReason         String?         // Reason for ending (user_choice, other)
+  isExPersona       Boolean         @default(false)
+  exPersonaSourceId String?
+  exPersonaGeneratedAt DateTime?
+  exMessagingEnabled Boolean        @default(true)
   
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
@@ -240,6 +245,9 @@ model Character {
   @@index([isActive, affection])          // Leaderboard: top by affection
   @@index([templateId])                   // Optimize reverse lookups from template to characters
   @@index([userId, isEnded])              // Find ended relationships
+  @@index([userId, isExPersona])          // Find ex personas for a user
+  @@index([userId, exPersonaSourceId])    // Find ex persona derived from a source character
+  @@unique([userId, exPersonaSourceId, isExPersona])
   @@map("characters")
 }
 
@@ -289,6 +297,7 @@ enum RelationshipEventType {
   ANNIVERSARY        // Anniversary milestone
   BREAKUP            // Relationship ended
   RECONCILIATION     // Got back together
+  EX_PERSONA_CREATED // Auto-created ex persona after breakup
   SPECIAL_MOMENT     // Special memory created
 }
 

@@ -128,6 +128,12 @@ export default function SettingsPage() {
       description: tr('Xem và chỉnh sửa thông tin AI đã học', 'View and edit what AI has learned'),
       href: '/settings/facts',
     },
+    {
+      icon: <Heart className="w-5 h-5" />,
+      label: tr('Quản lý người cũ AI', 'Manage AI exes'),
+      description: tr('Mở lại chat, tắt comeback hoặc xoá từng người cũ', 'Reopen chat, mute comeback messages, or delete each ex persona'),
+      href: '/settings/ex-personas',
+    },
   ];
 
   const appSettings: SettingItem[] = [

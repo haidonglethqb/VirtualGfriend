@@ -36,4 +36,6 @@ characterRouter.get('/relationship/status', relationshipController.getStatus);
 characterRouter.get('/relationship/history', relationshipController.getHistory);
 characterRouter.post('/relationship/end', relationshipController.endRelationship);
 characterRouter.post('/relationship/reconcile/:characterId', relationshipController.reconcile);
+characterRouter.patch('/relationship/ex-personas/:characterId', relationshipController.updateExPersonaSettings);
+characterRouter.delete('/relationship/ex-personas/:characterId', relationshipController.deleteExPersona);
 characterRouter.get('/relationship/can-start-new', relationshipController.canStartNew);

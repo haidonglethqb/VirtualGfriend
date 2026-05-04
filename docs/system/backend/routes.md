@@ -24,7 +24,7 @@ Complete API endpoint reference. Base path: `/api`.
 |---|---|---|
 | GET/PATCH | `/profile` | Get/update profile |
 | GET/PATCH | `/settings` | Get/update settings |
-| PATCH | `/privacy` | Update privacy |
+| PATCH | `/privacy` | Update privacy (`allowMessages`, `allowExPersonaMessages`, profile visibility) |
 
 ### Character (`/character`) — Auth required
 | Method | Path | Description |
@@ -36,6 +36,11 @@ Complete API endpoint reference. Base path: `/api`.
 | GET/POST | `/facts` | Get/add facts |
 | GET/POST | `/templates` | Template CRUD |
 | GET | `/relationship` | Relationship status + progression |
+| GET | `/relationship/history` | Full relationship list, including ex-personas and per-character messaging state |
+| POST | `/relationship/end` | Break up with active character. Optional body: `reason`, `exPersonaConsent` for premium auto ex-persona generation |
+| POST | `/relationship/reconcile/:characterId` | Restore an ended non-ex relationship and archive any linked ex-persona |
+| PATCH | `/relationship/ex-personas/:characterId` | Update ex-persona settings such as `exMessagingEnabled` |
+| DELETE | `/relationship/ex-personas/:characterId` | Permanently delete an ex-persona and its character-bound history |
 
 ### Chat (`/chat`) — Auth required
 | Method | Path | Description |

@@ -20,6 +20,7 @@ Next.js 14 App Router with protected routes, auth guards, and public auth pages.
 │   ├── /profile            → Edit profile
 │   ├── /character          → Character customization
 │   ├── /facts              → View/manage character facts
+│   ├── /ex-personas        → Manage AI ex-personas and reopen archived chats
 │   ├── /appearance         → Theme, font, UI settings
 │   ├── /language           → Language preferences
 │   ├── /privacy            → Privacy settings

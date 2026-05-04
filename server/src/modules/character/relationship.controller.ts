@@ -1,8 +1,19 @@
 import { Request, Response, NextFunction } from 'express'
 import { relationshipService } from './relationship.service'
 import { createModuleLogger } from '../../lib/logger'
+import { z } from 'zod'
+import { AppError } from '../../middlewares/error.middleware'
 
 const log = createModuleLogger('RelationshipController')
+
+const endRelationshipSchema = z.object({
+  reason: z.string().max(200).optional(),
+  exPersonaConsent: z.boolean().optional(),
+})
+
+const updateExPersonaSettingsSchema = z.object({
+  exMessagingEnabled: z.boolean(),
+})
 
 export const relationshipController = {
   /**
@@ -40,12 +51,19 @@ export const relationshipController = {
   async endRelationship(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id
-      const { reason } = req.body
+      const { reason, exPersonaConsent } = endRelationshipSchema.parse(req.body ?? {})
       
-      const result = await relationshipService.endRelationship(userId, reason)
+      const result = await relationshipService.endRelationship(userId, {
+        reason,
+        exPersonaConsent,
+        premiumTier: req.premiumInfo?.tier || 'FREE',
+      })
       
       res.json({ success: true, data: result })
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'))
+      }
       next(error)
     }
   },
@@ -61,6 +79,44 @@ export const relationshipController = {
       
       const result = await relationshipService.reconcileRelationship(userId, characterId)
       
+      res.json({ success: true, data: result })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  /**
+   * PATCH /relationship/ex-personas/:characterId
+   * Update user-managed settings for an ex persona
+   */
+  async updateExPersonaSettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.id
+      const { characterId } = req.params
+      const input = updateExPersonaSettingsSchema.parse(req.body ?? {})
+
+      const result = await relationshipService.updateExPersonaSettings(userId, characterId, input)
+
+      res.json({ success: true, data: result })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'))
+      }
+      next(error)
+    }
+  },
+
+  /**
+   * DELETE /relationship/ex-personas/:characterId
+   * Permanently delete an ex persona and related chat data
+   */
+  async deleteExPersona(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.id
+      const { characterId } = req.params
+
+      const result = await relationshipService.deleteExPersona(userId, characterId)
+
       res.json({ success: true, data: result })
     } catch (error) {
       next(error)

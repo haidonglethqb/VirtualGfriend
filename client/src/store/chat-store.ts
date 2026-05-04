@@ -27,21 +27,29 @@ interface MessagesData {
   limit: number
 }
 
+interface CharacterHistoryData {
+  messages: Message[]
+  hasMore?: boolean
+  nextCursor?: string
+}
+
 interface ChatState {
   messages: Message[]
   isTyping: boolean
   isConnected: boolean
   isLoading: boolean
   lastSyncTimestamp: number
+  currentCharacterId: string | null
 
   // Actions
   addMessage: (message: Message) => void
   addMessageIfUnique: (message: Message) => void
   replaceMessage: (tempId: string, realMessage: Message) => void
   setMessages: (messages: Message[]) => void
+  setActiveCharacterId: (characterId: string | null) => void
   setTyping: (isTyping: boolean) => void
   setConnected: (isConnected: boolean) => void
-  fetchMessages: () => Promise<void>
+  fetchMessages: (characterId?: string) => Promise<void>
   clearMessages: () => void
   mergeMessages: (newMessages: Message[]) => void
 }
@@ -56,6 +64,7 @@ export const useChatStore = create<ChatState>()(
       isConnected: false,
       isLoading: false,
       lastSyncTimestamp: 0,
+      currentCharacterId: null,
 
       addMessage: (message: Message) => {
         set((state: ChatState) => {
@@ -129,6 +138,10 @@ export const useChatStore = create<ChatState>()(
         })
       },
 
+      setActiveCharacterId: (characterId: string | null) => {
+        set({ currentCharacterId: characterId })
+      },
+
       setTyping: (isTyping: boolean) => {
         set({ isTyping })
       },
@@ -137,10 +150,11 @@ export const useChatStore = create<ChatState>()(
         set({ isConnected })
       },
 
-      fetchMessages: async () => {
+      fetchMessages: async (characterId?: string) => {
         set({ isLoading: true })
         try {
-          const response = await api.get<MessagesData>('/chat/history')
+          const endpoint = characterId ? `/chat/history/${characterId}` : '/chat/history'
+          const response = await api.get<MessagesData | CharacterHistoryData>(endpoint)
           if (response.success && response.data) {
             const fetchedMessages = response.data.messages || []
 
@@ -162,7 +176,16 @@ export const useChatStore = create<ChatState>()(
             set({ isLoading: false })
           }
         } catch {
-          // Keep existing messages on error
+          if (characterId) {
+            set({
+              messages: [],
+              isLoading: false,
+              lastSyncTimestamp: Date.now(),
+            })
+            return
+          }
+
+          // Keep existing messages on error for active-character mode.
           set({ isLoading: false })
         }
       },

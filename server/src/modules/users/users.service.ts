@@ -26,6 +26,7 @@ interface UpdatePrivacyData {
   profilePublic?: boolean;
   showActivity?: boolean;
   allowMessages?: boolean;
+  allowExPersonaMessages?: boolean;
 }
 
 export const userService = {
@@ -245,6 +246,7 @@ export const userService = {
         profilePublic: true,
         showActivity: true,
         allowMessages: true,
+        allowExPersonaMessages: true,
       },
     });
 
@@ -256,6 +258,7 @@ export const userService = {
         profilePublic: created.profilePublic ?? false,
         showActivity: created.showActivity ?? false,
         allowMessages: created.allowMessages ?? true,
+        allowExPersonaMessages: created.allowExPersonaMessages ?? true,
       };
     }
 
@@ -271,6 +274,7 @@ export const userService = {
         profilePublic: true,
         showActivity: true,
         allowMessages: true,
+        allowExPersonaMessages: true,
       },
     });
 

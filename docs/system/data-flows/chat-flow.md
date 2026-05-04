@@ -52,6 +52,11 @@ const typingDelay = Math.min(4000, Math.max(1500, responseLength * 25));
 - Auto-memory creation for milestones
 - Quest progress update
 
+## Ex-Persona Note
+- `POST /chat/send` already accepts explicit `characterId`, so ended ex-persona characters can be targeted without relying on active-character lookup.
+- `GET /chat/history` still resolves the active character only; ex-persona clients should use character-specific history access.
+- Proactive ex messages reuse the same `notification:proactive` socket event with `comeback_message` type.
+
 ## Related
 - [Registration Flow](./registration-flow.md)
 - [DM Flow](./dm-flow.md)
