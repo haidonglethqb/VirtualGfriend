@@ -24,55 +24,55 @@ VirtualGfriend ("Bạn gái ảo") is an AI companion web app where users intera
 
 | Document | Description |
 |---|---|
-| [Auth Flow](auth/auth-flow.md) | JWT-based auth: login, register, refresh, OTP verification |
-| [Password Reset](auth/password-reset.md) | Email-based password reset with token expiration |
-| [Admin Auth](auth/admin-auth.md) | Admin panel authentication and authorization |
+| [Auth Flow](authentication/auth-flow.md) | JWT-based auth: login, register, refresh, OTP verification |
+| [Authentication Overview](authentication/authentication-overview.md) | JWT architecture, cache-aside usage, auth surfaces |
+| [Premium Gating](authentication/premium-gating.md) | Paid tier access checks and downgrade behavior |
 
 ## Database
 
 | Document | Description |
 |---|---|
-| [Schema](database/schema.md) | Prisma schema: User, Character, Message, Conversation, Quest, Gift |
-| [Migrations](database/migrations.md) | Migration strategy and history |
-| [Indexes & Performance](database/indexes.md) | Query optimization, index strategy |
+| [Schema Overview](database/schema-overview.md) | Prisma schema groups and model navigation |
+| [User Models](database/user-models.md) | User, settings, tokens, identity fields |
+| [Character Models](database/character-models.md) | Character, relationship, ex-persona fields |
 
 ## AI Engine
 
 | Document | Description |
 |---|---|
-| [AI Service](ai/ai-service.md) | Groq AI integration, prompt engineering, response generation |
-| [Conversation Summary](ai/conversation-summary.md) | Long-context management via summarization |
-| [Facts & Learning](ai/facts-learning.md) | Character fact extraction and persistence |
-| [Proactive Notifications](ai/proactive-notifications.md) | AI-initiated messages (morning, night, miss-you) |
+| [Character Personality](ai-engine/character-personality.md) | Personality system and prompt shaping |
+| [Emotion Detection](ai-engine/emotion-detection.md) | Mood and emotional signal extraction |
+| [Memory System](ai-engine/memory-system.md) | Character memory persistence and recall |
+| [System Prompt](ai-engine/system-prompt.md) | Prompt contract and safety framing |
 
 ## Frontend
 
 | Document | Description |
 |---|---|
-| [App Structure](frontend/app-structure.md) | Next.js 14 App Router layout and routing |
+| [Routing Structure](frontend/routing-structure.md) | Next.js 14 App Router layout and routing |
 | [State Management](frontend/state-management.md) | Zustand stores + TanStack Query strategy |
-| [Real-Time UI](frontend/real-time-ui.md) | Socket.IO client, optimistic UI, cross-tab sync |
+| [Real-Time UI](frontend/real-time.md) | Socket.IO client, optimistic UI, cross-tab sync |
 | [UI Components](frontend/ui-components.md) | Radix UI components, Framer Motion animations |
+| [API Client](frontend/api-client.md) | Fetch wrapper, auto-refresh, retry behavior |
 
 ## Backend
 
 | Document | Description |
 |---|---|
-| [API Reference](backend/api-reference.md) | REST API endpoints documentation |
-| [Chat Module](backend/chat-module.md) | Chat service, message processing |
-| [DM Module](backend/dm-module.md) | Direct messaging between users |
+| [Routes](backend/routes.md) | REST API endpoints documentation |
+| [Modules](backend/modules.md) | Backend module organization and responsibilities |
 | [Socket Handlers](backend/socket-handlers.md) | WebSocket event handlers |
-| [Middleware Stack](backend/middleware-stack.md) | Auth, rate limiting, premium gating, error handling |
+| [Middleware Stack](backend/middleware.md) | Auth, rate limiting, premium gating, error handling |
 
 ## Gamification
 
 | Document | Description |
 |---|---|
-| [Quest System](gamification/quest-system.md) | Quest definitions, completion tracking, rewards |
-| [Gift System](gamification/gift-system.md) | Virtual gifts, shop, inventory management |
-| [Affection & Levels](gamification/affection-levels.md) | Affection progression, level-up mechanics |
+| [Quest System](gamification/quests.md) | Quest definitions, completion tracking, rewards |
+| [Gift System](gamification/gifts-shop.md) | Virtual gifts, shop, inventory management |
+| [Affection & Levels](gamification/levels-affection.md) | Affection progression, level-up mechanics |
 | [Leaderboard](gamification/leaderboard.md) | Scoring, caching, ranking algorithms |
-| [Relationship Stages](gamification/relationship-stages.md) | 8-stage progression: Stranger → Lover |
+| [Scenes](gamification/scenes.md) | Scene unlocks, activation, stage-based availability |
 
 ## Security
 
@@ -80,24 +80,26 @@ VirtualGfriend ("Bạn gái ảo") is an AI companion web app where users intera
 |---|---|
 | [Rate Limiting](security/rate-limiting.md) | Per-user & per-IP rate limits, Socket.IO limits |
 | [Input Validation](security/input-validation.md) | Zod schemas, content sanitization |
-| [HTTP Security](security/http-security.md) | Helmet, CORS, XSS, CSRF protection |
+| [Auth Security](security/auth-security.md) | JWT, admin auth, auth boundary protections |
+| [Data Protection](security/data-protection.md) | PII, secrets, and storage protections |
 
 ## Data Flows
 
 | Document | Description |
 |---|---|
 | [Chat Flow](data-flows/chat-flow.md) | Message send → AI processing → response delivery |
-| [Payment Flow](data-flows/payment-flow.md) | Stripe checkout, webhook handling, subscription activation |
-| [Auth Flow](data-flows/auth-flow.md) | Login → JWT issuance → token refresh |
+| [Purchase Flow](data-flows/purchase-flow.md) | Stripe checkout, webhook handling, subscription activation |
+| [Registration Flow](data-flows/registration-flow.md) | Registration OTP and account creation flow |
+| [DM Flow](data-flows/dm-flow.md) | Direct-message conversation and read/typing flow |
 
 ## Deployment
 
 | Document | Description |
 |---|---|
-| [Docker Compose](deployment/docker-compose.md) | Multi-container setup, health checks, profiles |
+| [Docker Setup](deployment/docker-setup.md) | Multi-container setup, health checks, profiles |
 | [Nginx Configuration](deployment/nginx-config.md) | SSL, WebSocket proxy, rate limiting, gzip |
-| [CI/CD Pipeline](deployment/cicd.md) | GitHub Actions, GHCR, semantic-release |
-| [Environment Setup](deployment/environment.md) | Environment variables, secrets management |
+| [CI/CD Pipeline](deployment/ci-cd.md) | GitHub Actions, GHCR, semantic-release |
+| [Environment Setup](deployment/environment-variables.md) | Environment variables, secrets management |
 
 ---
 

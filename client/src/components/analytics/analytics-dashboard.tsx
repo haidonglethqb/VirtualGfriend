@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Heart, MessageCircle, Gift, Calendar, Flame, TrendingUp, Award,
@@ -226,27 +226,27 @@ function ActivityHeatmap({ data }: ActivityHeatmapProps) {
 
 export function AnalyticsDashboard() {
   const { language } = useLanguageStore();
-  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+  const tr = useCallback((vi: string, en: string) => (language === 'vi' ? vi : en), [language]);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const response = await api.get<AnalyticsData>('/analytics');
-        if (response.success) {
-          setData(response.data);
-        }
-      } catch (err) {
-        setError(tr('Không thể tải thống kê', 'Could not load analytics'));
-      } finally {
-        setIsLoading(false);
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      const response = await api.get<AnalyticsData>('/analytics');
+      if (response.success) {
+        setData(response.data);
       }
-    };
+    } catch (err) {
+      setError(tr('Không thể tải thống kê', 'Could not load analytics'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tr]);
 
-    fetchAnalytics();
-  }, []);
+  useEffect(() => {
+    void fetchAnalytics();
+  }, [fetchAnalytics]);
 
   if (isLoading) {
     return (

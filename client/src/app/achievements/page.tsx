@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Trophy, Star, CheckCircle, Lock, Gift, MessageCircle, Heart, Zap,
@@ -48,13 +48,7 @@ export default function AchievementsPage() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchAchievements();
-    }
-  }, [isAuthenticated]);
-
-  async function fetchAchievements() {
+  const fetchAchievements = useCallback(async () => {
     try {
       const token = getAuthToken();
       const [achRes, ptsRes] = await Promise.all([
@@ -75,7 +69,13 @@ export default function AchievementsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      void fetchAchievements();
+    }
+  }, [fetchAchievements, isAuthenticated]);
 
   const categories = [
     { id: 'all', label: isVi ? 'Tất cả' : 'All', icon: Trophy },

@@ -56,6 +56,13 @@ interface SendMessageData {
   metadata?: Record<string, unknown>;
 }
 
+function isArchivedExPersona(character: {
+  isExPersona?: boolean | null
+  endReason?: string | null
+}) {
+  return character.isExPersona && character.endReason === 'source_relationship_reconciled'
+}
+
 export const chatService = {
   async getHistory(userId: string, characterId: string, page: number, limit: number) {
     const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
@@ -103,6 +110,10 @@ export const chatService = {
     });
 
     if (!character) {
+      throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
+    }
+
+    if (isArchivedExPersona(character)) {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
@@ -178,6 +189,10 @@ export const chatService = {
     });
 
     if (!character) {
+      throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
+    }
+
+    if (isArchivedExPersona(character)) {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
@@ -497,7 +512,8 @@ export const chatService = {
 
     const current = await cache.get<number>(cacheKey);
     if (current !== null) {
-      await cache.set(cacheKey, current + 1, 300);
+      await cache.incr(cacheKey);
+      await cache.expire(cacheKey, 300);
       return;
     }
 
@@ -509,6 +525,16 @@ export const chatService = {
       },
     });
 
-    await cache.set(cacheKey, count, 300);
+    const initialized = await cache.setNX(cacheKey, count, 300);
+    if (initialized) {
+      return;
+    }
+
+    // Another request warmed the cache first. Keep the higher known count
+    // instead of doing a read-modify-write increment that can overshoot.
+    const latest = await cache.get<number>(cacheKey);
+    if (latest === null || latest < count) {
+      await cache.set(cacheKey, count, 300);
+    }
   },
 };

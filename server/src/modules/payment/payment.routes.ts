@@ -3,6 +3,7 @@ import { authenticate } from '../../middlewares/auth.middleware'
 import {
   createCheckout,
   getStatus,
+  getCheckoutSession,
   cancelSub,
   getPricing,
 } from './payment.controller'
@@ -15,6 +16,7 @@ paymentRouter.get('/pricing', getPricing)
 // Protected — require authentication
 paymentRouter.post('/create-checkout', authenticate, createCheckout)
 paymentRouter.get('/status', authenticate, getStatus)
+paymentRouter.get('/checkout-session/:sessionId', authenticate, getCheckoutSession)
 paymentRouter.post('/cancel', authenticate, cancelSub)
 
 // Note: webhook route is mounted separately in index.ts (needs raw body)

@@ -143,7 +143,11 @@ export const userController = {
 
       // Count user's characters
       const characterCount = await prisma.character.count({
-        where: { userId: req.user!.id },
+        where: {
+          userId: req.user!.id,
+          isEnded: false,
+          isExPersona: false,
+        },
       });
 
       // Calculate days remaining if premium
@@ -157,8 +161,14 @@ export const userController = {
       // Get cancellation status from subscription table
       const subscription = await prisma.subscription.findUnique({
         where: { userId: req.user!.id },
-        select: { cancelAtPeriodEnd: true, currentPeriodEnd: true },
+        select: { status: true, cancelAtPeriodEnd: true, currentPeriodEnd: true },
       });
+
+      const now = new Date();
+      const hasScheduledCancellation = !!subscription?.cancelAtPeriodEnd &&
+        subscription.status !== 'CANCELED' &&
+        !!req.premiumInfo?.isPremium &&
+        (!subscription.currentPeriodEnd || subscription.currentPeriodEnd > now);
 
       res.json({
         success: true,
@@ -171,8 +181,8 @@ export const userController = {
           expiresAt: req.premiumInfo?.expiresAt || null,
           daysRemaining,
           expired: req.premiumInfo?.expired || false,
-          cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd || false,
-          cancelAt: subscription?.cancelAtPeriodEnd ? subscription.currentPeriodEnd : null,
+          cancelAtPeriodEnd: hasScheduledCancellation,
+          cancelAt: hasScheduledCancellation ? subscription?.currentPeriodEnd || null : null,
 
           // Full dynamic feature config for this tier
           features: {

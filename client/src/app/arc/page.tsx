@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, CheckCircle, Lock, Star, Crown, Zap, AlertCircle, ChevronRight } from 'lucide-react';
 import AppLayout from '@/components/layout/app-layout';
@@ -54,15 +54,7 @@ export default function ArcPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchArcs();
-    } else {
-      setLoading(false);
-    }
-  }, [isAuthenticated]);
-
-  async function fetchArcs() {
+  const fetchArcs = useCallback(async () => {
     try {
       setError(null);
       const token = getAuthToken();
@@ -79,7 +71,15 @@ export default function ArcPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [isVi]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      void fetchArcs();
+    } else {
+      setLoading(false);
+    }
+  }, [fetchArcs, isAuthenticated]);
 
   const tierLabels: Record<string, string> = {
     FREE: isVi ? 'Miễn phí' : 'Free',

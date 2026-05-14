@@ -1,13 +1,14 @@
 # Chat Flow
 
 ## Overview
-User sends message → Socket.IO → Server validates → Store → AI processing via Groq → Response → Socket.IO emit → Optimistic UI update.
+User sends message → REST or Socket.IO → Server validates + checks daily quota → Store → AI processing via Groq → Response → Socket.IO emit → Optimistic UI update.
 
 ## Flow Diagram
 
 ```mermaid
 sequenceDiagram
     participant Client
+    participant REST
     participant SocketIO
     participant ChatService
     participant DB
@@ -16,6 +17,8 @@ sequenceDiagram
     participant GameEvent
 
     Client->>SocketIO: message:send {characterId, content}
+    SocketIO->>DB: Read user premium tier
+    SocketIO->>ChatService: checkDailyLimit(userId, tier)
     SocketIO->>ChatService: sendMessage(userId, data)
     ChatService->>DB: Get character (cache → DB)
     ChatService->>DB: CREATE USER message
@@ -31,6 +34,11 @@ sequenceDiagram
     SocketIO->>Client: message:received {userMessage, aiMessage, emotion, newAffection, levelUp, ...}
     Client->>Client: Replace optimistic UI with server data
 ```
+
+## Quota Enforcement
+- `POST /api/chat/send` and Socket.IO `message:send` must both check daily usage before AI processing
+- only the chat service increments the daily message counter after the user message is persisted
+- free-tier users should receive `DAILY_LIMIT_REACHED` once the daily cap is exhausted
 
 ## Typing Delay Calculation
 
@@ -56,6 +64,7 @@ const typingDelay = Math.min(4000, Math.max(1500, responseLength * 25));
 - `POST /chat/send` already accepts explicit `characterId`, so ended ex-persona characters can be targeted without relying on active-character lookup.
 - `GET /chat/history` still resolves the active character only; ex-persona clients should use character-specific history access.
 - Proactive ex messages reuse the same `notification:proactive` socket event with `comeback_message` type.
+- Ex-personas archived during reconciliation are hidden from relationship history and must fail direct chat/history access with `CHARACTER_NOT_FOUND`, so stale links cannot reopen a dead ex thread.
 
 ## Related
 - [Registration Flow](./registration-flow.md)

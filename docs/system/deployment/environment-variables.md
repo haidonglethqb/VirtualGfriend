@@ -60,6 +60,9 @@
 ## Docker Compose Integration
 Variables read from `.env` file on VPS. Written by CI/CD pipeline from GitHub secrets during deploy.
 
+The deploy workflow renders `docker compose config` on the VPS after writing `.env` so interpolation and mounted-file dependencies fail fast before containers are recreated.
+Secret values containing `$` must be escaped before compose reads `.env`; the deploy workflow now rewrites values to avoid accidental variable interpolation.
+
 ## Related
 - [Docker Setup](./docker-setup.md)
 - [CI/CD](./ci-cd.md)

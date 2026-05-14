@@ -5,6 +5,7 @@ import { createModuleLogger } from '../../lib/logger'
 import {
   createCheckoutSession,
   getSubscriptionStatus,
+  getCheckoutSessionStatus,
   cancelSubscription,
   handleWebhookEvent,
   getPricingConfig,
@@ -45,6 +46,26 @@ export async function getStatus(req: Request, res: Response, next: NextFunction)
   try {
     const userId = req.user!.id
     const status = await getSubscriptionStatus(userId)
+    res.json({ success: true, data: status })
+  } catch (error) {
+    next(error)
+  }
+}
+
+/** GET /api/payment/checkout-session/:sessionId */
+export async function getCheckoutSession(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user!.id
+    const sessionId = req.params.sessionId
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Checkout session ID is required' },
+      })
+    }
+
+    const status = await getCheckoutSessionStatus(userId, sessionId)
     res.json({ success: true, data: status })
   } catch (error) {
     next(error)

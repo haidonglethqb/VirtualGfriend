@@ -3,6 +3,8 @@
 ## Overview
 GitHub Actions pipeline with type checking, parallel Docker builds, and automated VPS deployment.
 
+Runtime deploy depends on both `docker-compose.yml` and `nginx/nginx.conf` being synchronized to the VPS before `docker compose up`.
+
 ## Pipeline Stages
 
 ```mermaid
@@ -53,11 +55,19 @@ JWT_SECRET=${{ secrets.JWT_SECRET }}
 # ... all secrets
 ENVEOF
 
+# Escape `$` inside secret values before Docker Compose reads `.env`
+awk '...' .env > .env.tmp && mv .env.tmp .env
+
 # Step 2: Login to GHCR
 docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
 # Step 3: Pull new images
 docker compose pull
+
+# Step 3.5: Validate compose + mounted runtime files
+test -f docker-compose.yml
+test -f nginx/nginx.conf
+docker compose config > /tmp/vgfriend-compose.rendered.yml
 
 # Step 4: Start databases, wait healthy
 docker compose up -d postgres redis

@@ -36,6 +36,10 @@
 | `./nginx/nginx.conf:/etc/nginx/nginx.conf:ro` | Nginx config (read-only) |
 | `./nginx/ssl:/etc/nginx/ssl:ro` | SSL certificates (read-only) |
 
+## Runtime Asset Requirement
+
+Production deploy must sync both `docker-compose.yml` and `nginx/nginx.conf` to the VPS. If `nginx/nginx.conf` is stale or missing, the `nginx` service can fail even when server and client images are healthy.
+
 ## Network
 - Bridge network: `vgfriend-network`
 - All services communicate via Docker DNS (e.g., `postgres`, `redis`)

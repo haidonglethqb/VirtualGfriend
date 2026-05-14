@@ -67,9 +67,13 @@ export const characterController = {
       // Check character limit based on dynamic tier config (resolved in premium middleware)
       const maxCharacters = req.premiumInfo?.features?.maxCharacters ?? 1;
 
-      // Count existing characters (including inactive ones)
+      // Count relationship slots in use. Ended relationships and ex-personas do not consume slots.
       const existingCount = await prisma.character.count({
-        where: { userId: req.user!.id },
+        where: {
+          userId: req.user!.id,
+          isEnded: false,
+          isExPersona: false,
+        },
       });
 
       if (maxCharacters !== -1 && existingCount >= maxCharacters) {

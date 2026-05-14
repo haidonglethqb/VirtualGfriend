@@ -100,7 +100,7 @@ export default function MessagesPage() {
   const { toast } = useToast()
   const { isAuthenticated, user, accessToken } = useAuthStore()
   const { language } = useLanguageStore()
-  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en)
+  const tr = useCallback((vi: string, en: string) => (language === 'vi' ? vi : en), [language])
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConvo, setActiveConvo] = useState<Conversation | null>(null)
@@ -141,7 +141,7 @@ export default function MessagesPage() {
     } catch {
       toast({ title: tr('Lỗi', 'Error'), description: tr('Không thể tải tin nhắn', 'Could not load messages'), variant: 'destructive' })
     }
-  }, [toast])
+  }, [toast, tr])
 
   // Initialize
   useEffect(() => {

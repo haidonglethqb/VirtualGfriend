@@ -539,7 +539,7 @@ function BroadcastModal({
 export default function AdminPage() {
   const { language, toggleLanguage } = useLanguageStore();
   const t = ADMIN_I18N[language];
-  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+  const tr = useCallback((vi: string, en: string) => (language === 'vi' ? vi : en), [language]);
 
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = checking
   const [token, setToken] = useState('');
@@ -591,6 +591,12 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const handleLogout = useCallback(() => {
+    setToken('');
+    localStorage.removeItem('adminToken');
+    setIsLoggedIn(false);
+  }, []);
+
   const apiCall = useCallback(async (endpoint: string, options: RequestInit = {}, authToken?: string) => {
     const tokenToUse = authToken || token || localStorage.getItem('adminToken') || '';
     
@@ -609,7 +615,7 @@ export default function AdminPage() {
     }
     
     return res;
-  }, [token]);
+  }, [handleLogout, token, tr]);
 
   // Check for saved token on mount
   useEffect(() => {
@@ -637,48 +643,6 @@ export default function AdminPage() {
     }
   }, []);
 
-  // Fetch data when tab changes
-  useEffect(() => {
-    if (isLoggedIn !== true || !token) return;
-
-    const fetchData = async () => {
-      try {
-        switch (activeTab) {
-          case 'dashboard':
-            fetchStats();
-            break;
-          case 'users':
-            fetchUsers();
-            break;
-          case 'characters':
-            fetchCharacters();
-            break;
-          case 'messages':
-            fetchMessages();
-            break;
-          case 'quests':
-            fetchQuests();
-            break;
-          case 'templates':
-            fetchTemplates();
-            break;
-          case 'analytics':
-            fetchAnalytics();
-            break;
-          case 'system':
-            fetchSystemInfo();
-            break;
-          case 'tier-configs':
-            break;
-        }
-      } catch (err) {
-        console.error('Fetch error:', err);
-      }
-    };
-
-    fetchData();
-  }, [isLoggedIn, token, activeTab, pagination.page, searchQuery]);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -705,19 +669,13 @@ export default function AdminPage() {
     }
   };
 
-  const handleLogout = () => {
-    setToken('');
-    localStorage.removeItem('adminToken');
-    setIsLoggedIn(false);
-  };
-
   // Fetch functions
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     const res = await apiCall('/stats');
     if (res.ok) setStats(await res.json());
-  };
+  }, [apiCall]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     const params = new URLSearchParams({
       page: String(pagination.page),
       limit: '20',
@@ -729,9 +687,9 @@ export default function AdminPage() {
       setUsers(data.users);
       setPagination(data.pagination);
     }
-  };
+  }, [apiCall, pagination.page, searchQuery]);
 
-  const fetchCharacters = async () => {
+  const fetchCharacters = useCallback(async () => {
     const params = new URLSearchParams({ page: String(pagination.page), limit: '20' });
     const res = await apiCall(`/characters?${params}`);
     if (res.ok) {
@@ -739,9 +697,9 @@ export default function AdminPage() {
       setCharacters(data.characters);
       setPagination(data.pagination);
     }
-  };
+  }, [apiCall, pagination.page]);
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     const params = new URLSearchParams({ page: String(pagination.page), limit: '50' });
     const res = await apiCall(`/messages?${params}`);
     if (res.ok) {
@@ -749,28 +707,70 @@ export default function AdminPage() {
       setMessages(data.messages);
       setPagination(data.pagination);
     }
-  };
+  }, [apiCall, pagination.page]);
 
-  const fetchQuests = async () => {
+  const fetchQuests = useCallback(async () => {
     const res = await apiCall('/quests');
     if (res.ok) setQuests(await res.json());
-  };
+  }, [apiCall]);
 
-  const fetchAnalytics = async (days?: number) => {
+  const fetchAnalytics = useCallback(async (days?: number) => {
     const d = days ?? analyticsDays;
     const res = await apiCall(`/analytics?days=${d}`);
     if (res.ok) setAnalytics(await res.json());
-  };
+  }, [analyticsDays, apiCall]);
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     const res = await apiCall('/templates');
     if (res.ok) setTemplates(await res.json());
-  };
+  }, [apiCall]);
 
-  const fetchSystemInfo = async () => {
+  const fetchSystemInfo = useCallback(async () => {
     const res = await apiCall('/system');
     if (res.ok) setSystemInfo(await res.json());
-  };
+  }, [apiCall]);
+
+  // Fetch data when tab changes
+  useEffect(() => {
+    if (isLoggedIn !== true || !token) return;
+
+    const fetchData = async () => {
+      try {
+        switch (activeTab) {
+          case 'dashboard':
+            await fetchStats();
+            break;
+          case 'users':
+            await fetchUsers();
+            break;
+          case 'characters':
+            await fetchCharacters();
+            break;
+          case 'messages':
+            await fetchMessages();
+            break;
+          case 'quests':
+            await fetchQuests();
+            break;
+          case 'templates':
+            await fetchTemplates();
+            break;
+          case 'analytics':
+            await fetchAnalytics();
+            break;
+          case 'system':
+            await fetchSystemInfo();
+            break;
+          case 'tier-configs':
+            break;
+        }
+      } catch (err) {
+        console.error('Fetch error:', err);
+      }
+    };
+
+    void fetchData();
+  }, [activeTab, fetchAnalytics, fetchCharacters, fetchMessages, fetchQuests, fetchStats, fetchSystemInfo, fetchTemplates, fetchUsers, isLoggedIn, pagination.page, searchQuery, token]);
 
   // Action handlers
   const handleUpdateUser = async () => {

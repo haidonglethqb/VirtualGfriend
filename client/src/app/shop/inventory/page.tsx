@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -42,19 +42,11 @@ export default function InventoryPage() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
   const { language } = useLanguageStore();
-  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+  const tr = useCallback((vi: string, en: string) => (language === 'vi' ? vi : en), [language]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth/login');
-      return;
-    }
-    fetchInventory();
-  }, [isAuthenticated, router]);
-
-  const fetchInventory = async () => {
+  const fetchInventory = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await api.get<InventoryItem[]>('/shop/inventory');
@@ -70,7 +62,15 @@ export default function InventoryPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast, tr]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+    void fetchInventory();
+  }, [fetchInventory, isAuthenticated, router]);
 
   if (!isAuthenticated) {
     return null;

@@ -26,14 +26,27 @@ async function autoDowngradeIfExpired(userId: string, expiresAt: Date | null): P
   if (!isPremiumExpired(expiresAt)) return false;
 
   try {
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        isPremium: false,
-        premiumTier: 'FREE',
-        // Keep premiumExpiresAt for record
-      },
-    });
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          isPremium: false,
+          premiumTier: 'FREE',
+          // Keep premiumExpiresAt for record
+        },
+      }),
+      prisma.subscription.updateMany({
+        where: {
+          userId,
+          status: { not: 'CANCELED' },
+          currentPeriodEnd: { lte: new Date() },
+        },
+        data: {
+          status: 'CANCELED',
+          cancelAtPeriodEnd: false,
+        },
+      }),
+    ]);
     logger.info(`User ${userId} premium expired - auto-downgraded to FREE`);
 
     // Invalidate cache to prevent stale premium access

@@ -148,9 +148,6 @@ export const chatController = {
         characterId,
       });
 
-      // Increment daily count in cache after successful send
-      await chatService.incrementDailyCount(req.user!.id);
-
       // Include remaining messages in response for frontend
       const newUsage = await chatService.checkDailyLimit(req.user!.id, tier);
 

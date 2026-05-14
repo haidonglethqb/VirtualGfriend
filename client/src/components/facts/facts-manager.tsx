@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Brain, Edit2, Trash2, Plus, Save, X, 
@@ -171,7 +171,7 @@ export function FactsManager() {
   const [isAdding, setIsAdding] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  const fetchFacts = async () => {
+  const fetchFacts = useCallback(async () => {
     try {
       const response = await api.get<{ facts: Fact[]; grouped: GroupedFacts }>('/character/facts');
       if (response.success) {
@@ -187,11 +187,11 @@ export function FactsManager() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
-    fetchFacts();
-  }, []);
+    void fetchFacts();
+  }, [fetchFacts]);
 
   const handleEdit = async (fact: Fact, newValue: string) => {
     try {

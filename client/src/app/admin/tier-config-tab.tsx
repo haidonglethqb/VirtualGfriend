@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Save } from 'lucide-react';
 import { PremiumTier, PremiumFeatures } from '@/lib/premium';
 import { useLanguageStore } from '@/store/language-store';
@@ -194,11 +194,7 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
 
   const isSavingAny = useMemo(() => savingTier !== null, [savingTier]);
 
-  useEffect(() => {
-    void fetchTierConfigs();
-  }, []);
-
-  async function fetchTierConfigs() {
+  const fetchTierConfigs = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await apiCall('/tier-configs');
@@ -215,7 +211,11 @@ export function TierConfigTab({ apiCall, showToast }: TierConfigTabProps) {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [apiCall, isVi, showToast]);
+
+  useEffect(() => {
+    void fetchTierConfigs();
+  }, [fetchTierConfigs]);
 
   function updateNumberField(tier: PremiumTier, field: NumberField, value: string) {
     const parsed = Number(value);

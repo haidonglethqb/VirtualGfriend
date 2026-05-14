@@ -49,12 +49,18 @@ model Character {
   isEnded           Boolean         @default(false)
   endedAt           DateTime?
   endReason         String?
+  isExPersona       Boolean         @default(false)
+  exPersonaSourceId String?
+  exPersonaGeneratedAt DateTime?
+  exMessagingEnabled Boolean        @default(true)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
   @@index([userId, isActive])
   @@index([isActive, level, experience])   // Leaderboard
   @@index([isActive, affection])           // Leaderboard
+  @@index([userId, isEnded])               // Ended relationships
+  @@index([userId, isExPersona])           // Ex-persona lookup
 }
 ```
 
@@ -159,7 +165,7 @@ enum RelationshipStage {
 ```prisma
 enum RelationshipEventType {
   STAGE_UP, FIRST_DATE, CONFESSION, STARTED_DATING,
-  ANNIVERSARY, BREAKUP, RECONCILIATION, SPECIAL_MOMENT
+  ANNIVERSARY, BREAKUP, RECONCILIATION, EX_PERSONA_CREATED, SPECIAL_MOMENT
 }
 ```
 
@@ -175,3 +181,10 @@ enum Gender { MALE, FEMALE, NON_BINARY, OTHER }
 - [User Models](./user-models.md) — User → Character relationship
 - [Gamification Models](./gamification-models.md) — Scenes and gift systems
 - [Prisma Schema](../../../server/prisma/schema.prisma) — Full source
+
+## Character Slot Rules
+
+- Premium character limits count only ongoing relationships
+- Ended relationships do not consume slots
+- Ex-personas do not consume slots
+- Subscription status and create-character checks must use the same slot-count rule

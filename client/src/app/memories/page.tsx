@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -58,7 +58,7 @@ export default function MemoriesPage() {
   const { isAuthenticated } = useAuthStore();
   const { character } = useCharacterStore();
   const { language } = useLanguageStore();
-  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+  const tr = useCallback((vi: string, en: string) => (language === 'vi' ? vi : en), [language]);
   const locale = language === 'vi' ? 'vi-VN' : 'en-US';
   const getTypeLabel = (type: string) => {
     switch (type) {
@@ -95,15 +95,7 @@ export default function MemoriesPage() {
   });
   const [isCreating, setIsCreating] = useState(false);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth/login');
-      return;
-    }
-    fetchMemories();
-  }, [isAuthenticated, router]);
-
-  const fetchMemories = async () => {
+  const fetchMemories = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await api.get<{ items: Memory[]; total: number }>('/memories?limit=100');
@@ -136,7 +128,15 @@ export default function MemoriesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast, tr]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+    void fetchMemories();
+  }, [fetchMemories, isAuthenticated, router]);
 
   const handleToggleFavorite = async (memoryId: string) => {
     try {

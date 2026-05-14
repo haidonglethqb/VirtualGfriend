@@ -155,14 +155,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Copy docker-compose.yml to VPS
+      - name: Copy runtime configs to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          source: "docker-compose.yml"
+          source: "docker-compose.yml,nginx/nginx.conf"
           target: ${{ secrets.VPS_DEPLOY_PATH }}
 
       - name: Deploy to VPS via SSH
@@ -207,6 +207,18 @@ jobs:
             echo "Step 0: Ensuring directories exist..."
             mkdir -p nginx/ssl nginx/logs
             echo "DONE: Directories ready"
+
+            echo ""
+            echo "Step 0.25: Validating runtime files..."
+            if [ ! -f docker-compose.yml ]; then
+              echo "ERROR: docker-compose.yml is missing on VPS"
+              exit 1
+            fi
+            if [ ! -f nginx/nginx.conf ]; then
+              echo "ERROR: nginx/nginx.conf is missing on VPS"
+              exit 1
+            fi
+            echo "DONE: Runtime files are present"
 
             # Validate critical secrets to prevent partial deploy causing runtime 503s
             echo ""
@@ -264,9 +276,23 @@ jobs:
             ENVEOF
             # Xóa leading whitespace và escape $ trong values
             sed -i 's/^[[:space:]]*//' .env
-            sed -i 's/\([^=]\)\$/\1$$/g' .env
+            awk 'BEGIN { FS=OFS="=" }
+              /^[A-Za-z_][A-Za-z0-9_]*=/ {
+                key = $1
+                value = substr($0, length(key) + 2)
+                gsub(/\$/, "$$", value)
+                print key, value
+                next
+              }
+              { print }
+            ' .env > .env.tmp && mv .env.tmp .env
             echo "DONE: .env written ($(wc -l < .env) lines)"
             echo "   GITHUB_REPOSITORY = ${{ needs.type-check.outputs.image_name_lower }}"
+
+            echo ""
+            echo "Step 1.5: Validating compose configuration..."
+            docker compose config > /tmp/vgfriend-compose.rendered.yml
+            echo "DONE: docker compose config rendered successfully"
 
             # ── Bước 2: Login GHCR ─────────────────────────────────
             echo ""

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Sparkles, ArrowRight, ArrowLeft, User, Check, Users } from 'lucide-react';
@@ -56,7 +56,7 @@ export default function OnboardingPage() {
     const { isAuthenticated } = useAuthStore();
     const { toast } = useToast();
     const { language } = useLanguageStore();
-    const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+    const tr = useCallback((vi: string, en: string) => (language === 'vi' ? vi : en), [language]);
     const [step, setStep] = useState(1);
     const [isCreating, setIsCreating] = useState(false);
     const [templates, setTemplates] = useState<CharacterTemplate[]>([]);
@@ -102,7 +102,7 @@ export default function OnboardingPage() {
             }
         };
         fetchTemplates();
-    }, [toast]);
+    }, [toast, tr]);
 
     const [formData, setFormData] = useState({
         userGender: 'NOT_SPECIFIED',

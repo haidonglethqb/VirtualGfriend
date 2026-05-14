@@ -195,14 +195,12 @@ export default function DashboardPage() {
     if (hour < 12) setGreeting(t.greetings.morning);
     else if (hour < 18) setGreeting(t.greetings.afternoon);
     else setGreeting(t.greetings.evening);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, router]);
+  }, [fetchCharacter, fetchDashboardData, isAuthenticated, router, t.greetings.afternoon, t.greetings.evening, t.greetings.morning]);
 
   // Update streak separately when user changes — no need to refetch all data
   useEffect(() => {
-    if (user) {
-      setStats((prev) => ({ ...prev, streak: user.streak || 1 }));
-    }
+    if (typeof user?.streak !== 'number') return;
+    setStats((prev) => ({ ...prev, streak: user.streak || 1 }));
   }, [user?.streak]);
 
   // Redirect to onboarding if no character

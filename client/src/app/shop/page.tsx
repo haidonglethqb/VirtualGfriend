@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -133,16 +133,7 @@ export default function ShopPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'coins' | 'gems'>('coins');
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth/login');
-      return;
-    }
-    fetchShopItems();
-    fetchCharacter();
-  }, [isAuthenticated, router, fetchCharacter]);
-
-  const fetchShopItems = async () => {
+  const fetchShopItems = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await api.get<ShopItem[]>('/shop');
@@ -159,7 +150,16 @@ export default function ShopPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t.error, t.loadError, toast]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+    void fetchShopItems();
+    fetchCharacter();
+  }, [fetchCharacter, fetchShopItems, isAuthenticated, router]);
 
   const filteredItems = activeTab === 'all' 
     ? items 

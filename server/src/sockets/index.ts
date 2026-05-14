@@ -192,6 +192,28 @@ export function setupSocketHandlers(io: Server) {
           return
         }
 
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { premiumTier: true },
+        })
+
+        const tier = user?.premiumTier || 'FREE'
+        const limitCheck = await chatService.checkDailyLimit(userId, tier)
+
+        if (!limitCheck.canSend) {
+          socket.emit('error', {
+            message: `Bạn đã hết lượt tin nhắn hôm nay (${limitCheck.limit} tin). Nâng cấp VIP để nhắn không giới hạn!`,
+            code: 'DAILY_LIMIT_REACHED',
+            dailyUsage: {
+              used: limitCheck.used,
+              limit: limitCheck.limit,
+              remaining: limitCheck.remaining,
+              isUnlimited: limitCheck.limit === -1,
+            },
+          })
+          return
+        }
+
         // Atomic idempotency check — prevent duplicate processing
         if (data.clientId) {
           const dedupKey = `dedup:${userId}:${data.clientId}`

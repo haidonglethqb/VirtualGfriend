@@ -1,6 +1,6 @@
 import Stripe from 'stripe'
 import { prisma, PremiumTier, SubscriptionStatus } from '../../lib/prisma'
-import { cache, CacheTTL } from '../../lib/redis'
+import { cache, CacheKeys, CacheTTL } from '../../lib/redis'
 import { getStripeOrThrow } from '../../lib/stripe'
 import { createModuleLogger } from '../../lib/logger'
 import {
@@ -151,6 +151,75 @@ async function getOrCreateStripeCustomer(userId: string, email: string): Promise
 
 // ── Subscription Status ──
 
+async function normalizeSubscriptionState(userId: string, input: {
+  user: {
+    isPremium: boolean
+    premiumTier: PremiumTier
+    premiumExpiresAt: Date | null
+  } | null
+  subscription: {
+    tier: PremiumTier
+    billingCycle: 'MONTHLY' | 'YEARLY'
+    status: SubscriptionStatus
+    currentPeriodEnd: Date
+    cancelAtPeriodEnd: boolean
+  } | null
+}) {
+  const now = new Date()
+  const premiumExpired = !!input.user?.premiumExpiresAt && input.user.premiumExpiresAt <= now
+  const subscriptionExpired = !!input.subscription?.currentPeriodEnd && input.subscription.currentPeriodEnd <= now
+
+  if (premiumExpired || subscriptionExpired) {
+    const updates = []
+
+    if (input.user && (input.user.isPremium || input.user.premiumTier !== 'FREE')) {
+      updates.push(
+        prisma.user.update({
+          where: { id: userId },
+          data: {
+            isPremium: false,
+            premiumTier: 'FREE',
+          },
+        })
+      )
+    }
+
+    if (input.subscription && input.subscription.status !== SubscriptionStatus.CANCELED) {
+      updates.push(
+        prisma.subscription.update({
+          where: { userId },
+          data: {
+            status: SubscriptionStatus.CANCELED,
+            cancelAtPeriodEnd: false,
+          },
+        })
+      )
+    }
+
+    if (updates.length > 0) {
+      await prisma.$transaction(updates)
+      await cache.del(CacheKeys.userAuth(userId), CacheKeys.user(userId))
+    }
+  }
+
+  return {
+    user: input.user
+      ? {
+          ...input.user,
+          isPremium: premiumExpired ? false : input.user.isPremium,
+          premiumTier: premiumExpired ? 'FREE' : input.user.premiumTier,
+        }
+      : null,
+    subscription: input.subscription
+      ? {
+          ...input.subscription,
+          status: subscriptionExpired ? SubscriptionStatus.CANCELED : input.subscription.status,
+          cancelAtPeriodEnd: subscriptionExpired ? false : input.subscription.cancelAtPeriodEnd,
+        }
+      : null,
+  }
+}
+
 export async function getSubscriptionStatus(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -162,7 +231,17 @@ export async function getSubscriptionStatus(userId: string) {
     },
   })
 
-  const sub = user?.subscription ?? null
+  const normalized = await normalizeSubscriptionState(userId, {
+    user: user ? {
+      isPremium: user.isPremium,
+      premiumTier: user.premiumTier,
+      premiumExpiresAt: user.premiumExpiresAt,
+    } : null,
+    subscription: user?.subscription ?? null,
+  })
+
+  const sub = normalized.subscription
+  const normalizedUser = normalized.user
 
   return {
     subscription: sub ? {
@@ -172,9 +251,89 @@ export async function getSubscriptionStatus(userId: string) {
       currentPeriodEnd: sub.currentPeriodEnd,
       cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
     } : null,
-    isPremium: user?.isPremium || false,
-    premiumTier: user?.premiumTier || 'FREE',
-    premiumExpiresAt: user?.premiumExpiresAt || null,
+    isPremium: normalizedUser?.isPremium || false,
+    premiumTier: normalizedUser?.premiumTier || 'FREE',
+    premiumExpiresAt: normalizedUser?.premiumExpiresAt || null,
+  }
+}
+
+export async function getCheckoutSessionStatus(userId: string, sessionId: string) {
+  const stripe = getStripeOrThrow()
+  const session = await stripe.checkout.sessions.retrieve(sessionId)
+
+  if (session.mode !== 'subscription') {
+    const err = new Error('Invalid checkout session') as Error & { statusCode?: number }
+    err.statusCode = 400
+    throw err
+  }
+
+  if (session.metadata?.userId !== userId) {
+    const err = new Error('Checkout session not found') as Error & { statusCode?: number }
+    err.statusCode = 404
+    throw err
+  }
+
+  const stripeSubscriptionId = typeof session.subscription === 'string' ? session.subscription : null
+
+  const [user, subscription] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        isPremium: true,
+        premiumTier: true,
+        premiumExpiresAt: true,
+      },
+    }),
+    stripeSubscriptionId
+      ? prisma.subscription.findUnique({
+          where: { stripeSubscriptionId },
+          select: {
+            tier: true,
+            status: true,
+            currentPeriodEnd: true,
+            cancelAtPeriodEnd: true,
+          },
+        })
+      : Promise.resolve(null),
+  ])
+
+  const normalized = await normalizeSubscriptionState(userId, {
+    user: user ? {
+      isPremium: user.isPremium,
+      premiumTier: user.premiumTier,
+      premiumExpiresAt: user.premiumExpiresAt,
+    } : null,
+    subscription: subscription ? {
+      ...subscription,
+      billingCycle: 'MONTHLY',
+    } : null,
+  })
+
+  const effectiveUser = normalized.user
+  const effectiveSubscription = normalized.subscription
+  const checkoutCompleted = session.status === 'complete'
+  const paymentCaptured = session.payment_status === 'paid' || session.payment_status === 'no_payment_required'
+  const premiumActivated = !!effectiveSubscription && effectiveSubscription.status === 'ACTIVE' && !!effectiveUser?.isPremium
+
+  return {
+    sessionId: session.id,
+    checkoutCompleted,
+    paymentStatus: session.payment_status,
+    sessionStatus: session.status,
+    premiumActivated,
+    premiumTier: effectiveUser?.premiumTier || 'FREE',
+    premiumExpiresAt: effectiveUser?.premiumExpiresAt || null,
+    cancelAtPeriodEnd: effectiveSubscription?.cancelAtPeriodEnd || false,
+    currentPeriodEnd: effectiveSubscription?.currentPeriodEnd || null,
+    subscription: effectiveSubscription
+      ? {
+          tier: effectiveSubscription.tier,
+          status: effectiveSubscription.status,
+          currentPeriodEnd: effectiveSubscription.currentPeriodEnd,
+          cancelAtPeriodEnd: effectiveSubscription.cancelAtPeriodEnd,
+        }
+      : null,
+    isReady: checkoutCompleted && paymentCaptured && premiumActivated,
   }
 }
 
@@ -182,9 +341,20 @@ export async function getSubscriptionStatus(userId: string) {
 
 export async function cancelSubscription(userId: string): Promise<void> {
   const stripe = getStripeOrThrow()
+  const now = new Date()
 
   const sub = await prisma.subscription.findUnique({ where: { userId } })
-  if (!sub || sub.status === 'CANCELED') {
+  if (sub && sub.currentPeriodEnd <= now && sub.status !== 'CANCELED') {
+    await prisma.subscription.update({
+      where: { userId },
+      data: {
+        status: 'CANCELED',
+        cancelAtPeriodEnd: false,
+      },
+    })
+  }
+
+  if (!sub || sub.status === 'CANCELED' || sub.currentPeriodEnd <= now) {
     const err = new Error('No active subscription found') as Error & { statusCode?: number }
     err.statusCode = 404
     throw err

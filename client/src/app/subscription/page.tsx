@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Crown, Check, X, Loader2, Zap, Gem, Sparkles
@@ -90,7 +90,7 @@ function getFeatureList(config: PremiumFeatures, isVi: boolean) {
 export default function SubscriptionPage() {
   const { language } = useLanguageStore();
   const isVi = language === 'vi';
-  const { allTierConfigs, fetchTierConfigs, lastFetchedAt } = usePremiumStore();
+  const { allTierConfigs, fetchTierConfigs } = usePremiumStore();
   const [status, setStatus] = useState<PremiumStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
@@ -106,18 +106,7 @@ export default function SubscriptionPage() {
     ULTIMATE: 'VIP Ultimate',
   };
 
-  useEffect(() => {
-    fetchPremiumStatus();
-    fetchPricing();
-  }, []);
-
-  useEffect(() => {
-    if (!lastFetchedAt) {
-      void fetchTierConfigs();
-    }
-  }, [fetchTierConfigs, lastFetchedAt]);
-
-  async function fetchPremiumStatus() {
+  const fetchPremiumStatus = useCallback(async () => {
     try {
       const response = await api.get<PremiumStatus>('/users/premium-status');
       if (response.success && response.data) {
@@ -128,9 +117,9 @@ export default function SubscriptionPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function fetchPricing() {
+  const fetchPricing = useCallback(async () => {
     try {
       const response = await api.get<PricingConfig>('/payment/pricing');
       if (response.success && response.data) {
@@ -139,7 +128,33 @@ export default function SubscriptionPage() {
     } catch (error) {
       console.error('Failed to fetch pricing:', error);
     }
-  }
+  }, []);
+
+  const refreshSubscriptionData = useCallback(async () => {
+    await Promise.all([
+      fetchPremiumStatus(),
+      fetchPricing(),
+      fetchTierConfigs(true),
+    ]);
+  }, [fetchPremiumStatus, fetchPricing, fetchTierConfigs]);
+
+  useEffect(() => {
+    void refreshSubscriptionData();
+  }, [refreshSubscriptionData]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshSubscriptionData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshSubscriptionData]);
 
   async function handleCheckout(tier: string) {
     setCheckoutLoading(tier);
@@ -161,7 +176,7 @@ export default function SubscriptionPage() {
     setCancelLoading(true);
     try {
       await api.post('/payment/cancel');
-      await fetchPremiumStatus();
+      await refreshSubscriptionData();
       toast({ title: isVi ? 'Đã hủy đăng ký' : 'Subscription cancelled', description: isVi ? 'Bạn vẫn sử dụng được đến hết kỳ hiện tại.' : 'You can still use premium until the end of the current period.' });
     } catch (error: any) {
       console.error('Cancel failed:', error);

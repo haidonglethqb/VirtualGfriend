@@ -59,6 +59,7 @@ model PaymentHistory {
 ```
 GET    /api/payment/pricing          → Public pricing info
 POST   /api/payment/create-checkout  → Stripe checkout session (auth required)
+GET    /api/payment/checkout-session/:sessionId → Verify checkout completion + activation state (auth)
 GET    /api/payment/status           → Current subscription status (auth)
 POST   /api/payment/cancel           → Cancel subscription (auth)
 POST   /api/payment/webhook          → Stripe webhook events (separate body parser)
@@ -104,6 +105,10 @@ export async function attachPremiumInfo(req, res, next) {
 }
 ```
 
+`autoDowngradeIfExpired` also cancels stale subscription rows whose `currentPeriodEnd` has already passed, so premium status screens do not keep showing `cancelAtPeriodEnd` for an already expired user.
+
+`GET /api/payment/status` and `GET /api/payment/checkout-session/:sessionId` normalize stale expired state on read as a fallback when the hourly reconciliation job has not run yet.
+
 ## Feature Gating on Resources
 
 Quests, gifts, scenes, and shop items can require minimum tiers:
@@ -124,6 +129,14 @@ model Scene {
   minimumTier     PremiumTier  @default(FREE)
 }
 ```
+
+## Daily Message Quotas
+
+- `FREE` users are limited by daily chat quota from tier config
+- paid tiers use unlimited daily chat quota unless tier config says otherwise
+- quota is checked on both REST `POST /api/chat/send` and Socket.IO `message:send`
+- `GET /api/chat/daily-usage` returns used, remaining, limit, and unlimited state for the current user
+- counters reset daily and are used before AI processing starts
 
 ## Related
 

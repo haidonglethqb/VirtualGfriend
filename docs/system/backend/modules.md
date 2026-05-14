@@ -53,7 +53,7 @@ flowchart TB
 
 | Feature | Implementation |
 |---|---|
-| `sendMessage` | AI call → save msgs → update affection/mood/level → extract facts → trigger quests |
+| `sendMessage` | Entry points check daily quota first, then AI call → save msgs → update affection/mood/level → extract facts → trigger quests |
 | History | Paginated `findMany`, `createdAt DESC` |
 | Dedup | Redis setNX `dedup:{userId}:{clientId}` (60s TTL) |
 

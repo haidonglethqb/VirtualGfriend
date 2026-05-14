@@ -58,6 +58,7 @@ model UserSettings {
   profilePublic         Boolean  @default(false)
   showActivity          Boolean  @default(false)
   allowMessages         Boolean  @default(true)
+  allowExPersonaMessages Boolean @default(true)
   activeSceneId         String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

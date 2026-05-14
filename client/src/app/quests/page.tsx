@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -110,15 +110,7 @@ export default function QuestsPage() {
   const [startingId, setStartingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('daily');
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth/login');
-      return;
-    }
-    fetchQuests();
-  }, [isAuthenticated, router]);
-
-  const fetchQuests = async () => {
+  const fetchQuests = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await api.get<Quest[]>('/quests/all');
@@ -135,7 +127,15 @@ export default function QuestsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t.error, t.loadError, toast]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+    void fetchQuests();
+  }, [fetchQuests, isAuthenticated, router]);
 
   const handleStartQuest = async (questId: string) => {
     try {

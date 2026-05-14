@@ -246,7 +246,13 @@ export const relationshipService = {
    */
   async getRelationshipHistory(userId: string) {
     const characters = await prisma.character.findMany({
-      where: { userId },
+      where: {
+        userId,
+        NOT: {
+          isExPersona: true,
+          endReason: 'source_relationship_reconciled',
+        },
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         template: true,
@@ -291,7 +297,7 @@ export const relationshipService = {
    */
   async canStartNewRelationship(userId: string, premiumTier: string) {
     const characters = await prisma.character.findMany({
-      where: { userId, isEnded: false },
+      where: { userId, isEnded: false, isExPersona: false },
     })
 
     const maxCharacters = {
