@@ -1,7 +1,7 @@
 # Payment Models
 
 > Stripe subscriptions, payment history, and billing configuration.
-> Last updated: 2026-04-09 · Reference: `server/prisma/schema.prisma`, `server/src/modules/payment/`
+> Last updated: 2026-05-14. Reference: `server/prisma/schema.prisma`, `server/src/modules/payment/`
 
 ## Subscription Model
 
@@ -121,7 +121,7 @@ The Stripe webhook (`/api/payment/webhook`) handles:
 | `invoice.payment_succeeded` | Update Subscription period dates |
 | `invoice.payment_failed` | Set Subscription status to `PAST_DUE` |
 | `customer.subscription.updated` | Sync tier, billing cycle, cancel status |
-| `customer.subscription.deleted` | Set `cancelAtPeriodEnd`, auto-downgrade on expiry |
+| `customer.subscription.deleted` | Mark subscription `CANCELED` and downgrade user to FREE |
 
 ## Related
 

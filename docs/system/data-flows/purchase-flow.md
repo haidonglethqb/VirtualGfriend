@@ -71,13 +71,14 @@ ACTIVE → PAST_DUE → (retry) → ACTIVE or CANCELED
 - User downgraded to FREE after period expires
 
 ## Status Polling
-- `GET /api/payment/status` returns the current subscription snapshot used by the success page and subscription settings UI
-- Frontend polls this endpoint after Stripe redirect until premium state is reflected locally
+- `GET /api/payment/checkout-session/:sessionId` is the success-page polling endpoint after Stripe redirect
+- `GET /api/payment/status` returns the normalized subscription snapshot for account/subscription status views
+- `GET /api/users/premium-status` powers the subscription settings UI with tier features and usage
 
 ## Success Page Guard
 - `/payment/success` must not trust the query string alone
 - frontend verifies `session_id` through `GET /api/payment/checkout-session/:sessionId`
-- missing or чужой session IDs must render an invalid-payment state instead of a success state
+- missing, invalid, or other-user session IDs must render an invalid-payment state instead of a success state
 
 ## Payment History
 ```prisma

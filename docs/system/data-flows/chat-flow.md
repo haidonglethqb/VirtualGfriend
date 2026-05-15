@@ -22,6 +22,7 @@ sequenceDiagram
     SocketIO->>ChatService: sendMessage(userId, data)
     ChatService->>DB: Get character (cache → DB)
     ChatService->>DB: CREATE USER message
+    ChatService->>ChatService: Increment cached daily USER-message counter
     ChatService->>DB: Get recent 20 messages
     ChatService->>AIService: generateResponse(context)
     Note over AIService: Groq API, personality-aware<br/>typing delay: min(4000, max(1500, len*25))
@@ -38,6 +39,7 @@ sequenceDiagram
 ## Quota Enforcement
 - `POST /api/chat/send` and Socket.IO `message:send` must both check daily usage before AI processing
 - only the chat service increments the daily message counter after the user message is persisted
+- the counter counts only `USER` messages and uses Redis `setNX`/`incr` to avoid read-modify-write drift during concurrent sends
 - free-tier users should receive `DAILY_LIMIT_REACHED` once the daily cap is exhausted
 
 ## Typing Delay Calculation
