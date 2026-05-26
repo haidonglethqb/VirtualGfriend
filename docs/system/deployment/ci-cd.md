@@ -58,16 +58,11 @@ ENVEOF
 # Escape `$` inside secret values before Docker Compose reads `.env`
 awk '...' .env > .env.tmp && mv .env.tmp .env
 
-# Fail-fast required secrets check (email provider aware)
+# Fail-fast required secrets check (includes SMTP_USER/SMTP_PASS)
 check_required "POSTGRES_PASSWORD" "${{ secrets.POSTGRES_PASSWORD }}"
 check_required "JWT_SECRET" "${{ secrets.JWT_SECRET }}"
-if [ "${{ secrets.EMAIL_PROVIDER }}" = "resend" ]; then
-  check_required "RESEND_API_KEY" "${{ secrets.RESEND_API_KEY }}"
-  check_required "RESEND_FROM_EMAIL" "${{ secrets.RESEND_FROM_EMAIL }}"
-else
-  check_required "SMTP_USER" "${{ secrets.SMTP_USER }}"
-  check_required "SMTP_PASS" "${{ secrets.SMTP_PASS }}"
-fi
+check_required "SMTP_USER" "${{ secrets.SMTP_USER }}"
+check_required "SMTP_PASS" "${{ secrets.SMTP_PASS }}"
 
 # Step 2: Login to GHCR
 docker login ghcr.io -u "${{ github.actor }}" --password-stdin

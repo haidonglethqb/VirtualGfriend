@@ -12,7 +12,6 @@ interface SendEmailOptions {
 
 class EmailService {
   private transporter: nodemailer.Transporter | null = null;
-  private resendConfigured = false;
   private initialized = false;
 
   constructor() {
@@ -22,52 +21,25 @@ class EmailService {
   private initializeTransporter() {
     const user = process.env.SMTP_USER?.trim();
     const pass = process.env.SMTP_PASS?.trim();
-    const resendApiKey = process.env.RESEND_API_KEY?.trim();
-    const resendFromEmail = process.env.RESEND_FROM_EMAIL?.trim();
-    const emailProvider = (process.env.EMAIL_PROVIDER || 'smtp').trim().toLowerCase();
 
     const emailConfig = {
       host: process.env.SMTP_HOST?.trim() || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_SECURE === 'true',
-      connectionTimeout: parseInt(process.env.SMTP_CONNECTION_TIMEOUT_MS || '10000'),
-      greetingTimeout: parseInt(process.env.SMTP_GREETING_TIMEOUT_MS || '10000'),
-      socketTimeout: parseInt(process.env.SMTP_SOCKET_TIMEOUT_MS || '20000'),
       auth: {
         user,
         pass,
       },
     };
 
-    this.transporter = null;
-    this.resendConfigured = false;
-
-    if (emailProvider === 'resend') {
-      if (resendApiKey && resendFromEmail) {
-        this.resendConfigured = true;
-        log.info('Service initialized with Resend API');
-      } else {
-        log.warn('Resend not configured - RESEND_API_KEY: ' + (resendApiKey ? 'SET' : 'MISSING') + ', RESEND_FROM_EMAIL: ' + (resendFromEmail ? 'SET' : 'MISSING'));
-      }
-      this.initialized = true;
-      return;
-    }
-
-    // Default SMTP provider
+    // Only initialize if credentials are provided
     if (user && pass) {
       this.transporter = nodemailer.createTransport(emailConfig);
+      this.initialized = true;
       log.info('Service initialized with user:', user);
     } else {
       log.warn('Service not configured - SMTP_USER: ' + (user ? 'SET' : 'MISSING') + ', SMTP_PASS: ' + (pass ? 'SET' : 'MISSING'));
     }
-
-    // Optional fallback transport over HTTPS (works on port 443)
-    if (resendApiKey && resendFromEmail) {
-      this.resendConfigured = true;
-      log.info('Resend fallback enabled');
-    }
-
-    this.initialized = true;
   }
 
   /**
@@ -83,92 +55,38 @@ class EmailService {
 
   isConfigured(): boolean {
     this.ensureInitialized();
-    return this.transporter !== null || this.resendConfigured;
-  }
-
-  private getFromAddress(): string {
-    const fromName = process.env.SMTP_FROM_NAME || 'VGfriend';
-    const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.SMTP_USER;
-    if (!fromEmail) return fromName;
-    return `"${fromName}" <${fromEmail}>`;
-  }
-
-  private async sendWithResend({ to, subject, html, text }: SendEmailOptions): Promise<boolean> {
-    if (!this.resendConfigured) {
-      return false;
-    }
-
-    const resendApiKey = process.env.RESEND_API_KEY?.trim();
-    const resendFromEmail = process.env.RESEND_FROM_EMAIL?.trim();
-    if (!resendApiKey || !resendFromEmail) {
-      log.error('Cannot send via Resend - missing API key or from email');
-      return false;
-    }
-
-    const resendApiUrl = process.env.RESEND_API_URL?.trim() || 'https://api.resend.com/emails';
-
-    try {
-      const response = await fetch(resendApiUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: this.getFromAddress(),
-          to: [to],
-          subject,
-          html,
-          text,
-        }),
-      });
-
-      if (!response.ok) {
-        const responseText = await response.text();
-        log.error(`Resend API error: ${response.status} ${response.statusText} - ${responseText.slice(0, 500)}`);
-        return false;
-      }
-
-      const payload = (await response.json().catch(() => ({}))) as { id?: string };
-      log.info('Message sent via Resend API:', payload.id || 'NO_ID');
-      return true;
-    } catch (error) {
-      log.error('Error sending email via Resend API:', error);
-      return false;
-    }
+    return this.transporter !== null;
   }
 
   async sendEmail({ to, subject, html, text }: SendEmailOptions): Promise<boolean> {
     this.ensureInitialized();
 
-    if (this.transporter) {
-      try {
-        const info = await this.transporter.sendMail({
-          from: this.getFromAddress(),
-          to,
-          subject,
-          text,
-          html,
-        });
+    if (!this.transporter) {
+      log.error('Cannot send email - service not configured');
+      return false;
+    }
 
-        log.info('Message sent via SMTP:', info.messageId);
-        return true;
-      } catch (error) {
-        log.error('Error sending email via SMTP:', error);
-        if (this.resendConfigured) {
-          log.warn('Trying Resend fallback after SMTP failure...');
-          return this.sendWithResend({ to, subject, html, text });
-        }
+    try {
+      const fromEmail = process.env.SMTP_FROM_EMAIL?.trim() || process.env.SMTP_USER;
+      if (!fromEmail) {
+        log.error('Cannot send email - SMTP_FROM_EMAIL/SMTP_USER is missing');
         return false;
       }
-    }
 
-    if (this.resendConfigured) {
-      return this.sendWithResend({ to, subject, html, text });
-    }
+      const info = await this.transporter.sendMail({
+        from: `"${process.env.SMTP_FROM_NAME || 'VGfriend'}" <${fromEmail}>`,
+        to,
+        subject,
+        text,
+        html,
+      });
 
-    log.error('Cannot send email - no provider configured');
-    return false;
+      log.info('Message sent:', info.messageId);
+      return true;
+    } catch (error) {
+      log.error('Error sending email:', error);
+      return false;
+    }
   }
 
   async sendOTP(email: string, otp: string): Promise<boolean> {

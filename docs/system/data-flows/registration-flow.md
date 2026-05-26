@@ -21,7 +21,7 @@ sequenceDiagram
     AuthService->>DB: Check email/username exists
     AuthService->>AuthService: bcrypt.hash(password, 12)
     AuthService->>Redis: SET pending_registration:{email} (15min)
-    AuthService->>Email: Send OTP (SMTP or HTTPS API fallback)
+    AuthService->>Email: Send OTP (Nodemailer SMTP)
     AuthService-->>Client: {status: "OTP_SENT", email}
 
     Client->>AuthRouter: POST /api/auth/verify-registration
@@ -49,9 +49,8 @@ function generateTokens(userId, email) {
 ```
 
 ## Email Delivery
-- **Transport**: Nodemailer SMTP with optional Resend HTTPS API fallback
-- **Config (SMTP)**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
-- **Config (HTTPS API)**: `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
+- **Transport**: Nodemailer SMTP
+- **Config**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
 - **OTP TTL**: 5-15 minutes (configurable)
 
 ## Client-Side (Zustand)

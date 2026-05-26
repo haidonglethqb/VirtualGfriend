@@ -16,13 +16,11 @@
 |----------|-------------|---------|
 | `STRIPE_SECRET_KEY` | Stripe API secret | `sk_live_...` |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signature verification | `whsec_...` |
-| `EMAIL_PROVIDER` | Email provider mode (`smtp` or `resend`) | `smtp` |
 | `SMTP_HOST` | Email server | `smtp.gmail.com` |
 | `SMTP_PORT` | Email port | `587` |
 | `SMTP_USER` | Email username | `app@domain.com` |
 | `SMTP_PASS` | Email password | App-specific password |
-| `RESEND_API_KEY` | Resend API key (required when `EMAIL_PROVIDER=resend`) | `re_...` |
-| `RESEND_FROM_EMAIL` | Sender email verified in Resend | `otp@domain.com` |
+| `SMTP_FROM_EMAIL` | Verified sender email (optional, recommended for SMTP relays) | `otp@domain.com` |
 | `CORS_ORIGIN` | Allowed frontend domain | `https://vgfriend.io.vn` |
 | `DO_SPACES_KEY` | DigitalOcean Spaces access key | Spaces IAM key |
 | `DO_SPACES_SECRET` | DigitalOcean Spaces secret | Spaces IAM secret |
@@ -37,10 +35,6 @@
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection |
-| `RESEND_API_URL` | `https://api.resend.com/emails` | Resend API endpoint override |
-| `SMTP_CONNECTION_TIMEOUT_MS` | `10000` | SMTP connect timeout in ms |
-| `SMTP_GREETING_TIMEOUT_MS` | `10000` | SMTP greeting timeout in ms |
-| `SMTP_SOCKET_TIMEOUT_MS` | `20000` | SMTP socket timeout in ms |
 | `DO_SPACES_ENDPOINT` | `https://sgp1.digitaloceanspaces.com` | S3-compatible endpoint |
 | `DO_SPACES_BUCKET` | `haichu` | Bucket name |
 | `DO_SPACES_REGION` | `sgp1` | Region |
