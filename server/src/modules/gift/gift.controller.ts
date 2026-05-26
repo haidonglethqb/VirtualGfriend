@@ -57,7 +57,8 @@ export const giftController = {
       let characterId = data.characterId;
       if (!characterId) {
         const character = await prisma.character.findFirst({
-          where: { userId: req.user!.id, isActive: true },
+          where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
+          orderBy: { createdAt: 'desc' },
         });
         if (!character) {
           return next(new AppError('No active character found', 400, 'NO_CHARACTER'));

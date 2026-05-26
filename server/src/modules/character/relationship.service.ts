@@ -5,7 +5,7 @@ import { RelationshipStage, RelationshipEventType } from '@prisma/client'
 import { createModuleLogger } from '../../lib/logger'
 import { RELATIONSHIP_THRESHOLDS, SCENE_PROGRESSION } from '../../lib/constants'
 import { exPersonaService } from './ex-persona.service'
-import type { PremiumTier } from '../admin/tier-config.service'
+import { getTierConfig, type PremiumTier } from '../admin/tier-config.service'
 
 const log = createModuleLogger('Relationship')
 
@@ -42,7 +42,8 @@ export const relationshipService = {
    */
   async getRelationshipStatus(userId: string) {
     const character = await prisma.character.findFirst({
-      where: { userId, isActive: true, isEnded: false },
+      where: { userId, isActive: true, isEnded: false, isExPersona: false },
+      orderBy: { createdAt: 'desc' },
       include: {
         relationshipHistory: {
           orderBy: { createdAt: 'desc' },
@@ -117,7 +118,8 @@ export const relationshipService = {
    */
   async updateAffection(userId: string, amount: number, reason: string) {
     const character = await prisma.character.findFirst({
-      where: { userId, isActive: true, isEnded: false },
+      where: { userId, isActive: true, isEnded: false, isExPersona: false },
+      orderBy: { createdAt: 'desc' },
     })
 
     if (!character) {
@@ -176,13 +178,18 @@ export const relationshipService = {
   async endRelationship(
     userId: string,
     options?: {
+      characterId?: string
       reason?: string
       exPersonaConsent?: boolean
       premiumTier?: PremiumTier
     }
   ) {
+    const targetCharacterId = options?.characterId
     const character = await prisma.character.findFirst({
-      where: { userId, isActive: true, isEnded: false },
+      where: targetCharacterId
+        ? { id: targetCharacterId, userId, isActive: true, isEnded: false, isExPersona: false }
+        : { userId, isActive: true, isEnded: false, isExPersona: false },
+      ...(targetCharacterId ? {} : { orderBy: { createdAt: 'desc' as const } }),
     })
 
     if (!character) {
@@ -295,17 +302,13 @@ export const relationshipService = {
   /**
    * Check if user can start a new relationship
    */
-  async canStartNewRelationship(userId: string, premiumTier: string) {
+  async canStartNewRelationship(userId: string, premiumTier: PremiumTier) {
     const characters = await prisma.character.findMany({
       where: { userId, isEnded: false, isExPersona: false },
     })
 
-    const maxCharacters = {
-      FREE: 1,
-      BASIC: 2,
-      PRO: 5,
-      ULTIMATE: -1, // Unlimited
-    }[premiumTier] ?? 1
+    const tierConfig = await getTierConfig(premiumTier)
+    const maxCharacters = tierConfig.maxCharacters
 
     if (maxCharacters === -1) {
       return { canStart: true, currentCount: characters.length, maxAllowed: -1 }
@@ -336,6 +339,22 @@ export const relationshipService = {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND')
     }
 
+    const tierConfig = await getTierConfig(user.premiumTier)
+    const maxCharacters = tierConfig.maxCharacters
+    if (maxCharacters !== -1) {
+      const currentActiveCount = await prisma.character.count({
+        where: { userId, isEnded: false, isExPersona: false },
+      })
+
+      if (currentActiveCount >= maxCharacters) {
+        throw new AppError(
+          `Bạn đã đạt giới hạn số nhân vật (${maxCharacters}). Hãy kết thúc một mối quan hệ hoặc nâng cấp VIP để quay lại với ${character.name}.`,
+          403,
+          'CHARACTER_LIMIT_REACHED'
+        )
+      }
+    }
+
     const reconcileCost = 100 // Gems required to reconcile
     if (user.premiumTier === 'FREE' && user.gems < reconcileCost) {
       throw new AppError(
@@ -351,12 +370,6 @@ export const relationshipService = {
     // Wrap all DB operations in transaction for atomicity
     await prisma.$transaction(async (tx) => {
       await exPersonaService.archiveForSource(tx, userId, character.id, 'source_relationship_reconciled')
-
-      // Deactivate any current active relationships
-      await tx.character.updateMany({
-        where: { userId, isActive: true },
-        data: { isActive: false },
-      })
 
       // Reactivate the character with reduced affection
       await tx.character.update({

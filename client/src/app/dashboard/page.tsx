@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Heart, MessageCircle, Gift, Star, Target,
-  Calendar, Sparkles, ImageIcon, CheckCircle, Trophy, TrendingUp
+  Calendar, Sparkles, ImageIcon, CheckCircle, Trophy, TrendingUp, UserPlus, Settings
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -54,6 +54,12 @@ const DASHBOARD_I18N = {
     recentMoments: 'Khoảnh khắc gần đây',
     viewAlbum: 'Xem album →',
     createMemories: 'Trò chuyện nhiều hơn để tạo kỷ niệm đẹp!',
+    activeChats: 'Các cuộc chat đang hoạt động',
+    activeChatsDesc: 'Mở từng nhân vật bằng cuộc chat riêng',
+    openChat: 'Mở chat',
+    noActiveChats: 'Chưa có cuộc chat đang hoạt động',
+    createNewCharacter: 'Tạo người yêu mới',
+    characterSettings: 'Cài đặt',
   },
   en: {
     occupations: {
@@ -91,6 +97,12 @@ const DASHBOARD_I18N = {
     recentMoments: 'Recent Moments',
     viewAlbum: 'View Album →',
     createMemories: 'Chat more to create beautiful memories!',
+    activeChats: 'Active chats',
+    activeChatsDesc: 'Open each character in a separate chat',
+    openChat: 'Open chat',
+    noActiveChats: 'No active chats yet',
+    createNewCharacter: 'Create new companion',
+    characterSettings: 'Settings',
   },
 } as const;
 
@@ -137,6 +149,22 @@ interface Memory {
   createdAt: string;
 }
 
+interface RelationshipCharacter {
+  id: string;
+  name: string;
+  avatarUrl?: string | null;
+  relationshipStage: string;
+  affection: number;
+  isEnded: boolean;
+  isExPersona: boolean;
+}
+
+interface CanStartRelationshipInfo {
+  canStart: boolean;
+  currentCount: number;
+  maxAllowed: number;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
@@ -146,6 +174,8 @@ export default function DashboardPage() {
   const [greeting, setGreeting] = useState('');
   const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([]);
   const [recentMemories, setRecentMemories] = useState<Memory[]>([]);
+  const [activeRelationships, setActiveRelationships] = useState<RelationshipCharacter[]>([]);
+  const [canStartRelationship, setCanStartRelationship] = useState<CanStartRelationshipInfo | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     messagesToday: 0,
     streak: 1,
@@ -154,11 +184,13 @@ export default function DashboardPage() {
 
   const fetchDashboardData = useCallback(async () => {
     // Fetch all dashboard data in parallel for faster load
-    const [questsResult, chatResult, giftResult, memoriesResult] = await Promise.allSettled([
+    const [questsResult, chatResult, giftResult, memoriesResult, relationshipsResult, canStartResult] = await Promise.allSettled([
       api.get<DailyQuest[]>('/quests/daily'),
       api.get<{ messages: Array<{ createdAt: string }> }>('/chat/history?limit=100'),
       api.get<{ items: unknown[]; total: number }>('/shop/history'),
       api.get<{ items: Memory[] }>('/memories?limit=3'),
+      api.get<RelationshipCharacter[]>('/character/relationship/history'),
+      api.get<CanStartRelationshipInfo>('/character/relationship/can-start-new'),
     ]);
 
     if (questsResult.status === 'fulfilled' && questsResult.value.success) {
@@ -180,6 +212,16 @@ export default function DashboardPage() {
 
     if (memoriesResult.status === 'fulfilled' && memoriesResult.value.success) {
       setRecentMemories(memoriesResult.value.data.items?.slice(0, 3) || []);
+    }
+
+    if (relationshipsResult.status === 'fulfilled' && relationshipsResult.value.success) {
+      setActiveRelationships(
+        relationshipsResult.value.data.filter((item) => !item.isEnded && !item.isExPersona)
+      );
+    }
+
+    if (canStartResult.status === 'fulfilled' && canStartResult.value.success) {
+      setCanStartRelationship(canStartResult.value.data);
     }
   }, []);
 
@@ -362,7 +404,7 @@ export default function DashboardPage() {
 
                 {/* Quick actions */}
                 <div className="grid grid-cols-2 gap-3">
-                  <Link href="/chat" className="w-full">
+                  <Link href={character?.id ? `/chat?characterId=${encodeURIComponent(character.id)}` : '/chat'} className="w-full">
                     <button className="w-full flex items-center justify-center gap-2 h-12 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all shadow-[0_0_20px_rgba(244,37,140,0.3)]">
                       <MessageCircle className="w-5 h-5" />
                       {t.chatNow}
@@ -414,6 +456,69 @@ export default function DashboardPage() {
                   value={stats.giftsGiven}
                   trend={stats.giftsGiven}
                 />
+              </div>
+            </motion.div>
+
+            {/* Active Chats */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+            >
+              <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-lg font-bold">{t.activeChats}</h3>
+                    <p className="text-sm text-[#ba9cab]">{t.activeChatsDesc}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {canStartRelationship?.canStart && (
+                      <Link href="/onboarding">
+                        <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-love/40 text-love hover:bg-love/10 transition-colors">
+                          <UserPlus className="w-3.5 h-3.5" />
+                          {t.createNewCharacter}
+                        </button>
+                      </Link>
+                    )}
+                    <MessageCircle className="w-5 h-5 text-love" />
+                  </div>
+                </div>
+
+                {activeRelationships.length > 0 ? (
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {activeRelationships.map((item) => (
+                      <div key={item.id} className="flex items-center gap-3 rounded-xl bg-[#181114] border border-[#392830] p-3 hover:border-love/50 transition-colors">
+                        <Link href={`/chat?characterId=${encodeURIComponent(item.id)}`} className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center overflow-hidden text-white font-bold">
+                            {item.avatarUrl ? (
+                              <Image src={item.avatarUrl} alt={item.name} width={48} height={48} className="w-full h-full object-cover" sizes="48px" />
+                            ) : (
+                              item.name.charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold truncate">{item.name}</p>
+                            <p className="text-xs text-[#ba9cab]">{getRelationshipLabel(item.relationshipStage)} • {item.affection}</p>
+                          </div>
+                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/chat?characterId=${encodeURIComponent(item.id)}`} className="text-xs text-love font-semibold hover:underline">
+                            {t.openChat}
+                          </Link>
+                          <Link
+                            href={`/settings/character?characterId=${encodeURIComponent(item.id)}`}
+                            className="w-8 h-8 rounded-full border border-[#4a3640] hover:border-love/50 hover:text-love text-[#ba9cab] transition-colors flex items-center justify-center"
+                            title={t.characterSettings}
+                          >
+                            <Settings className="w-4 h-4" />
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#ba9cab]">{t.noActiveChats}</p>
+                )}
               </div>
             </motion.div>
 

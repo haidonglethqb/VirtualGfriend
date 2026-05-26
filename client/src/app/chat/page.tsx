@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Heart, Send, Mic, Smile, Paperclip,
-  Gift, Phone, Video, Sparkles, X, Check, Loader2, ImageIcon
+  Gift, Phone, Video, Sparkles, X, Check, Loader2, ImageIcon, Settings
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/app-layout'
 import { useAuthStore } from '@/store/auth-store'
@@ -73,8 +73,8 @@ const CHAT_I18N = {
     imageFeature: 'Tính năng gửi ảnh sẽ có trong bản cập nhật tới!',
     voiceMessageFeature: 'Tính năng ghi âm sẽ có trong bản cập nhật tới!',
     loadingMessages: 'Đang tải tin nhắn...',
-    missingCharacter: 'Không tìm thấy người cũ AI',
-    missingCharacterDesc: 'Liên kết này không còn hợp lệ hoặc người cũ AI đã bị xoá.',
+    missingCharacter: 'Không tìm thấy cuộc chat',
+    missingCharacterDesc: 'Liên kết này không còn hợp lệ hoặc nhân vật đã bị xoá/kết thúc.',
     startConversation: 'Bắt đầu cuộc trò chuyện!',
     startConversationDesc: 'Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện với {name} của bạn 💕',
     sendImage: 'Gửi ảnh (VIP)',
@@ -93,6 +93,7 @@ const CHAT_I18N = {
     error: 'Lỗi',
     cannotLoadInventory: 'Không thể tải túi đồ',
     cannotSendGift: 'Không thể tặng quà',
+    characterSettings: 'Cài đặt nhân vật',
   },
   en: {
     lover: 'Lover',
@@ -111,8 +112,8 @@ const CHAT_I18N = {
     imageFeature: 'Image sending feature will be available in the next update!',
     voiceMessageFeature: 'Voice recording feature will be available in the next update!',
     loadingMessages: 'Loading messages...',
-    missingCharacter: 'AI ex not found',
-    missingCharacterDesc: 'This link is no longer valid or the AI ex has already been deleted.',
+    missingCharacter: 'Chat not found',
+    missingCharacterDesc: 'This link is no longer valid or the character has been deleted/ended.',
     startConversation: 'Start a conversation!',
     startConversationDesc: 'Send your first message to start chatting with your {name} 💕',
     sendImage: 'Send Image (VIP)',
@@ -131,6 +132,7 @@ const CHAT_I18N = {
     error: 'Error',
     cannotLoadInventory: 'Cannot load inventory',
     cannotSendGift: 'Cannot send gift',
+    characterSettings: 'Character settings',
   },
 } as const;
 
@@ -240,7 +242,7 @@ function ChatPageContent() {
       const response = await api.get<ChatCharacterSummary[]>('/character/relationship/history')
       const matchedCharacter = response.data?.find((item) => item.id === requestedCharacterId)
 
-      if (matchedCharacter?.isExPersona) {
+      if (matchedCharacter && (matchedCharacter.isExPersona || !matchedCharacter.isEnded)) {
         setChatCharacter({
           ...matchedCharacter,
           mood: matchedCharacter.mood || 'sad',
@@ -515,6 +517,12 @@ function ChatPageContent() {
   const displayCharacterName = displayCharacter?.name || t.lover;
   const affectionLevel = Math.floor((displayCharacter?.affection || 0) / 100) + 1;
   const activeScene = getActiveScene();
+  const openCharacterSettings = () => {
+    if (!activeChatCharacterId) {
+      return;
+    }
+    router.push(`/settings/character?characterId=${encodeURIComponent(activeChatCharacterId)}`);
+  };
 
   return (
     <AppLayout>
@@ -589,6 +597,13 @@ function ChatPageContent() {
               >
                 <Gift className="w-5 h-5" />
               </button>
+              <button
+                onClick={openCharacterSettings}
+                className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors"
+                title={t.characterSettings}
+              >
+                <Settings className="w-5 h-5 text-[#ba9cab]" />
+              </button>
             </div>
           </div>
         </div>
@@ -644,6 +659,13 @@ function ChatPageContent() {
                 className="w-10 h-10 rounded-full bg-love/20 border border-love/30 flex items-center justify-center text-love hover:bg-love hover:text-white transition-all"
               >
                 <Gift className="w-5 h-5" />
+              </button>
+              <button
+                onClick={openCharacterSettings}
+                className="w-10 h-10 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center text-[#ba9cab] hover:bg-[#392830]/80 hover:text-white transition-all"
+                title={t.characterSettings}
+              >
+                <Settings className="w-4 h-4" />
               </button>
             </div>
           </div>

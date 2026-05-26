@@ -69,7 +69,7 @@ function getFeatureList(config: PremiumFeatures, isVi: boolean) {
   const fmtNum = (v: number) => v === -1 ? (isVi ? 'Không giới hạn' : 'Unlimited') : String(v);
   return [
     { label: isVi ? 'Tin nhắn/ngày' : 'Messages/day', value: fmtNum(config.maxMessagesPerDay), has: true },
-    { label: isVi ? 'Số nhân vật' : 'Characters', value: fmtNum(config.maxCharacters), has: true },
+    { label: isVi ? 'Nhân vật hoạt động' : 'Active characters', value: fmtNum(config.maxCharacters), has: true },
     { label: isVi ? 'Thưởng xu/tháng' : 'Monthly coin bonus', value: config.monthlyCoinBonus > 0 ? `${config.monthlyCoinBonus.toLocaleString('vi-VN')}` : null, has: config.monthlyCoinBonus > 0 },
     { label: isVi ? 'Thưởng ngọc/tháng' : 'Monthly gem bonus', value: config.monthlyGemBonus > 0 ? `${config.monthlyGemBonus.toLocaleString('vi-VN')}` : null, has: config.monthlyGemBonus > 0 },
     { label: isVi ? 'Nhân XP' : 'XP multiplier', value: config.xpMultiplier > 1 ? `x${config.xpMultiplier}` : null, has: config.xpMultiplier > 1 },

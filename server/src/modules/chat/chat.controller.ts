@@ -46,9 +46,11 @@ export const chatController = {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 50;
       
-      // Get active character for this user to filter messages
+      // Default history uses the newest active non-ex character. Multi-chat
+      // clients should call /history/:characterId for a specific thread.
       const character = await prisma.character.findFirst({
-        where: { userId: req.user!.id, isActive: true },
+        where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
+        orderBy: { createdAt: 'desc' },
       });
       if (!character) {
         return res.json({ success: true, data: { messages: [], total: 0, page: 1, pageSize: limit, hasMore: false } });
@@ -132,7 +134,8 @@ export const chatController = {
       let characterId = data.characterId;
       if (!characterId) {
         const character = await prisma.character.findFirst({
-          where: { userId: req.user!.id, isActive: true },
+          where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
+          orderBy: { createdAt: 'desc' },
         });
         if (!character) {
           log.error('No active character found for user:', req.user!.id);

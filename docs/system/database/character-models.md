@@ -184,7 +184,9 @@ enum Gender { MALE, FEMALE, NON_BINARY, OTHER }
 
 ## Character Slot Rules
 
-- Premium character limits count only ongoing relationships
+- `maxCharacters` means concurrent active companions/chats, not lifetime character count
+- Slot usage counts only characters where `isEnded=false` and `isExPersona=false`
 - Ended relationships do not consume slots
 - Ex-personas do not consume slots
-- Subscription status and create-character checks must use the same slot-count rule
+- `isActive` is no longer a singleton flag: users can have multiple active non-ex characters at the same time
+- Legacy endpoints without explicit `characterId` resolve to the newest active non-ex character (`createdAt DESC`)

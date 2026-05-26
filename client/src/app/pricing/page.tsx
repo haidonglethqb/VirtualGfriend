@@ -39,7 +39,7 @@ function buildFeatureList(config: PremiumFeatures, tr: (vi: string, en: string) 
       ? tr('Tin nhắn không giới hạn', 'Unlimited messages')
       : tr(`${config.maxMessagesPerDay} tin nhắn mỗi ngày`, `${config.maxMessagesPerDay} messages per day`),
     config.maxCharacters === -1
-      ? tr('Số nhân vật không giới hạn', 'Unlimited characters')
+      ? tr('Số nhân vật hoạt động không giới hạn', 'Unlimited active characters')
       : tr(`${config.maxCharacters} nhân vật hoạt động`, `${config.maxCharacters} active characters`),
     config.canAccessPremiumGifts || config.canAccessPremiumScenes
       ? tr('Quà tặng và bối cảnh premium', 'Premium gifts and scenes')

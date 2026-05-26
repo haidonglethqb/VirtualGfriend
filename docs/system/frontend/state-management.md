@@ -62,6 +62,7 @@ fetchMessages(characterId?) → API call → setMessages()
 
 - `chat-store.fetchMessages(characterId?)` can now load active-chat history or explicit character history for ex-persona conversations.
 - `notification-store.proactiveNotification` already carries `characterId`, which the chat page now uses to route replies into character-specific chat sessions.
+- `character-store.createCharacter()` preserves backend error payload/message (e.g. `CHARACTER_LIMIT_REACHED`) so onboarding can show the real tier/quota error.
 
 ## Cross-Tab Synchronization
 

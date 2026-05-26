@@ -35,29 +35,29 @@ Complete API endpoint reference. Base path: `/api`.
 ### Character (`/character`) — Auth required
 | Method | Path | Description |
 |---|---|---|
-| GET | `/` | Current active character |
-| GET | `/me` | Alias for current active character |
-| POST | `/` | Create character |
-| PATCH | `/` | Update character |
-| PATCH | `/update` | Alias for update current character |
+| GET | `/` | Current default active character (newest active non-ex). Optional query: `characterId` to load a specific active non-ex character |
+| GET | `/me` | Alias for GET `/` (supports optional `characterId` query) |
+| POST | `/` | Create character (enforces tier `maxCharacters` by counting only `isEnded=false && isExPersona=false`) |
+| PATCH | `/` | Update default active character, or target a specific active non-ex character via optional query `characterId` |
+| PATCH | `/update` | Alias for PATCH `/` (supports optional `characterId` query) |
 | PATCH | `/customize` | Avatar customization |
 | GET/POST | `/facts` | Get/add facts |
 | PATCH/DELETE | `/facts/:factId` | Update/delete fact |
 | GET | `/templates` | Public template list |
 | GET | `/relationship` | Relationship status + progression |
 | GET | `/relationship/history` | Full relationship list, including live ex-personas and per-character messaging state |
-| POST | `/relationship/end` | Break up with active character. Optional body: `reason`, `exPersonaConsent` for premium auto ex-persona generation |
-| POST | `/relationship/reconcile/:characterId` | Restore an ended non-ex relationship and archive any linked ex-persona |
+| POST | `/relationship/end` | Break up with default active character (newest active non-ex), or a specific one via optional body `characterId`; also accepts optional `reason`, `exPersonaConsent` |
+| POST | `/relationship/reconcile/:characterId` | Restore an ended non-ex relationship and archive any linked ex-persona (also enforces tier `maxCharacters`; FREE additionally requires gems) |
 | PATCH | `/relationship/ex-personas/:characterId` | Update ex-persona settings such as `exMessagingEnabled` |
 | DELETE | `/relationship/ex-personas/:characterId` | Permanently delete an ex-persona and its character-bound history |
 
 ### Chat (`/chat`) — Auth required
 | Method | Path | Description |
 |---|---|---|
-| GET | `/history` | Paginated messages |
+| GET | `/history` | Legacy default history for newest active non-ex character |
 | GET | `/history/:characterId` | Paginated messages for a specific character; archived reconciled ex-personas must return not found |
 | GET | `/daily-usage` | Premium-aware daily usage counters |
-| POST | `/send` | Send (REST fallback, socket preferred) |
+| POST | `/send` | Send (REST fallback, socket preferred). `characterId` is the standard multi-chat target; when omitted, server falls back to newest active non-ex character |
 | DELETE | `/message/:messageId` | Delete a message |
 | GET | `/search` | Search messages |
 

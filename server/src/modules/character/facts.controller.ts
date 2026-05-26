@@ -14,7 +14,8 @@ export const factsController = {
   async getFacts(req: Request, res: Response, next: NextFunction) {
     try {
       const character = await prisma.character.findFirst({
-        where: { userId: req.user!.id, isActive: true },
+        where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
+        orderBy: { createdAt: 'desc' },
       });
 
       if (!character) {
@@ -73,7 +74,8 @@ export const factsController = {
       const data = updateFactSchema.parse(req.body);
 
       const character = await prisma.character.findFirst({
-        where: { userId: req.user!.id, isActive: true },
+        where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
+        orderBy: { createdAt: 'desc' },
       });
 
       if (!character) {
@@ -114,7 +116,8 @@ export const factsController = {
       const { factId } = req.params;
 
       const character = await prisma.character.findFirst({
-        where: { userId: req.user!.id, isActive: true },
+        where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
+        orderBy: { createdAt: 'desc' },
       });
 
       if (!character) {
@@ -153,7 +156,8 @@ export const factsController = {
       const data = schema.parse(req.body);
 
       const character = await prisma.character.findFirst({
-        where: { userId: req.user!.id, isActive: true },
+        where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
+        orderBy: { createdAt: 'desc' },
       });
 
       if (!character) {

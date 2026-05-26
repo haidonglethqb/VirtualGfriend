@@ -163,7 +163,7 @@ export default function OnboardingPage() {
 
         setIsCreating(true);
         try {
-            await createCharacter({
+            const createdCharacter = await createCharacter({
                 name: formData.name || 'Người ấy',
                 gender: formData.gender,
                 personality: formData.personality as 'caring' | 'playful' | 'shy' | 'passionate' | 'intellectual',
@@ -188,20 +188,13 @@ export default function OnboardingPage() {
                 description: tr('Đã tạo nhân vật thành công.', 'Character created successfully.'),
             });
 
-            router.push('/dashboard');
+            router.push(`/chat?characterId=${encodeURIComponent(createdCharacter.id)}`);
         } catch (error: any) {
             console.error('Failed to create character:', error);
 
             let errorMessage = tr('Không thể tạo người yêu ảo. Vui lòng thử lại!', 'Could not create your AI companion. Please try again!');
 
-            if (error?.response?.status === 400) {
-                errorMessage = tr('Thông tin nhân vật không hợp lệ. Vui lòng kiểm tra lại.', 'Invalid character data. Please review your inputs.');
-            } else if (error?.response?.status === 401) {
-                errorMessage = tr('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'Session expired. Please sign in again.');
-                setTimeout(() => router.push('/auth/login'), 2000);
-            } else if (error?.response?.status === 500) {
-                errorMessage = tr('Lỗi server. Vui lòng thử lại sau ít phút.', 'Server error. Please try again in a few minutes.');
-            } else if (error?.message) {
+            if (error?.message) {
                 errorMessage = error.message;
             }
 

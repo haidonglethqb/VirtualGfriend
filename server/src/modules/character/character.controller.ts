@@ -51,9 +51,16 @@ const addFactSchema = z.object({
 export const characterController = {
   async getMyCharacter(req: Request, res: Response, next: NextFunction) {
     try {
-      const character = await characterService.getActiveCharacter(req.user!.id);
+      const characterIdRaw = req.query.characterId;
+      const characterId = typeof characterIdRaw === 'string'
+        ? z.string().uuid().parse(characterIdRaw)
+        : undefined;
+      const character = await characterService.getActiveCharacter(req.user!.id, { characterId });
       res.json({ success: true, data: character });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));
+      }
       next(error);
     }
   },
@@ -101,7 +108,11 @@ export const characterController = {
   async updateCharacter(req: Request, res: Response, next: NextFunction) {
     try {
       const data = updateCharacterSchema.parse(req.body);
-      const character = await characterService.updateCharacter(req.user!.id, data);
+      const characterIdRaw = req.query.characterId;
+      const characterId = typeof characterIdRaw === 'string'
+        ? z.string().uuid().parse(characterIdRaw)
+        : undefined;
+      const character = await characterService.updateCharacter(req.user!.id, data, { characterId });
       res.json({ success: true, data: character });
     } catch (error) {
       if (error instanceof z.ZodError) {

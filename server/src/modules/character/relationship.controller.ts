@@ -7,6 +7,7 @@ import { AppError } from '../../middlewares/error.middleware'
 const log = createModuleLogger('RelationshipController')
 
 const endRelationshipSchema = z.object({
+  characterId: z.string().uuid().optional(),
   reason: z.string().max(200).optional(),
   exPersonaConsent: z.boolean().optional(),
 })
@@ -51,9 +52,10 @@ export const relationshipController = {
   async endRelationship(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id
-      const { reason, exPersonaConsent } = endRelationshipSchema.parse(req.body ?? {})
+      const { characterId, reason, exPersonaConsent } = endRelationshipSchema.parse(req.body ?? {})
       
       const result = await relationshipService.endRelationship(userId, {
+        characterId,
         reason,
         exPersonaConsent,
         premiumTier: req.premiumInfo?.tier || 'FREE',

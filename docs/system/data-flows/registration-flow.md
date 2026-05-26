@@ -21,7 +21,7 @@ sequenceDiagram
     AuthService->>DB: Check email/username exists
     AuthService->>AuthService: bcrypt.hash(password, 12)
     AuthService->>Redis: SET pending_registration:{email} (15min)
-    AuthService->>Email: Send OTP (Nodemailer SMTP)
+    AuthService->>Email: Send OTP (SMTP or HTTPS API fallback)
     AuthService-->>Client: {status: "OTP_SENT", email}
 
     Client->>AuthRouter: POST /api/auth/verify-registration
@@ -49,14 +49,16 @@ function generateTokens(userId, email) {
 ```
 
 ## Email Delivery
-- **Transport**: Nodemailer SMTP
-- **Config**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
+- **Transport**: Nodemailer SMTP with optional Resend HTTPS API fallback
+- **Config (SMTP)**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
+- **Config (HTTPS API)**: `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
 - **OTP TTL**: 5-15 minutes (configurable)
 
 ## Client-Side (Zustand)
 - Tokens stored in Zustand persist middleware
 - `accessToken` attached to API requests as `Bearer` header
 - `refreshToken` stored in DB, rotated on use
+- After authentication, onboarding creates a character via `POST /api/character`; successful creation routes user to `/chat?characterId=<newCharacterId>` (explicit chat thread).
 
 ## Related
 - [Auth Security](../security/auth-security.md)

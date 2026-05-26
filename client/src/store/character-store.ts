@@ -97,7 +97,7 @@ interface CharacterState {
     occupation?: string;
     templateId?: string;
     avatarUrl?: string;
-  }) => Promise<void>;
+  }) => Promise<Character>;
   updateMood: (mood: string) => void;
   updateAffection: (change: number) => void;
   setAffection: (affection: number) => void;
@@ -142,9 +142,14 @@ export const useCharacterStore = create<CharacterState>((set) => ({
       const response = await api.post<Character>('/character', data);
       if (response.success && response.data) {
         set({ character: response.data, isLoading: false, needsCreation: false });
+        return response.data;
       }
-    } catch {
+      throw new Error('Character creation failed');
+    } catch (error) {
       set({ isLoading: false });
+      if (error instanceof Error) {
+        throw error;
+      }
       throw new Error('Failed to create character');
     }
   },

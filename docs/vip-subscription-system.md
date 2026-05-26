@@ -34,7 +34,7 @@ The VIP/Subscription system enables monetization through 4-tier premium access:
 | **ULTIMATE** | 💎 | Power users, unlimited everything |
 
 **Key capabilities:**
-- **Feature gating** — 19 configurable fields per tier control access to messages, characters, media, gifts, quests, scenes, and progression multipliers
+- **Feature gating** — 19 configurable fields per tier control access to messages, active companion chats, media, gifts, quests, scenes, and progression multipliers
 - **Stripe integration** — Monthly/yearly billing in VND, free trial support, webhook-driven activation and lifecycle management
 - **Dynamic configuration** — Admins can change any tier config field at runtime; changes are cached in Redis (1-hour TTL) and take effect immediately
 - **Auto-expiry** — Expired premium users are automatically downgraded to FREE via middleware (on-request) and cron reconciliation (hourly)
@@ -186,7 +186,7 @@ All 19 configurable fields per tier. Stored in `SystemConfig` under key `premium
 
 | Field | Type | FREE | BASIC | PRO | ULTIMATE | Description |
 |---|---|---|---|---|---|---|
-| `maxCharacters` | number | `1` | `5` | `5` | `-1` | Max characters user can create (`-1` = unlimited) |
+| `maxCharacters` | number | `1` | `5` | `5` | `-1` | Max concurrent active companions/chats (`isEnded=false && !isExPersona`, `-1` = unlimited) |
 | `maxMessagesPerDay` | number | `20` | `-1` | `-1` | `-1` | Daily message limit (`-1` = unlimited) |
 | `adFree` | boolean | `false` | `true` | `true` | `true` | Hide ads |
 | `voiceMessages` | boolean | `false` | `true` | `true` | `true` | Send voice messages |
@@ -411,7 +411,8 @@ These are enforced on the backend and **cannot be bypassed** by frontend manipul
 | Feature | Enforcement Point | File | Mechanism |
 |---|---|---|---|
 | **Daily message limit** | Before sending chat message | `chat.service.ts:checkDailyLimit()` | Reads `maxMessagesPerDay` from tier config via Redis cache, counts messages in Redis per user per day |
-| **Character limit** | Before creating character | `character.controller.ts:createCharacter()` | Counts existing characters, compares with `maxCharacters` from `req.premiumInfo.features` |
+| **Character limit** | Before creating character | `character.controller.ts:createCharacter()` | Counts ongoing non-ex relationships (`isEnded=false && !isExPersona`) and compares with `maxCharacters` from `req.premiumInfo.features` |
+| **Character limit (reconcile)** | Before reconciling ended relationship | `relationship.service.ts:reconcileRelationship()` | Loads tier config by `user.premiumTier`, counts ongoing non-ex relationships, blocks with `CHARACTER_LIMIT_REACHED` if at limit |
 | **Premium gift access** | Before purchasing/sending gift | `gift.service.ts` | Checks `requiresPremium` and `minimumTier` on gift, compares with user's `canAccessPremiumGifts` |
 | **Premium quest access** | Before starting/claiming quest | `quest.service.ts` | Checks `requiresPremium` and `minimumTier` on quest, compares with user's `canAccessPremiumQuests` |
 | **Premium scene access** | Before unlocking/accessing scene | `scene.service.ts` | Checks `requiresPremium` and `minimumTier` on scene, compares with user's `canAccessPremiumScenes` |

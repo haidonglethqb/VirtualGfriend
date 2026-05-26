@@ -48,6 +48,10 @@ interface AddFactData {
   importance?: number;
 }
 
+type CharacterTargetOptions = {
+  characterId?: string;
+};
+
 // Affection thresholds for relationship stages
 const RELATIONSHIP_THRESHOLDS: Record<RelationshipStage, number> = {
   STRANGER: 0,
@@ -179,15 +183,23 @@ function getUnlockedFeatures(level: number): string[] {
 }
 
 export const characterService = {
-  async getActiveCharacter(userId: string) {
-    // Try cache first
-    const cacheKey = CacheKeys.character(userId);
-    const cached = await cache.get<any>(cacheKey);
-    if (cached) return cached;
+  async getActiveCharacter(userId: string, options?: CharacterTargetOptions) {
+    const targetCharacterId = options?.characterId;
+    const shouldUseDefaultCache = !targetCharacterId;
+
+    // Try cache first for legacy default behavior
+    if (shouldUseDefaultCache) {
+      const cacheKey = CacheKeys.character(userId);
+      const cached = await cache.get<any>(cacheKey);
+      if (cached) return cached;
+    }
 
     // Try full query with all includes first
     let character = await prisma.character.findFirst({
-      where: { userId, isActive: true },
+      where: targetCharacterId
+        ? { id: targetCharacterId, userId, isActive: true, isEnded: false, isExPersona: false }
+        : { userId, isActive: true, isEnded: false, isExPersona: false },
+      ...(targetCharacterId ? {} : { orderBy: { createdAt: 'desc' as const } }),
       include: {
         template: true,
         characterFacts: {
@@ -226,8 +238,10 @@ export const characterService = {
       progressPercent,
     };
 
-    // Cache result
-    await cache.set(cacheKey, result, CacheTTL.CHARACTER);
+    // Cache only default active-character lookup.
+    if (shouldUseDefaultCache) {
+      await cache.set(CacheKeys.character(userId), result, CacheTTL.CHARACTER);
+    }
 
     return result;
   },
@@ -241,34 +255,26 @@ export const characterService = {
       personality: data.personality,
     });
 
-    // Use transaction to ensure atomicity: deactivate old characters and create new one
-    const character = await prisma.$transaction(async (tx) => {
-      // Deactivate other characters
-      await tx.character.updateMany({
-        where: { userId },
-        data: { isActive: false },
-      });
-
-      // Create new character
-      return tx.character.create({
-        data: {
-          userId,
-          name: data.name,
-          nickname: data.nickname,
-          gender: data.gender || 'FEMALE',
-          personality: data.personality || 'caring',
-          birthday: data.birthday ? new Date(data.birthday) : undefined,
-          bio: data.bio || `Xin chao! Toi la ${data.name}`,
-          age: data.age || 22,
-          occupation: data.occupation || 'student',
-          templateId: data.templateId || undefined,
-          avatarUrl: data.avatarUrl || undefined,
-          isActive: true,
-        },
-        include: {
-          template: true,
-        },
-      });
+    // Users can keep multiple ongoing relationships active. APIs that need a
+    // default companion choose the newest active non-ex character.
+    const character = await prisma.character.create({
+      data: {
+        userId,
+        name: data.name,
+        nickname: data.nickname,
+        gender: data.gender || 'FEMALE',
+        personality: data.personality || 'caring',
+        birthday: data.birthday ? new Date(data.birthday) : undefined,
+        bio: data.bio || `Xin chao! Toi la ${data.name}`,
+        age: data.age || 22,
+        occupation: data.occupation || 'student',
+        templateId: data.templateId || undefined,
+        avatarUrl: data.avatarUrl || undefined,
+        isActive: true,
+      },
+      include: {
+        template: true,
+      },
     });
 
     log.debug('Character created:', {
@@ -286,9 +292,13 @@ export const characterService = {
     return character;
   },
 
-  async updateCharacter(userId: string, data: UpdateCharacterData) {
+  async updateCharacter(userId: string, data: UpdateCharacterData, options?: CharacterTargetOptions) {
+    const targetCharacterId = options?.characterId;
     const character = await prisma.character.findFirst({
-      where: { userId, isActive: true },
+      where: targetCharacterId
+        ? { id: targetCharacterId, userId, isActive: true, isEnded: false, isExPersona: false }
+        : { userId, isActive: true, isEnded: false, isExPersona: false },
+      ...(targetCharacterId ? {} : { orderBy: { createdAt: 'desc' as const } }),
     });
 
     if (!character) {
@@ -302,14 +312,19 @@ export const characterService = {
 
     // Invalidate caches
     await cache.del(CacheKeys.character(userId));
+    await cache.del(CacheKeys.characterById(character.id));
     await cache.del(CacheKeys.characterWithFacts(character.id));
 
     return updated;
   },
 
-  async customizeCharacter(userId: string, data: CustomizeCharacterData) {
+  async customizeCharacter(userId: string, data: CustomizeCharacterData, options?: CharacterTargetOptions) {
+    const targetCharacterId = options?.characterId;
     const character = await prisma.character.findFirst({
-      where: { userId, isActive: true },
+      where: targetCharacterId
+        ? { id: targetCharacterId, userId, isActive: true, isEnded: false, isExPersona: false }
+        : { userId, isActive: true, isEnded: false, isExPersona: false },
+      ...(targetCharacterId ? {} : { orderBy: { createdAt: 'desc' as const } }),
     });
 
     if (!character) {
@@ -323,14 +338,19 @@ export const characterService = {
 
     // Invalidate caches
     await cache.del(CacheKeys.character(userId));
+    await cache.del(CacheKeys.characterById(character.id));
     await cache.del(CacheKeys.characterWithFacts(character.id));
 
     return updated;
   },
 
-  async getFacts(userId: string) {
+  async getFacts(userId: string, options?: CharacterTargetOptions) {
+    const targetCharacterId = options?.characterId;
     const character = await prisma.character.findFirst({
-      where: { userId, isActive: true },
+      where: targetCharacterId
+        ? { id: targetCharacterId, userId, isActive: true, isEnded: false, isExPersona: false }
+        : { userId, isActive: true, isEnded: false, isExPersona: false },
+      ...(targetCharacterId ? {} : { orderBy: { createdAt: 'desc' as const } }),
     });
 
     if (!character) {
@@ -343,9 +363,13 @@ export const characterService = {
     });
   },
 
-  async addFact(userId: string, data: AddFactData) {
+  async addFact(userId: string, data: AddFactData, options?: CharacterTargetOptions) {
+    const targetCharacterId = options?.characterId;
     const character = await prisma.character.findFirst({
-      where: { userId, isActive: true },
+      where: targetCharacterId
+        ? { id: targetCharacterId, userId, isActive: true, isEnded: false, isExPersona: false }
+        : { userId, isActive: true, isEnded: false, isExPersona: false },
+      ...(targetCharacterId ? {} : { orderBy: { createdAt: 'desc' as const } }),
     });
 
     if (!character) {
@@ -379,9 +403,13 @@ export const characterService = {
     return fact;
   },
 
-  async getRelationshipStatus(userId: string) {
+  async getRelationshipStatus(userId: string, options?: CharacterTargetOptions) {
+    const targetCharacterId = options?.characterId;
     const character = await prisma.character.findFirst({
-      where: { userId, isActive: true },
+      where: targetCharacterId
+        ? { id: targetCharacterId, userId, isActive: true, isEnded: false, isExPersona: false }
+        : { userId, isActive: true, isEnded: false, isExPersona: false },
+      ...(targetCharacterId ? {} : { orderBy: { createdAt: 'desc' as const } }),
     });
 
     if (!character) {
@@ -620,7 +648,8 @@ export const characterService = {
   // NEW: Check what features are unlocked at current level
   async getUnlockedFeaturesForUser(userId: string) {
     const character = await prisma.character.findFirst({
-      where: { userId, isActive: true },
+      where: { userId, isActive: true, isEnded: false, isExPersona: false },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (!character) {

@@ -9,7 +9,7 @@ Next.js 14 App Router with protected routes, auth guards, and public auth pages.
 ```
 /                           → Landing page (public)
 ├── /dashboard              → Main dashboard (protected)
-├── /chat                   → AI character chat (protected)
+├── /chat                   → AI character chat (protected, supports `?characterId=<id>` for explicit thread)
 ├── /shop                   → Gift shop catalog (protected)
 │   └── /inventory          → User's purchased items (protected)
 ├── /messages               → User-to-user DM (protected)
@@ -18,7 +18,7 @@ Next.js 14 App Router with protected routes, auth guards, and public auth pages.
 ├── /leaderboard            → Rankings (protected)
 ├── /settings               → Settings hub (protected)
 │   ├── /profile            → Edit profile
-│   ├── /character          → Character customization
+│   ├── /character          → Character customization (supports `?characterId=<id>` to edit/break up specific active character)
 │   ├── /facts              → View/manage character facts
 │   ├── /ex-personas        → Manage AI ex-personas and reopen archived chats
 │   ├── /appearance         → Theme, font, UI settings

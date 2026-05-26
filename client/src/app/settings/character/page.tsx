@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Loader2, Check, Heart, User, RefreshCw, AlertTriangle, MessageCircleHeart, Lock } from 'lucide-react';
 import Link from 'next/link';
@@ -21,20 +21,34 @@ interface EndRelationshipResponse {
   exPersonaId?: string;
 }
 
-export default function CharacterSettingsPage() {
+interface EditableCharacter {
+  id: string;
+  name: string;
+  bio?: string;
+  personality?: string;
+  templateId?: string;
+  avatarUrl?: string;
+  affection?: number;
+}
+
+function CharacterSettingsPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
   const { character } = useCharacterStore();
   const { clearMessages } = useChatStore();
   const { language } = useLanguageStore();
   const { hasFeatureAccess } = usePremiumAccess();
-  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+  const tr = useCallback((vi: string, en: string) => (language === 'vi' ? vi : en), [language]);
   const canCreateExPersonaOnBreakup = hasFeatureAccess('canCreateExPersonaOnBreakup');
+  const requestedCharacterId = searchParams.get('characterId');
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCharacter, setIsLoadingCharacter] = useState(false);
   const [isEndingRelationship, setIsEndingRelationship] = useState(false);
   const [templates, setTemplates] = useState<CharacterTemplate[]>([]);
+  const [selectedCharacter, setSelectedCharacter] = useState<EditableCharacter | null>(null);
   const [showTemplateGrid, setShowTemplateGrid] = useState(false);
   const [breakupReason, setBreakupReason] = useState('');
   const [wantsExPersona, setWantsExPersona] = useState(true);
@@ -74,17 +88,57 @@ export default function CharacterSettingsPage() {
       router.push('/auth/login');
       return;
     }
+  }, [isAuthenticated, router]);
 
-    if (character) {
-      setFormData({
-        name: character.name || '',
-        bio: character.bio || '',
-        personality: character.personality || '',
-        templateId: character.templateId || '',
-        avatarUrl: character.avatarUrl || '',
-      });
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
     }
-  }, [isAuthenticated, router, character]);
+
+    const applyCharacter = (value: EditableCharacter | null) => {
+      setSelectedCharacter(value);
+      if (!value) {
+        return;
+      }
+      setFormData({
+        name: value.name || '',
+        bio: value.bio || '',
+        personality: value.personality || '',
+        templateId: value.templateId || '',
+        avatarUrl: value.avatarUrl || '',
+      });
+    };
+
+    if (!requestedCharacterId) {
+      applyCharacter((character as EditableCharacter | null) ?? null);
+      return;
+    }
+    setSelectedCharacter((prev) => (prev?.id === requestedCharacterId ? prev : null));
+
+    const fetchTargetCharacter = async () => {
+      setIsLoadingCharacter(true);
+      try {
+        const response = await api.get<EditableCharacter>(`/character?characterId=${encodeURIComponent(requestedCharacterId)}`);
+        if (response.success && response.data) {
+          applyCharacter(response.data);
+          return;
+        }
+      } catch {
+        // Handled by redirect below.
+      } finally {
+        setIsLoadingCharacter(false);
+      }
+
+      toast({
+        title: tr('Không tìm thấy nhân vật', 'Character not found'),
+        description: tr('Không thể mở phần cài đặt cho nhân vật này.', 'Unable to open settings for this character.'),
+        variant: 'destructive',
+      });
+      router.replace('/dashboard');
+    };
+
+    void fetchTargetCharacter();
+  }, [character, isAuthenticated, requestedCharacterId, router, toast, tr]);
 
   const handleSelectTemplate = (template: CharacterTemplate) => {
     setFormData((prev) => ({
@@ -96,6 +150,10 @@ export default function CharacterSettingsPage() {
   };
 
   const handleSave = async () => {
+    if (!selectedCharacter?.id) {
+      return;
+    }
+
     if (!formData.name.trim()) {
       toast({
         title: tr('Lỗi', 'Error'),
@@ -117,17 +175,29 @@ export default function CharacterSettingsPage() {
       if (formData.templateId) payload.templateId = formData.templateId;
       if (formData.avatarUrl) payload.avatarUrl = formData.avatarUrl;
 
-      const response = await api.patch('/character', payload);
+      const endpoint = requestedCharacterId
+        ? `/character?characterId=${encodeURIComponent(selectedCharacter.id)}`
+        : '/character';
+      const response = await api.patch<EditableCharacter>(endpoint, payload);
       if (response.success) {
+        if (response.data) {
+          setSelectedCharacter(response.data);
+        }
         const { fetchCharacter: refetch } = useCharacterStore.getState();
-        refetch();
+        if (!requestedCharacterId || character?.id === selectedCharacter.id) {
+          refetch();
+        }
 
         toast({
           title: tr('Thành công', 'Success'),
           description: tr('Thông tin nhân vật đã được cập nhật', 'Character information updated'),
         });
 
-        router.push('/settings');
+        if (requestedCharacterId) {
+          router.replace(`/settings/character?characterId=${encodeURIComponent(selectedCharacter.id)}`);
+        } else {
+          router.push('/settings');
+        }
       }
     } catch {
       toast({
@@ -141,7 +211,7 @@ export default function CharacterSettingsPage() {
   };
 
   const handleEndRelationship = async () => {
-    if (!character) {
+    if (!selectedCharacter) {
       return;
     }
 
@@ -149,17 +219,15 @@ export default function CharacterSettingsPage() {
       setIsEndingRelationship(true);
 
       const response = await api.post<EndRelationshipResponse>('/character/relationship/end', {
+        characterId: selectedCharacter.id,
         reason: breakupReason.trim() || undefined,
         exPersonaConsent: canCreateExPersonaOnBreakup ? wantsExPersona : false,
       });
 
-      clearMessages();
-      useCharacterStore.setState({
-        character: null,
-        isLoading: false,
-        needsCreation: true,
-        moodInfo: null,
-      });
+      if (character?.id === selectedCharacter.id) {
+        clearMessages();
+        await useCharacterStore.getState().fetchCharacter();
+      }
 
       if (response.data?.exPersonaCreated && response.data.exPersonaId) {
         toast({
@@ -196,11 +264,25 @@ export default function CharacterSettingsPage() {
     }
   };
 
+  const activeCharacter = requestedCharacterId
+    ? selectedCharacter
+    : ((character as EditableCharacter | null) ?? null);
   const selectedTemplate = templates.find((item) => item.id === formData.templateId);
-  const displayAvatarUrl = formData.avatarUrl || character?.avatarUrl;
+  const displayAvatarUrl = formData.avatarUrl || activeCharacter?.avatarUrl;
 
   if (!isAuthenticated) {
     return null;
+  }
+
+  if (requestedCharacterId && (!activeCharacter || isLoadingCharacter)) {
+    return (
+      <AppLayout>
+        <div className="max-w-2xl mx-auto py-20 flex items-center justify-center text-[#ba9cab]">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          <span>{tr('Đang tải nhân vật...', 'Loading character...')}</span>
+        </div>
+      </AppLayout>
+    );
   }
 
   return (
@@ -220,7 +302,7 @@ export default function CharacterSettingsPage() {
           <h1 className="text-2xl font-bold">{tr('Người yêu ảo của tôi', 'My virtual partner')}</h1>
         </motion.div>
 
-        {character && (
+        {activeCharacter && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -230,18 +312,18 @@ export default function CharacterSettingsPage() {
             <div className="flex items-center gap-4">
               <div className="relative w-20 h-20 rounded-full overflow-hidden flex-shrink-0 border-2 border-love/30">
                 {displayAvatarUrl ? (
-                  <Image src={displayAvatarUrl} alt={character.name} fill className="object-cover" sizes="80px" />
+                  <Image src={displayAvatarUrl} alt={activeCharacter.name} fill className="object-cover" sizes="80px" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-3xl font-bold text-white">
-                    {character.name?.[0]?.toUpperCase()}
+                    {activeCharacter.name?.[0]?.toUpperCase()}
                   </div>
                 )}
               </div>
 
               <div className="flex-1">
-                <h2 className="text-2xl font-bold">{character.name}</h2>
+                <h2 className="text-2xl font-bold">{activeCharacter.name}</h2>
                 <p className="text-[#ba9cab] text-sm">
-                  {tr('Mức độ yêu thích', 'Affection level')}: {character.affection || 0}
+                  {tr('Mức độ yêu thích', 'Affection level')}: {activeCharacter.affection || 0}
                 </p>
                 {selectedTemplate && (
                   <p className="text-love text-xs mt-1">
@@ -388,7 +470,7 @@ export default function CharacterSettingsPage() {
           </div>
         </motion.div>
 
-        {character && (
+        {activeCharacter && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -403,8 +485,8 @@ export default function CharacterSettingsPage() {
                 <h2 className="text-lg font-bold text-white">{tr('Kết thúc mối quan hệ', 'End relationship')}</h2>
                 <p className="text-sm text-[#ba9cab] mt-1">
                   {tr(
-                    'Thao tác này sẽ kết thúc mối quan hệ hiện tại với nhân vật đang hoạt động.',
-                    'This will end the current relationship with your active character.'
+                    'Thao tác này sẽ kết thúc mối quan hệ với nhân vật này.',
+                    'This will end the relationship with this character.'
                   )}
                 </p>
               </div>
@@ -500,5 +582,24 @@ export default function CharacterSettingsPage() {
         )}
       </div>
     </AppLayout>
+  );
+}
+
+function CharacterSettingsFallback() {
+  return (
+    <AppLayout>
+      <div className="max-w-2xl mx-auto py-20 flex items-center justify-center text-[#ba9cab]">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+        <span>Loading character...</span>
+      </div>
+    </AppLayout>
+  );
+}
+
+export default function CharacterSettingsPage() {
+  return (
+    <Suspense fallback={<CharacterSettingsFallback />}>
+      <CharacterSettingsPageContent />
+    </Suspense>
   );
 }
