@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { AppError } from '../../middlewares/error.middleware';
 
 // Mood levels và thresholds
 export type MoodLevel = 'very_sad' | 'sad' | 'neutral' | 'happy' | 'very_happy' | 'excited';
@@ -156,10 +157,10 @@ export const moodService = {
   /**
    * Lấy mood hiện tại của character
    */
-  async getCurrentMood(characterId: string): Promise<MoodResult> {
+  async getCurrentMood(characterId: string, userId: string): Promise<MoodResult> {
     // Get character data
-    const character = await prisma.character.findUnique({
-      where: { id: characterId },
+    const character = await prisma.character.findFirst({
+      where: { id: characterId, userId },
       include: {
         messages: {
           orderBy: { createdAt: 'desc' },
@@ -169,7 +170,7 @@ export const moodService = {
     });
 
     if (!character) {
-      throw new Error('Character not found');
+      throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
     // Calculate time since last chat

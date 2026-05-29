@@ -43,7 +43,7 @@ sequenceDiagram
   S->>T: emit character:typing (room)
   S->>S: chatService.sendMessage()
   S->>T: emit message:receive (user + clientId, isOwn: true)
-  S->>S: Delay: 1-3s or length-proportional
+  S->>S: Delay: 1.5-4s (length-proportional)
   S->>T: emit message:receive (AI response)
   S->>T: emit character:affection_change (if changed)
   S->>T: emit quest:completed / milestone:unlocked
@@ -68,6 +68,7 @@ User-to-user messaging (1-on-1 + group 3-50):
 socket.on('dm:send', async ({ conversationId, content, clientId }) => {
   // Rate limit: 20/60s, Idempotency: dedup_dm setNX
   const message = await dmService.sendMessage(userId, conversationId, content);
+  // Security: load active members from DB at send-time (no stale cache)
   members.forEach(m => io.to(`user:${m.userId}`).emit('dm:receive', message));
 });
 ```
@@ -75,7 +76,7 @@ socket.on('dm:send', async ({ conversationId, content, clientId }) => {
 | Event | Rate Limit | Description |
 |---|---|---|
 | `dm:send` | 20/60s | Send DM, broadcast to members |
-| `dm:typing` | 30/60s | Typing to other members |
+| `dm:typing` | 30/60s | Typing to other members (sender membership verified first) |
 | `dm:read` | None | Mark as read |
 
 ## Handler: Cross-Tab Sync
@@ -88,13 +89,23 @@ Tab A (new)           Server              Tab B (existing)
    |<- sync:state_receive                     |
 ```
 
+- `sync:response` is forwarded only if `targetSocketId` belongs to the same `user:{userId}` room.
+- `sync:state_receive` includes `currentCharacterId` to keep message state scoped to the active conversation.
+
 ## Handler: `character:mood_check`
 ```typescript
 socket.on('character:mood_check', async ({ characterId }) => {
-  const mood = await moodService.getCurrentMood(characterId);
+  // Ownership check: characterId must belong to socket user
+  const mood = await moodService.getCurrentMood(characterId, userId);
   io.to(userRoom).emit('character:mood_update', { characterId, ...mood });
+  // Errors are emitted as character:mood_error with { code, message, characterId }
 });
 ```
+
+## AI Typing Delay
+
+- Delay is length-sensitive per reply and clamped between `1500ms` and `4000ms`.
+- Applied at emit-time for AI response to keep typing indicator behavior proportional.
 
 ## Proactive Notification Check
 

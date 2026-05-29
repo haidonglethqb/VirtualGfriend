@@ -92,7 +92,7 @@ this.tokenSyncChannel.onmessage = (event) => {
 |---|---|
 | **429 Rate Limited** | Wait `Retry-After` (max 5s), retry once with `X-Rate-Retry: 1` |
 | **401 Unauthorized** | Auto-refresh → retry with `X-Retry: 1` |
-| **Refresh fails** | Throw → auth store clears → redirect to login |
+| **Refresh fails** | Throw → auth store clears → redirect to `/auth/login` |
 | **Non-JSON response** | Throw `Server error (${status})` |
 | **200 with `success: false`** | Throw `data.message` |
 

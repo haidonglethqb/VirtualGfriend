@@ -52,7 +52,7 @@ interface StripePricingConfig {
 
 | Event | Action |
 |-------|--------|
-| `checkout.session.completed` | Create/activate subscription |
+| `checkout.session.completed` | Upsert/activate subscription and sync user premium state (tier/cycle resolved from Stripe price when available, ordering guarded by transactional watermark using `event.created` + `event.id` dedupe + event-priority precedence, writes serialized by subscription + user locks) |
 | `invoice.paid` | Renew subscription, update period |
 | `invoice.payment_failed` | Set status to PAST_DUE |
 | `customer.subscription.updated` | Sync tier/billing changes |
@@ -72,6 +72,7 @@ ACTIVE → PAST_DUE → (retry) → ACTIVE or CANCELED
 
 ## Status Polling
 - `GET /api/payment/checkout-session/:sessionId` is the success-page polling endpoint after Stripe redirect
+- Checkout-session status reports subscription `billingCycle` from DB (no hardcoded monthly fallback)
 - `GET /api/payment/status` returns the normalized subscription snapshot for account/subscription status views
 - `GET /api/users/premium-status` powers the subscription settings UI with tier features and usage
 

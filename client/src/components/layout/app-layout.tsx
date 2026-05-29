@@ -231,8 +231,8 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
     '/quests': activeQuestCount,
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push('/');
   };
 

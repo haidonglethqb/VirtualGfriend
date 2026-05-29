@@ -126,7 +126,7 @@ class ApiClient {
       } catch {
         // Fallback: clear storage manually
         localStorage.removeItem('vgfriend-auth');
-        window.location.href = '/login';
+        window.location.href = '/auth/login';
       }
     }
 

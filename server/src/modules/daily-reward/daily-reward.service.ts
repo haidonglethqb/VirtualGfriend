@@ -15,9 +15,18 @@ export const dailyRewardService = {
     { day: 7, type: 'gems' as const, value: 25 }, // Big reward on day 7
   ],
 
+  getUtcDayWindow(date = new Date()) {
+    const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    return { start, end };
+  },
+
   async claimDailyReward(userId: string) {
+    const now = new Date();
+    const { start: todayStart, end: tomorrowStart } = this.getUtcDayWindow(now);
+
     // Check if already claimed today
-    const cacheKey = `daily_reward:claimed:${userId}:${new Date().toDateString()}`;
+    const cacheKey = `daily_reward:claimed:${userId}:${todayStart.toISOString().slice(0, 10)}`;
     const alreadyClaimed = await cache.get(cacheKey);
     if (alreadyClaimed) {
       throw new AppError('Đã nhận thưởng hôm nay rồi!', 400, 'ALREADY_CLAIMED');
@@ -34,37 +43,45 @@ export const dailyRewardService = {
     const effectiveTier = isExpired ? 'FREE' : user.premiumTier;
     const config = await getTierConfig(effectiveTier);
 
-    // Calculate which day in the cycle
-    const lastClaim = await prisma.dailyReward.findFirst({
-      where: { userId },
-      orderBy: { claimedAt: 'desc' },
-      select: { day: true, claimedAt: true },
-    });
-
-    let day = 1;
-    if (lastClaim) {
-      const daysSince = Math.floor((Date.now() - lastClaim.claimedAt.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSince <= 1) {
-        // Consecutive day
-        day = Math.min(lastClaim.day + 1, 7);
-      } else {
-        // Streak broken, reset to day 1
-        day = 1;
-      }
-    }
-
-    const reward = this.DAILY_REWARDS[day - 1];
-
     // VIP bonuses
     let bonusMultiplier = 1;
     if (effectiveTier === 'BASIC') bonusMultiplier = 1.2;
     else if (effectiveTier === 'PRO') bonusMultiplier = 1.5;
     else if (effectiveTier === 'ULTIMATE') bonusMultiplier = 2;
 
-    const finalValue = Math.round(reward.value * bonusMultiplier);
+    // Record and distribute atomically (includes anti-double-claim guard)
+    const result = await prisma.$transaction(async (tx) => {
+      // Serialize claims per user inside the same DB transaction to avoid race conditions.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`daily_reward:${userId}`}))`;
 
-    // Record and distribute
-    await prisma.$transaction(async (tx) => {
+      const claimedToday = await tx.dailyReward.findFirst({
+        where: {
+          userId,
+          claimedAt: { gte: todayStart, lt: tomorrowStart },
+        },
+        select: { id: true },
+      });
+
+      if (claimedToday) {
+        throw new AppError('Đã nhận thưởng hôm nay rồi!', 400, 'ALREADY_CLAIMED');
+      }
+
+      // Calculate which day in the cycle using last claim before today
+      const lastClaim = await tx.dailyReward.findFirst({
+        where: { userId, claimedAt: { lt: todayStart } },
+        orderBy: { claimedAt: 'desc' },
+        select: { day: true, claimedAt: true },
+      });
+
+      let day = 1;
+      if (lastClaim) {
+        const daysSince = Math.floor((todayStart.getTime() - lastClaim.claimedAt.getTime()) / (1000 * 60 * 60 * 24));
+        day = daysSince <= 1 ? Math.min(lastClaim.day + 1, 7) : 1;
+      }
+
+      const reward = this.DAILY_REWARDS[day - 1];
+      const finalValue = Math.round(reward.value * bonusMultiplier);
+
       await tx.dailyReward.create({
         data: { userId, day, rewardType: reward.type, rewardValue: finalValue },
       });
@@ -76,15 +93,20 @@ export const dailyRewardService = {
       if (Object.keys(updates).length > 0) {
         await tx.user.update({ where: { id: userId }, data: updates });
       }
+
+      return { day, rewardType: reward.type, value: finalValue, bonusMultiplier };
     });
 
     // Cache to prevent double-claim (TTL: 24 hours)
     await cache.set(cacheKey, '1', 86400);
 
-    return { day, rewardType: reward.type, value: finalValue, bonusMultiplier };
+    return result;
   },
 
   async getDailyRewardStatus(userId: string) {
+    const now = new Date();
+    const { start: todayStart, end: tomorrowStart } = this.getUtcDayWindow(now);
+
     const lastClaim = await prisma.dailyReward.findFirst({
       where: { userId },
       orderBy: { claimedAt: 'desc' },
@@ -92,16 +114,26 @@ export const dailyRewardService = {
     });
 
     let currentDay = 1;
-    let canClaim = true;
-    const todayStr = new Date().toDateString();
-    const cacheKey = `daily_reward:claimed:${userId}:${todayStr}`;
+    const cacheKey = `daily_reward:claimed:${userId}:${todayStart.toISOString().slice(0, 10)}`;
+    let canClaim = !(await cache.get(cacheKey));
 
-    if (await cache.get(cacheKey)) {
-      canClaim = false;
+    if (canClaim) {
+      const claimedToday = await prisma.dailyReward.findFirst({
+        where: {
+          userId,
+          claimedAt: { gte: todayStart, lt: tomorrowStart },
+        },
+        select: { id: true },
+      });
+
+      if (claimedToday) {
+        canClaim = false;
+        await cache.set(cacheKey, '1', 86400);
+      }
     }
 
     if (lastClaim) {
-      const daysSince = Math.floor((Date.now() - lastClaim.claimedAt.getTime()) / (1000 * 60 * 60 * 24));
+      const daysSince = Math.floor((todayStart.getTime() - lastClaim.claimedAt.getTime()) / (1000 * 60 * 60 * 24));
       if (daysSince <= 1) {
         currentDay = Math.min(lastClaim.day + 1, 7);
       }

@@ -80,25 +80,29 @@ export const giftService = {
 
     const price = data.paymentMethod === 'coins' ? gift.priceCoins : gift.priceGems;
     const totalPrice = price * data.quantity;
-    const userBalance = data.paymentMethod === 'coins' ? tierUser.coins : tierUser.gems;
-
-    if (userBalance < totalPrice) {
-      throw new AppError(
-        `Not enough ${data.paymentMethod}`,
-        400,
-        'INSUFFICIENT_BALANCE'
-      );
-    }
 
     // Use transaction for atomicity
     const result = await prisma.$transaction(async (tx) => {
-      // Deduct balance
-      await tx.user.update({
-        where: { id: userId },
+      // Deduct balance atomically with a balance guard to prevent concurrent overspending
+      const balanceDebit = await tx.user.updateMany({
+        where: {
+          id: userId,
+          ...(data.paymentMethod === 'coins'
+            ? { coins: { gte: totalPrice } }
+            : { gems: { gte: totalPrice } }),
+        },
         data: {
           [data.paymentMethod]: { decrement: totalPrice },
         },
       });
+
+      if (balanceDebit.count === 0) {
+        throw new AppError(
+          `Not enough ${data.paymentMethod}`,
+          400,
+          'INSUFFICIENT_BALANCE'
+        );
+      }
 
       // Add to inventory
       const userGift = await tx.userGift.upsert({
@@ -108,7 +112,12 @@ export const giftService = {
         include: { gift: true },
       });
 
-      return userGift;
+      const updatedUser = await tx.user.findUnique({
+        where: { id: userId },
+        select: { coins: true, gems: true },
+      });
+
+      return { userGift, updatedUser };
     });
 
     // Invalidate inventory cache
@@ -116,12 +125,14 @@ export const giftService = {
 
     return {
       purchase: {
-        gift: result.gift,
+        gift: result.userGift.gift,
         quantity: data.quantity,
         totalPrice,
         paymentMethod: data.paymentMethod,
       },
-      newBalance: userBalance - totalPrice,
+      newBalance: data.paymentMethod === 'coins'
+        ? (result.updatedUser?.coins ?? 0)
+        : (result.updatedUser?.gems ?? 0),
     };
   },
 

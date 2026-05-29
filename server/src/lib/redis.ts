@@ -159,12 +159,13 @@ export const cache = {
   async setNX(key: string, value: unknown, ttlSeconds: number = 60): Promise<boolean> {
     try {
       const client = await getClient();
-      if (!client) return false;
+      // Fail-open when Redis is unavailable to avoid dropping valid operations.
+      if (!client) return true;
 
       const result = await client.set(key, JSON.stringify(value), 'EX', ttlSeconds, 'NX');
       return result === 'OK';
     } catch {
-      return false;
+      return true;
     }
   },
 
@@ -226,6 +227,7 @@ export const cache = {
 export const CacheKeys = {
   user: (userId: string) => `user:${userId}`,
   userAuth: (userId: string) => `user:auth:${userId}`,
+  socketAuth: (userId: string) => `socket:auth:${userId}`,
   character: (userId: string) => `character:active:${userId}`,
   characterById: (characterId: string) => `character:${characterId}`,
   characterWithFacts: (characterId: string) => `character:${characterId}:facts`,

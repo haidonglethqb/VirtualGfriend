@@ -262,6 +262,23 @@ class SocketService {
       }
     })
 
+    this.socket.on('character:mood_error', (data: {
+      characterId?: string
+      code: string
+      message: string
+    }) => {
+      if (data.characterId && !this.isCurrentConversation(data.characterId)) {
+        return
+      }
+
+      console.warn('[Socket] Mood check failed:', data)
+      useNotificationStore.getState().showGeneralNotification({
+        type: 'warning',
+        title: 'Mood Update Failed',
+        message: data.message || 'Unable to refresh character mood right now.',
+      })
+    })
+
     // Quest completed notification
     this.socket.on('quest:completed', (data: {
       questId: string
@@ -351,10 +368,8 @@ class SocketService {
     })
 
     this.socket.on('error', (error: unknown) => {
-      // Log socket errors for debugging
-      console.warn('[Socket] Connection error:', error)
-      // Update connection state to show error UI
-      useChatStore.getState().setConnected(false)
+      // Server also uses this channel for business validation errors; do not flip connection state here.
+      console.warn('[Socket] Server error event:', error)
     })
   }
 

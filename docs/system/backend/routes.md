@@ -69,9 +69,15 @@ Complete API endpoint reference. Base path: `/api`.
 | Quests | `POST /claim/:questId` | Claim reward |
 | Gifts | `GET /gifts` | Gift catalog |
 | Gifts | `GET /gifts/inventory` | Purchased items |
-| Gifts | `POST /gifts/buy` | Buy with coins/gems |
+| Gifts | `POST /gifts/buy` | Buy with coins/gems (atomic debit with balance guard) |
 | Gifts | `POST /gifts/send` | Send to character |
 | Gifts | `GET /gifts/history` | Gift history |
+
+### Daily Reward (`/daily-reward`) — Auth required
+| Method | Path | Description |
+|---|---|---|
+| GET | `/status` | Current reward day + can-claim status |
+| POST | `/claim` | Claim daily reward (UTC-day guard + transaction-safe anti double-claim) |
 
 ### Scenes (`/scenes`), Memories (`/memories`)
 | Module | Path | Description |

@@ -7,7 +7,8 @@ import { dmService } from '../modules/dm/dm.service'
 import { proactiveNotificationService } from '../modules/ai/proactive-notification.service'
 import { moodService } from '../modules/character/mood.service'
 import { createModuleLogger } from '../lib/logger'
-import { MESSAGE_LIMITS, CACHE_TTL, RATE_LIMITS, TIMINGS } from '../lib/constants'
+import { MESSAGE_LIMITS, CACHE_TTL, RATE_LIMITS } from '../lib/constants'
+import { AppError } from '../middlewares/error.middleware'
 
 const log = createModuleLogger('Socket')
 
@@ -75,7 +76,7 @@ export function setupSocketHandlers(io: Server) {
       ) as JwtPayload
 
       // Use cache-aside pattern (same as auth middleware) instead of raw DB query
-      const cacheKey = CacheKeys.userAuth(decoded.userId)
+      const cacheKey = CacheKeys.socketAuth(decoded.userId)
       let user = await cache.get<{ id: string; email: string }>(cacheKey)
       if (!user) {
         const dbUser = await prisma.user.findUnique({
@@ -115,13 +116,13 @@ export function setupSocketHandlers(io: Server) {
 
         // Cache character list for 5 minutes to avoid repeated DB queries
         const charCacheKey = `user:${userId}:characters:list`
-        let characters = await cache.get<Array<{ id: string; name: string }>>(charCacheKey)
-
-        if (!characters) {
-          characters = await prisma.character.findMany({
+        const cachedCharacters = await cache.get<Array<{ id: string; name: string }>>(charCacheKey)
+        const characters = cachedCharacters ?? await prisma.character.findMany({
             where: { userId },
             select: { id: true, name: true },
           })
+
+        if (!cachedCharacters) {
           await cache.set(charCacheKey, characters, 300) // 5 minutes
         }
 
@@ -149,7 +150,12 @@ export function setupSocketHandlers(io: Server) {
     // Handle mood check request
     socket.on('character:mood_check', async (data: { characterId: string }) => {
       try {
-        const mood = await moodService.getCurrentMood(data.characterId)
+        if (!data?.characterId) {
+          socket.emit('error', { message: 'characterId is required' })
+          return
+        }
+
+        const mood = await moodService.getCurrentMood(data.characterId, userId)
         // Broadcast mood update to all user's tabs
         io.to(userRoom).emit('character:mood_update', {
           characterId: data.characterId,
@@ -157,7 +163,21 @@ export function setupSocketHandlers(io: Server) {
           sourceSocketId: socket.id,
         })
       } catch (err) {
+        if (err instanceof AppError) {
+          socket.emit('character:mood_error', {
+            characterId: data?.characterId,
+            code: err.code,
+            message: err.message,
+          })
+          return
+        }
+
         log.error('Mood check error:', err)
+        socket.emit('character:mood_error', {
+          characterId: data?.characterId,
+          code: 'MOOD_CHECK_FAILED',
+          message: 'Unable to check mood right now',
+        })
       }
     })
 
@@ -178,6 +198,11 @@ export function setupSocketHandlers(io: Server) {
         // Input validation
         if (!data.content || typeof data.content !== 'string') {
           socket.emit('error', { message: 'Message content is required' })
+          return
+        }
+
+        if (!data.characterId || typeof data.characterId !== 'string') {
+          socket.emit('error', { message: 'characterId is required' })
           return
         }
 
@@ -302,7 +327,7 @@ export function setupSocketHandlers(io: Server) {
               })
             })
           }
-        }, TIMINGS.AI_TYPING_DELAY) // Use constant from constants module
+        }, typingDelay)
 
       } catch (error) {
         log.error('Error sending message:', error)
@@ -338,10 +363,17 @@ export function setupSocketHandlers(io: Server) {
       targetSocketId: string
       messages: unknown[]
       typing: boolean
+      currentCharacterId?: string
     }) => {
+      const targetSocket = io.sockets.sockets.get(data.targetSocketId)
+      if (!targetSocket || !targetSocket.rooms.has(userRoom)) {
+        return
+      }
+
       io.to(data.targetSocketId).emit('sync:state_receive', {
         messages: data.messages,
         typing: data.typing,
+        currentCharacterId: data.currentCharacterId,
         sourceSocketId: socket.id,
       })
     })
@@ -382,20 +414,14 @@ export function setupSocketHandlers(io: Server) {
 
         const message = await dmService.sendMessage(userId, data.conversationId, data.content)
 
-        // Get conversation members to broadcast (cached for 5 minutes)
-        const membersCacheKey = `conversation:${data.conversationId}:members`
-        let members = await cache.get<Array<{ userId: string }>>(membersCacheKey)
-
-        if (!members) {
-          members = await prisma.conversationMember.findMany({
-            where: { conversationId: data.conversationId, isActive: true },
-            select: { userId: true },
-          })
-          await cache.set(membersCacheKey, members, 300) // 5 minutes
-        }
+        // Query active members from DB directly to avoid stale room membership leakage
+        const members = await prisma.conversationMember.findMany({
+          where: { conversationId: data.conversationId, isActive: true },
+          select: { userId: true },
+        })
 
         // Broadcast to all members' rooms
-        members.forEach(member => {
+        members.forEach((member: { userId: string }) => {
           io.to(`user:${member.userId}`).emit('dm:receive', {
             ...message,
             conversationId: data.conversationId,
@@ -419,20 +445,24 @@ export function setupSocketHandlers(io: Server) {
           return
         }
 
-        // Broadcast typing to other members (cached to avoid DB query on every keystroke)
-        const membersCacheKey = `conversation:${data.conversationId}:members`
-        let members = await cache.get<Array<{ userId: string }>>(membersCacheKey)
+        // Ensure sender is an active member before broadcasting typing state
+        const senderMembership = await prisma.conversationMember.findFirst({
+          where: { conversationId: data.conversationId, userId, isActive: true },
+          select: { id: true },
+        })
 
-        if (!members) {
-          members = await prisma.conversationMember.findMany({
-            where: { conversationId: data.conversationId, isActive: true },
-            select: { userId: true },
-          })
-          await cache.set(membersCacheKey, members, 300) // 5 minutes
+        if (!senderMembership) {
+          return
         }
 
+        // Broadcast typing to active members using fresh membership list
+        const members = await prisma.conversationMember.findMany({
+          where: { conversationId: data.conversationId, isActive: true },
+          select: { userId: true },
+        })
+
         // Filter out current user and broadcast to others
-        members.filter(m => m.userId !== userId).forEach(member => {
+        members.filter((m: { userId: string }) => m.userId !== userId).forEach((member: { userId: string }) => {
           io.to(`user:${member.userId}`).emit('dm:typing', {
             conversationId: data.conversationId,
             userId,

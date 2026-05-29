@@ -4,19 +4,30 @@ import { AppError } from '../../middlewares/error.middleware';
 
 export const arcService = {
   async getAllArcs(userId: string) {
-    const arcs = await prisma.arc.findMany({
-      where: { isActive: true },
-      orderBy: { orderIndex: 'asc' },
-      include: {
-        arcProgress: { where: { userId } },
-        quests: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
-      },
-    });
+    const [user, arcs] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { premiumTier: true },
+      }),
+      prisma.arc.findMany({
+        where: { isActive: true },
+        orderBy: { orderIndex: 'asc' },
+        include: {
+          arcProgress: { where: { userId } },
+          quests: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+        },
+      }),
+    ]);
+
+    const tierHierarchy = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
+    const userTier = user?.premiumTier || 'FREE';
+    const userTierIndex = tierHierarchy.indexOf(userTier);
 
     return arcs.map(arc => {
       const progress = arc.arcProgress[0];
       const totalQuests = arc.quests.length;
-      const isUnlocked = arc.requiredTier === 'FREE' || true; // Check against user tier
+      const requiredTierIndex = tierHierarchy.indexOf(arc.requiredTier || 'FREE');
+      const isUnlocked = userTierIndex >= requiredTierIndex;
 
       return {
         id: arc.id,

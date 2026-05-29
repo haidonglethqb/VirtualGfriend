@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '@/services/api';
+import { socketService } from '@/services/socket';
 import { useChatStore } from './chat-store';
 import { useCharacterStore } from './character-store';
 
@@ -99,6 +100,7 @@ export const useAuthStore = create<AuthState>()(
         }
         
         // Clear all user-scoped stores
+        socketService.disconnect();
         useChatStore.getState().clearMessages();
         useCharacterStore.getState().clear();
         
@@ -121,6 +123,7 @@ export const useAuthStore = create<AuthState>()(
             });
           }
         } catch {
+          socketService.disconnect();
           set({
             user: null,
             accessToken: null,
@@ -225,6 +228,7 @@ if (typeof window !== 'undefined') {
           });
         } else if (!newToken && currentToken) {
           // Token was cleared (logout from another tab)
+          socketService.disconnect();
           useAuthStore.setState({
             accessToken: null,
             user: null,

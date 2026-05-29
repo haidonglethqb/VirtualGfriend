@@ -40,14 +40,16 @@ reconnectWithNewToken(newToken: string) { /* After token refresh */ }
 | `character:typing` | `chat-store.setTyping(true)` | Show typing + 30s safety timeout |
 | `character:mood_change` | `character-store` | Update mood |
 | `character:mood_update` | `character-store` | Full mood info (score, emoji, factors) |
+| `character:mood_error` | `notification-store` | Show structured mood-check failure (`code`, `message`) |
 | `character:affection_change` | `character-store` | Update affection + level-up/relationship modals |
 | `notification:proactive` | `notification-store` | AI-initiated (morning, night, miss_you, comeback_message) |
 | `quest:completed` | `notification-store` | Quest completion toast |
 | `milestone:unlocked` | `notification-store` | Milestone unlocked modal |
 | `sync:state_request` | Emit `sync:response` | Share state with requesting tab |
-| `sync:state_receive` | `chat-store.mergeMessages()` | Apply state from another tab |
+| `sync:state_receive` | `chat-store.mergeMessages()` | Apply state from another tab (includes `currentCharacterId` scope) |
 | `dm:receive` | DM module | User-to-user message |
 | `dm:typing` | DM module | Other user typing |
+| `error` | Logging only | Business/server error event; does not toggle socket connected state |
 
 ## Outbound Events
 
