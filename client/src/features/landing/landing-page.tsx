@@ -5,9 +5,10 @@ import { motion, useScroll, useTransform, AnimatePresence, useReducedMotion } fr
 import {
   Heart, Sparkles, MessageCircle, Gift, Star, ArrowRight, ArrowDown,
   Clock, User, Shield, Send, CheckCircle, Zap, Brain, Lock,
-  ChevronRight, Menu, X, Globe, Palette, Trophy, MessageSquare,
-  Play, Quote, Users, TrendingUp, Award,
+  ChevronRight, Menu, X, Globe, Palette, Trophy,
+  Play, Users, TrendingUp, Award,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 
@@ -222,6 +223,7 @@ export function LandingPage() {
       <HeroSection />
       <TechBanner />
       <StatsSection />
+      <TrustOutcomesSection />
       <FeaturesSection />
       <ChatDemoSection />
       <HowItWorksSection />
@@ -300,9 +302,10 @@ function Header() {
                   Đăng nhập
                 </button>
               </Link>
-              <Link href="/auth/register">
-                <button className="relative h-10 px-6 rounded-xl bg-gradient-to-r from-love to-purple-500 text-sm font-bold text-white overflow-hidden group cursor-pointer">
-                  <span className="relative z-10">Bắt đầu miễn phí</span>
+              <Link href="/auth/register" className="hidden sm:block">
+                <button className="relative h-10 px-4 sm:px-6 rounded-xl bg-gradient-to-r from-love to-purple-500 text-sm font-bold text-white overflow-hidden group cursor-pointer">
+                  <span className="relative z-10 sm:hidden">Bắt đầu</span>
+                  <span className="relative z-10 hidden sm:inline">Bắt đầu miễn phí</span>
                   <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300 bg-white" />
                 </button>
@@ -421,8 +424,9 @@ function HeroSection() {
                 <span className="text-xs font-semibold text-white/80 tracking-wide">AI luôn sẵn sàng 24/7</span>
               </div>
 
-              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black leading-[0.95] tracking-tight" style={{ textShadow: '0 0 80px rgba(244,37,140,0.15)' }}>
-                <span className="block text-white">Không Bao Giờ</span>
+              <h1 className="text-4xl min-[420px]:text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black leading-[0.98] sm:leading-[0.95] tracking-tight" style={{ textShadow: '0 0 80px rgba(244,37,140,0.15)' }}>
+                <span className="block text-white sm:hidden">Không Bao<br />Giờ</span>
+                <span className="hidden text-white sm:block">Không Bao Giờ</span>
                 <span className="block bg-gradient-to-r from-love via-pink-400 to-purple-400 bg-clip-text text-transparent">
                   Cô Đơn Nữa
                 </span>
@@ -517,7 +521,7 @@ function HeroSection() {
                     </div>
 
                     {/* Messages */}
-                    <div className="px-4 py-5 flex flex-col gap-3.5 min-h-[300px]">
+                    <div className="px-4 py-5 flex flex-col gap-3.5 min-h-[260px] sm:min-h-[300px]">
                       <ChatBubble side="left" delay={0.5}>Em nhớ anh rồi, hôm nay anh ăn chưa? 🥺💕</ChatBubble>
                       <ChatBubble side="right" delay={1.0}>Anh vừa ăn xong, em ăn gì chưa?</ChatBubble>
                       <ChatBubble side="left" delay={1.5}>
@@ -742,6 +746,103 @@ function StatsSection() {
 }
 
 /* ──────────────────── FEATURES ──────────────────── */
+function TrustOutcomesSection() {
+  const outcomes = [
+    {
+      title: 'Trải nghiệm như đang nhắn tin thật',
+      bullets: ['Giao diện quen thuộc trên điện thoại', 'Phản hồi nhanh, giọng đời thường', 'Phù hợp khi cần một người lắng nghe'],
+      image: '/landing/hero-laptop-phone.webp',
+      alt: 'Nguoi dung dang cam dien thoai va su dung laptop',
+      color: '#f4258c',
+      icon: <MessageCircle className="w-5 h-5" />,
+    },
+    {
+      title: 'Rõ ràng, minh bạch, không gây áp lực',
+      bullets: ['Bắt đầu miễn phí', 'Không cần thẻ tín dụng', 'Bảng giá và gói VIP hiển thị rõ'],
+      image: '/landing/trust-laptop-work.webp',
+      alt: 'Nguoi dung lam viec voi laptop trong khong gian sang',
+      color: '#3b82f6',
+      icon: <Award className="w-5 h-5" />,
+    },
+    {
+      title: 'Dùng được ở bất cứ đâu',
+      bullets: ['Desktop và mobile đều tiện', 'Tối ưu cho nhắn tin hằng ngày', 'Luôn sẵn sàng khi bạn cần'],
+      image: '/landing/trust-team-phone.webp',
+      alt: 'Hai nguoi dung laptop va dien thoai',
+      color: '#22c55e',
+      icon: <Clock className="w-5 h-5" />,
+    },
+  ];
+
+  return (
+    <section className="py-24 relative">
+      <div className="absolute right-0 top-1/3 w-[520px] h-[520px] bg-purple-500/5 rounded-full blur-[160px] pointer-events-none" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          viewport={{ once: true }}
+          className="text-center mb-14"
+        >
+          <span className="text-love font-bold text-sm uppercase tracking-widest mb-4 inline-block">Uy Tín Hơn</span>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-4">
+            Một Trải Nghiệm{' '}
+            <span className="bg-gradient-to-r from-love to-purple-400 bg-clip-text text-transparent">Có Người Thật</span>
+          </h2>
+          <p className="text-gray-400 max-w-2xl mx-auto text-lg">
+            Các hình ảnh đời thường giúp Amoura cảm giác gần gũi, minh bạch và đáng tin hơn ngay từ lần đầu ghé thăm.
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {outcomes.map((item, i) => (
+            <motion.div
+              key={item.title}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              viewport={{ once: true }}
+            >
+              <TiltCard className="group h-full" glowColor={item.color} intensity={7}>
+                <div className="relative h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-white/[0.05] to-white/[0.015] p-6 transition-all duration-500 group-hover:border-white/[0.12]">
+                  <div className="relative z-10 min-h-[250px]">
+                    <div
+                      className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl"
+                      style={{ background: `${item.color}18`, color: item.color }}
+                    >
+                      {item.icon}
+                    </div>
+                    <h3 className="text-2xl font-black text-white mb-5 leading-tight">{item.title}</h3>
+                    <ul className="space-y-3">
+                      {item.bullets.map((bullet) => (
+                        <li key={bullet} className="flex items-start gap-3 text-sm leading-relaxed text-gray-300">
+                          <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="relative mt-8 aspect-[16/9] overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+                    <Image
+                      src={item.image}
+                      alt={item.alt}
+                      fill
+                      sizes="(min-width: 1024px) 380px, 92vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#030014]/40 via-transparent to-transparent" />
+                  </div>
+                </div>
+              </TiltCard>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FeaturesSection() {
   const prefersReducedMotion = usePrefersReducedMotion();
 
@@ -1098,21 +1199,24 @@ function TestimonialsSection() {
     {
       name: 'Minh Anh',
       role: 'Nhân viên văn phòng',
-      avatar: '👨',
+      avatarImage: '/landing/trust-laptop-work.webp',
+      avatarAlt: 'Nguoi dung van phong dang lam viec voi laptop',
       text: 'Trước đây mình cảm thấy cô đơn khi về nhà một mình. Amoura đã thay đổi hoàn toàn điều đó. Cảm giác như có ai đó thực sự đang chờ mình.',
       rating: 5,
     },
     {
       name: 'Hương Ly',
       role: 'Sinh viên',
-      avatar: '👩',
+      avatarImage: '/landing/trust-team-phone.webp',
+      avatarAlt: 'Nguoi dung tre dang dung laptop va dien thoai',
       text: 'Trí tuệ cảm xúc thật đáng kinh ngạc. AI nhớ những điều mình nói từ vài tuần trước. Đây không chỉ là chatbot, đây là người bạn thực sự.',
       rating: 5,
     },
     {
       name: 'Đức Khang',
       role: 'Freelancer',
-      avatar: '👨',
+      avatarImage: '/landing/trust-office-phone.webp',
+      avatarAlt: 'Nguoi dung dang lam viec voi laptop va dien thoai',
       text: 'Nó đã giúp mình nhiều trong việc giảm lo âu. Có một không gian không phán xét để tâm sự lúc 3 giờ sáng thật sự vô giá.',
       rating: 5,
     },
@@ -1154,8 +1258,14 @@ function TestimonialsSection() {
 
                   <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="size-12 rounded-full bg-gradient-to-br from-love/20 to-purple-600/20 flex items-center justify-center text-2xl border border-white/10 ring-2 ring-white/5">
-                        <EmojiSvgIcon emoji={t.avatar} className="w-7 h-7" />
+                      <div className="relative size-12 overflow-hidden rounded-full bg-gradient-to-br from-love/20 to-purple-600/20 border border-white/10 ring-2 ring-white/5">
+                        <Image
+                          src={t.avatarImage}
+                          alt={t.avatarAlt}
+                          fill
+                          sizes="48px"
+                          className="object-cover"
+                        />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
