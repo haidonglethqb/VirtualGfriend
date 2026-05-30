@@ -3,24 +3,48 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middlewares/error.middleware';
 
+const querySchema = z.object({
+  characterId: z.string().uuid().optional(),
+});
+
 const updateFactSchema = z.object({
   value: z.string().min(1).max(500),
 });
 
+function inferFactSource(fact: { importance: number; sourceType?: string | null }) {
+  if (fact.sourceType === 'ai_inline') return 'ai_inline';
+  if (fact.sourceType === 'manual') return 'user_added';
+  return fact.importance >= 8 ? 'user_added' : 'ai_learned';
+}
+
 export const factsController = {
+  async resolveCharacter(req: Request) {
+    const query = querySchema.parse(req.query ?? {});
+    const character = await prisma.character.findFirst({
+      where: query.characterId
+        ? { id: query.characterId, userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false }
+        : { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
+      ...(query.characterId ? {} : { orderBy: { createdAt: 'desc' as const } }),
+      include: {
+        template: {
+          select: { avatarUrl: true },
+        },
+      },
+    });
+
+    if (!character) {
+      throw new AppError('No active character', 404, 'NO_CHARACTER');
+    }
+
+    return character;
+  },
+
   /**
    * Get all facts for user's character
    */
   async getFacts(req: Request, res: Response, next: NextFunction) {
     try {
-      const character = await prisma.character.findFirst({
-        where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      if (!character) {
-        throw new AppError('No active character', 404, 'NO_CHARACTER');
-      }
+      const character = await factsController.resolveCharacter(req);
 
       const facts = await prisma.characterFact.findMany({
         where: { characterId: character.id },
@@ -46,21 +70,29 @@ export const factsController = {
         data: {
           facts: facts.map(f => ({
             ...f,
-            source: f.importance >= 8 ? 'user_added' : 'ai_learned', // Infer source from importance
+            source: inferFactSource(f),
           })),
           grouped: Object.fromEntries(
             Object.entries(groupedFacts).map(([cat, items]) => [
               cat, 
               items.map(f => ({
                 ...f,
-                source: f.importance >= 8 ? 'user_added' : 'ai_learned',
+                source: inferFactSource(f),
               }))
             ])
           ),
           total: facts.length,
+          character: {
+            id: character.id,
+            name: character.name,
+            avatarUrl: character.avatarUrl || character.template?.avatarUrl || null,
+          },
         },
       });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));
+      }
       next(error);
     }
   },
@@ -72,15 +104,7 @@ export const factsController = {
     try {
       const { factId } = req.params;
       const data = updateFactSchema.parse(req.body);
-
-      const character = await prisma.character.findFirst({
-        where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      if (!character) {
-        throw new AppError('No active character', 404, 'NO_CHARACTER');
-      }
+      const character = await factsController.resolveCharacter(req);
 
       const fact = await prisma.characterFact.findFirst({
         where: { id: factId, characterId: character.id },
@@ -94,12 +118,24 @@ export const factsController = {
         where: { id: factId },
         data: {
           value: data.value,
+          sourceType: 'manual',
           importance: 8, // Mark as user-edited
           updatedAt: new Date(),
         },
       });
 
-      res.json({ success: true, data: { ...updated, source: 'user_edited' } });
+      res.json({
+        success: true,
+        data: {
+          ...updated,
+          source: 'user_edited',
+          character: {
+            id: character.id,
+            name: character.name,
+            avatarUrl: character.avatarUrl || character.template?.avatarUrl || null,
+          },
+        },
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));
@@ -114,15 +150,7 @@ export const factsController = {
   async deleteFact(req: Request, res: Response, next: NextFunction) {
     try {
       const { factId } = req.params;
-
-      const character = await prisma.character.findFirst({
-        where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      if (!character) {
-        throw new AppError('No active character', 404, 'NO_CHARACTER');
-      }
+      const character = await factsController.resolveCharacter(req);
 
       const fact = await prisma.characterFact.findFirst({
         where: { id: factId, characterId: character.id },
@@ -136,8 +164,21 @@ export const factsController = {
         where: { id: factId },
       });
 
-      res.json({ success: true, message: 'Fact deleted' });
+      res.json({
+        success: true,
+        message: 'Fact deleted',
+        data: {
+          character: {
+            id: character.id,
+            name: character.name,
+            avatarUrl: character.avatarUrl || character.template?.avatarUrl || null,
+          },
+        },
+      });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));
+      }
       next(error);
     }
   },
@@ -154,15 +195,7 @@ export const factsController = {
       });
 
       const data = schema.parse(req.body);
-
-      const character = await prisma.character.findFirst({
-        where: { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      if (!character) {
-        throw new AppError('No active character', 404, 'NO_CHARACTER');
-      }
+      const character = await factsController.resolveCharacter(req);
 
       // Check for duplicate key
       const existing = await prisma.characterFact.findFirst({
@@ -179,11 +212,24 @@ export const factsController = {
           data: {
             value: data.value,
             category: data.category || existing.category,
+            sourceType: 'manual',
             importance: 8, // User-added facts are important
             updatedAt: new Date(),
           },
         });
-        return res.json({ success: true, data: { ...updated, source: 'user_added' }, updated: true });
+        return res.json({
+          success: true,
+          data: {
+            ...updated,
+            source: 'user_added',
+            character: {
+              id: character.id,
+              name: character.name,
+              avatarUrl: character.avatarUrl || character.template?.avatarUrl || null,
+            },
+          },
+          updated: true,
+        });
       }
 
       const fact = await prisma.characterFact.create({
@@ -192,11 +238,23 @@ export const factsController = {
           key: data.key,
           value: data.value,
           category: data.category || 'other',
+          sourceType: 'manual',
           importance: 8, // User-added facts are important
         },
       });
 
-      res.status(201).json({ success: true, data: { ...fact, source: 'user_added' } });
+      res.status(201).json({
+        success: true,
+        data: {
+          ...fact,
+          source: 'user_added',
+          character: {
+            id: character.id,
+            name: character.name,
+            avatarUrl: character.avatarUrl || character.template?.avatarUrl || null,
+          },
+        },
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));

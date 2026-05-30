@@ -84,7 +84,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout, isAuthenticated, accessToken } = useAuthStore();
-  const { character } = useCharacterStore();
+  const { character, selectedCharacterId } = useCharacterStore();
   const { language, toggleLanguage } = useLanguageStore();
   const { generalNotification, showGeneralNotification, hideGeneralNotification } = useNotificationStore();
   const t = APP_LAYOUT_I18N[language] || APP_LAYOUT_I18N.vi;
@@ -231,6 +231,13 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
     '/quests': activeQuestCount,
   };
 
+  const resolveNavHref = useCallback((href: string) => {
+    if (href === '/chat' && selectedCharacterId) {
+      return `/chat?characterId=${encodeURIComponent(selectedCharacterId)}`;
+    }
+    return href;
+  }, [selectedCharacterId]);
+
   const handleLogout = async () => {
     await logout();
     router.push('/');
@@ -254,10 +261,11 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const badge = badgeCounts[item.href] || 0;
+            const href = resolveNavHref(item.href);
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={href}
                 className={`relative flex items-center gap-2 text-sm font-medium transition-all duration-200 hover:scale-105 ${
                   isActive ? 'text-love' : 'text-[#ba9cab] hover:text-white'
                 }`}
@@ -338,10 +346,11 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                 {navItems.map((item) => {
                   const isActive = pathname === item.href;
                   const badge = badgeCounts[item.href] || 0;
+                  const href = resolveNavHref(item.href);
                   return (
                     <Link
                       key={item.href}
-                      href={item.href}
+                      href={href}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group relative ${
                         isActive 
                           ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]' 

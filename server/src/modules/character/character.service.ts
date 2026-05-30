@@ -52,6 +52,24 @@ type CharacterTargetOptions = {
   characterId?: string;
 };
 
+type ActiveCharacterSummary = {
+  id: string;
+  name: string;
+  avatarUrl?: string | null;
+  mood: string;
+  affection: number;
+  level: number;
+  experience: number;
+  relationshipStage: RelationshipStage;
+  age: number;
+  occupation: string;
+  stats: {
+    messages: number;
+    gifts: number;
+    memories: number;
+  };
+};
+
 // Affection thresholds for relationship stages
 const RELATIONSHIP_THRESHOLDS: Record<RelationshipStage, number> = {
   STRANGER: 0,
@@ -183,6 +201,43 @@ function getUnlockedFeatures(level: number): string[] {
 }
 
 export const characterService = {
+  async getActiveCharacters(userId: string): Promise<ActiveCharacterSummary[]> {
+    const characters = await prisma.character.findMany({
+      where: { userId, isActive: true, isEnded: false, isExPersona: false },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        template: {
+          select: { avatarUrl: true },
+        },
+        _count: {
+          select: {
+            messages: true,
+            receivedGifts: true,
+            memories: true,
+          },
+        },
+      },
+    });
+
+    return characters.map((character) => ({
+      id: character.id,
+      name: character.name,
+      avatarUrl: character.avatarUrl || character.template?.avatarUrl || null,
+      mood: character.mood,
+      affection: character.affection,
+      level: character.level,
+      experience: character.experience,
+      relationshipStage: character.relationshipStage,
+      age: character.age,
+      occupation: character.occupation,
+      stats: {
+        messages: character._count.messages,
+        gifts: character._count.receivedGifts,
+        memories: character._count.memories,
+      },
+    }));
+  },
+
   async getActiveCharacter(userId: string, options?: CharacterTargetOptions) {
     const targetCharacterId = options?.characterId;
     const shouldUseDefaultCache = !targetCharacterId;

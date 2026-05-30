@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Brain } from 'lucide-react';
 import Link from 'next/link';
@@ -9,18 +9,38 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
 import { FactsManager } from '@/components/facts/facts-manager';
 import { useLanguageStore } from '@/store/language-store';
+import { useCharacterStore } from '@/store/character-store';
+import { CompanionSwitcher } from '@/components/companion/companion-switcher';
 
 export default function FactsSettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
   const { language } = useLanguageStore();
+  const {
+    characters,
+    selectedCharacterId,
+    character,
+    fetchCharacter,
+    setSelectedCharacterId,
+  } = useCharacterStore();
   const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+  const requestedCharacterId = searchParams.get('characterId');
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/auth/login');
+      return;
     }
-  }, [isAuthenticated, router]);
+    void fetchCharacter(requestedCharacterId || undefined);
+  }, [fetchCharacter, isAuthenticated, requestedCharacterId, router]);
+
+  const handleSelectCompanion = async (characterId: string) => {
+    if (!characterId) return;
+    setSelectedCharacterId(characterId);
+    await fetchCharacter(characterId);
+    router.replace(`/settings/facts?characterId=${encodeURIComponent(characterId)}`);
+  };
 
   if (!isAuthenticated) {
     return null;
@@ -56,7 +76,13 @@ export default function FactsSettingsPage() {
 
         {/* Content */}
         <div className="p-4">
-          <FactsManager />
+          <CompanionSwitcher
+            companions={characters}
+            selectedCharacterId={selectedCharacterId}
+            onSelect={handleSelectCompanion}
+            className="mb-4"
+          />
+          <FactsManager characterId={selectedCharacterId} characterName={character?.name} />
         </div>
       </div>
     </AppLayout>

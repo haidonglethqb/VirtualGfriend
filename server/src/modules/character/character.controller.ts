@@ -105,6 +105,15 @@ export const characterController = {
     }
   },
 
+  async getActiveCharacters(req: Request, res: Response, next: NextFunction) {
+    try {
+      const characters = await characterService.getActiveCharacters(req.user!.id);
+      res.json({ success: true, data: characters });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async updateCharacter(req: Request, res: Response, next: NextFunction) {
     try {
       const data = updateCharacterSchema.parse(req.body);

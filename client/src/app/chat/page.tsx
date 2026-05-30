@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Heart, Send, Mic, Smile, Paperclip,
-  Gift, Phone, Video, Sparkles, X, Check, Loader2, ImageIcon, Settings
+  Gift, Phone, Video, Sparkles, X, Check, Loader2, ImageIcon, Settings, BookOpen
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/app-layout'
 import { useAuthStore } from '@/store/auth-store'
@@ -24,6 +24,7 @@ import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon'
 import { usePremiumAccess } from '@/components/PremiumGate'
 import { useSceneStore } from '@/store/scene-store'
 import { useLanguageStore } from '@/store/language-store'
+import { CompanionSwitcher } from '@/components/companion/companion-switcher'
 
 interface InventoryItem {
   id: string;
@@ -94,6 +95,9 @@ const CHAT_I18N = {
     cannotLoadInventory: 'Không thể tải túi đồ',
     cannotSendGift: 'Không thể tặng quà',
     characterSettings: 'Cài đặt nhân vật',
+    knowledgeScope: 'Kiến thức cho {name}',
+    openFacts: 'Mở facts',
+    factsCount: '{count} facts',
   },
   en: {
     lover: 'Lover',
@@ -133,6 +137,9 @@ const CHAT_I18N = {
     cannotLoadInventory: 'Cannot load inventory',
     cannotSendGift: 'Cannot send gift',
     characterSettings: 'Character settings',
+    knowledgeScope: 'Knowledge for {name}',
+    openFacts: 'Open facts',
+    factsCount: '{count} facts',
   },
 } as const;
 
@@ -153,7 +160,15 @@ function ChatPageContent() {
   const { language } = useLanguageStore();
   const t = CHAT_I18N[language];
   const { isAuthenticated, accessToken } = useAuthStore();
-  const { character, fetchCharacter, updateAffection, isLoading: characterLoading, needsCreation } = useCharacterStore();
+  const {
+    character,
+    characters,
+    selectedCharacterId,
+    setSelectedCharacterId,
+    fetchCharacter,
+    updateAffection,
+    needsCreation,
+  } = useCharacterStore();
   const { 
     messages, 
     isTyping,
@@ -199,6 +214,7 @@ function ChatPageContent() {
   const [isSendingGift, setIsSendingGift] = useState(false)
   const [giftSuccess, setGiftSuccess] = useState(false)
   const [chatCharacter, setChatCharacter] = useState<ChatCharacterSummary | null>(null)
+  const [factsCount, setFactsCount] = useState(0)
   const previousRequestedCharacterIdRef = useRef<string | null>(null)
   const handledMissingCharacterIdRef = useRef<string | null>(null)
 
@@ -337,15 +353,26 @@ function ChatPageContent() {
       return
     }
 
-    if (!requestedCharacterId && !character && !characterLoading) {
-      fetchCharacter()
-    }
+    void fetchCharacter(requestedCharacterId || undefined)
     
     fetchMessages(requestedCharacterId || undefined)
     fetchScenes() // Load scenes for background selector
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, router, fetchMessages, fetchScenes, fetchCharacter, character, characterLoading, needsCreation, requestedCharacterId])
+  }, [isAuthenticated, router, fetchMessages, fetchScenes, fetchCharacter, needsCreation, requestedCharacterId])
+
+  useEffect(() => {
+    if (!requestedCharacterId) {
+      return
+    }
+    if (!characters.some((item) => item.id === requestedCharacterId)) {
+      return
+    }
+    if (selectedCharacterId === requestedCharacterId) {
+      return
+    }
+    setSelectedCharacterId(requestedCharacterId)
+  }, [characters, requestedCharacterId, selectedCharacterId, setSelectedCharacterId])
 
   useEffect(() => {
     useChatStore.getState().setActiveCharacterId(activeChatCharacterId || null)
@@ -392,6 +419,26 @@ function ChatPageContent() {
       window.removeEventListener('vgfriend:chat-character-update', handleChatCharacterUpdate as EventListener)
     }
   }, [requestedCharacterId])
+
+  useEffect(() => {
+    if (!activeChatCharacterId || chatCharacter?.isExPersona) {
+      setFactsCount(0)
+      return
+    }
+
+    const fetchFactsCount = async () => {
+      try {
+        const response = await api.get<{ total: number }>(`/character/facts?characterId=${encodeURIComponent(activeChatCharacterId)}`)
+        if (response.success) {
+          setFactsCount(response.data.total || 0)
+        }
+      } catch {
+        setFactsCount(0)
+      }
+    }
+
+    void fetchFactsCount()
+  }, [activeChatCharacterId, chatCharacter?.isExPersona])
 
   // Connect socket when accessToken is available — separate effect to avoid re-running fetchMessages
   useEffect(() => {
@@ -534,12 +581,33 @@ function ChatPageContent() {
     }
     router.push(`/settings/character?characterId=${encodeURIComponent(activeChatCharacterId)}`);
   };
+  const openFactsSettings = () => {
+    if (!activeChatCharacterId) {
+      return
+    }
+    router.push(`/settings/facts?characterId=${encodeURIComponent(activeChatCharacterId)}`)
+  }
+  const handleSelectCompanion = async (characterId: string) => {
+    setSelectedCharacterId(characterId)
+    useChatStore.getState().clearMessages()
+    setChatCharacter(null)
+    router.push(`/chat?characterId=${encodeURIComponent(characterId)}`)
+    await fetchCharacter(characterId)
+  }
+  const knowledgeLabel = t.knowledgeScope.replace('{name}', displayCharacterName)
+  const factsCountLabel = t.factsCount.replace('{count}', String(factsCount))
 
   return (
     <AppLayout>
       <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-12rem)] lg:h-[calc(100vh-10rem)]">
         {/* Left Side: Character Card */}
         <div className="hidden lg:flex lg:w-80 flex-col">
+          <CompanionSwitcher
+            companions={characters}
+            selectedCharacterId={requestedCharacterId || selectedCharacterId}
+            onSelect={handleSelectCompanion}
+            className="mb-4"
+          />
           {/* Character Info Card */}
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6 flex flex-col items-center">
             {/* Avatar */}
@@ -616,6 +684,23 @@ function ChatPageContent() {
                 <Settings className="w-5 h-5 text-[#ba9cab]" />
               </button>
             </div>
+
+            {!chatCharacter?.isExPersona && (
+              <button
+                type="button"
+                onClick={openFactsSettings}
+                className="w-full mt-4 rounded-xl border border-[#4a3640] bg-[#181114] px-3 py-2 text-left hover:border-love/40 hover:bg-[#22161c] transition-colors"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-[#ba9cab] truncate">{knowledgeLabel}</span>
+                  <BookOpen className="w-4 h-4 text-love shrink-0" />
+                </div>
+                <div className="mt-1 flex items-center justify-between">
+                  <span className="text-sm text-white">{factsCountLabel}</span>
+                  <span className="text-xs text-love">{t.openFacts}</span>
+                </div>
+              </button>
+            )}
           </div>
         </div>
 
@@ -678,7 +763,23 @@ function ChatPageContent() {
               >
                 <Settings className="w-4 h-4" />
               </button>
+              {!chatCharacter?.isExPersona && (
+                <button
+                  onClick={openFactsSettings}
+                  className="w-10 h-10 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center text-[#ba9cab] hover:bg-[#392830]/80 hover:text-white transition-all"
+                  title={t.openFacts}
+                >
+                  <BookOpen className="w-4 h-4" />
+                </button>
+              )}
             </div>
+          </div>
+          <div className="lg:hidden px-3 py-2 border-b border-[#392830] bg-[#24191f]">
+            <CompanionSwitcher
+              companions={characters}
+              selectedCharacterId={requestedCharacterId || selectedCharacterId}
+              onSelect={handleSelectCompanion}
+            />
           </div>
 
           {/* Messages Area */}

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { api } from '@/services/api';
 
+const SELECTED_CHARACTER_KEY = 'vgfriend:selected-character-id';
+
 // Rank titles mirroring server LEVEL_RANKS
 const LEVEL_RANKS = [
   { maxLevel: 4, title: 'Người lạ' },
@@ -46,24 +48,32 @@ export interface CharacterTemplate {
   sortOrder: number;
 }
 
-interface Character {
+export interface ActiveCharacter {
   id: string;
   name: string;
-  nickname?: string;
-  gender: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER';
   avatar?: string;
   avatarUrl?: string;
+  mood: string;
+  affection: number;
+  level: number;
+  experience: number;
+  relationshipStage: string;
+  age: number;
+  occupation: string;
+  stats?: {
+    messages: number;
+    gifts: number;
+    memories: number;
+  };
+}
+
+export interface Character extends ActiveCharacter {
+  nickname?: string;
+  gender: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER';
   templateId?: string;
   template?: CharacterTemplate;
   bio?: string;
   personality: string;
-  mood: string;
-  level: number;
-  experience: number;
-  affection: number;
-  relationshipStage: string;
-  age: number;
-  occupation: string;
   avatarStyle: string;
   hairStyle: string;
   hairColor: string;
@@ -82,13 +92,18 @@ interface MoodInfo {
 
 interface CharacterState {
   character: Character | null;
+  selectedCharacter: Character | null;
+  characters: ActiveCharacter[];
+  selectedCharacterId: string | null;
   isLoading: boolean;
   needsCreation: boolean;
   moodInfo: MoodInfo | null;
 
   // Actions
   setCharacter: (character: Character) => void;
-  fetchCharacter: () => Promise<void>;
+  setCharacters: (characters: ActiveCharacter[]) => void;
+  setSelectedCharacterId: (characterId: string | null) => void;
+  fetchCharacter: (characterId?: string) => Promise<void>;
   createCharacter: (data: {
     name: string;
     gender?: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER';
@@ -106,30 +121,151 @@ interface CharacterState {
   clear: () => void;
 }
 
-export const useCharacterStore = create<CharacterState>((set) => ({
+function persistSelectedCharacterId(characterId: string | null) {
+  if (typeof window === 'undefined') return;
+  if (!characterId) {
+    localStorage.removeItem(SELECTED_CHARACTER_KEY);
+    return;
+  }
+  localStorage.setItem(SELECTED_CHARACTER_KEY, characterId);
+}
+
+function loadPersistedSelectedCharacterId() {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(SELECTED_CHARACTER_KEY);
+}
+
+function mergeSelectedIntoList(
+  characters: ActiveCharacter[],
+  selectedCharacter: Character | null
+): ActiveCharacter[] {
+  if (!selectedCharacter) return characters;
+  return characters.map((item) => item.id === selectedCharacter.id
+    ? {
+      ...item,
+      name: selectedCharacter.name,
+      avatarUrl: selectedCharacter.avatarUrl || item.avatarUrl,
+      mood: selectedCharacter.mood,
+      affection: selectedCharacter.affection,
+      level: selectedCharacter.level,
+      experience: selectedCharacter.experience,
+      relationshipStage: selectedCharacter.relationshipStage,
+      age: selectedCharacter.age,
+      occupation: selectedCharacter.occupation,
+    }
+    : item);
+}
+
+export const useCharacterStore = create<CharacterState>((set, get) => ({
   character: null,
+  selectedCharacter: null,
+  characters: [],
+  selectedCharacterId: null,
   isLoading: true,
   needsCreation: false,
   moodInfo: null,
 
   setCharacter: (character: Character) => {
-    set({ character, isLoading: false, needsCreation: false });
+    const currentCharacters = get().characters;
+    const mergedCharacters = mergeSelectedIntoList(currentCharacters, character);
+    const hasCharacter = mergedCharacters.some((item) => item.id === character.id);
+    const finalCharacters = hasCharacter
+      ? mergedCharacters
+      : [
+        {
+          id: character.id,
+          name: character.name,
+          avatar: character.avatar,
+          avatarUrl: character.avatarUrl,
+          mood: character.mood,
+          affection: character.affection,
+          level: character.level,
+          experience: character.experience,
+          relationshipStage: character.relationshipStage,
+          age: character.age,
+          occupation: character.occupation,
+        },
+        ...mergedCharacters,
+      ];
+
+    set({
+      character,
+      selectedCharacter: character,
+      selectedCharacterId: character.id,
+      characters: finalCharacters,
+      isLoading: false,
+      needsCreation: false,
+    });
+    persistSelectedCharacterId(character.id);
   },
 
-  fetchCharacter: async () => {
+  setCharacters: (characters: ActiveCharacter[]) => {
+    const selectedCharacter = get().selectedCharacter;
+    set({
+      characters: mergeSelectedIntoList(characters, selectedCharacter),
+    });
+  },
+
+  setSelectedCharacterId: (characterId: string | null) => {
+    set({
+      selectedCharacterId: characterId,
+    });
+    persistSelectedCharacterId(characterId);
+  },
+
+  fetchCharacter: async (characterId?: string) => {
     try {
       set({ isLoading: true });
-      const response = await api.get<Character>('/character');
-      if (response.success && response.data) {
-        set({ character: response.data, isLoading: false, needsCreation: false });
-      } else {
-        set({ isLoading: false, needsCreation: true, character: null });
+      const activeResponse = await api.get<ActiveCharacter[]>('/character/active');
+      const activeCharacters = activeResponse.success ? (activeResponse.data || []) : [];
+
+      if (activeCharacters.length === 0) {
+        set({
+          character: null,
+          selectedCharacter: null,
+          characters: [],
+          selectedCharacterId: null,
+          isLoading: false,
+          needsCreation: true,
+        });
+        persistSelectedCharacterId(null);
+        return;
       }
+
+      const currentSelected = get().selectedCharacterId;
+      const persistedSelected = loadPersistedSelectedCharacterId();
+      const requestedId = characterId || currentSelected || persistedSelected;
+      const exists = requestedId ? activeCharacters.some((item) => item.id === requestedId) : false;
+      const effectiveCharacterId: string = exists && requestedId ? requestedId : activeCharacters[0].id;
+
+      const characterResponse = await api.get<Character>(`/character?characterId=${encodeURIComponent(effectiveCharacterId)}`);
+      if (!characterResponse.success || !characterResponse.data) {
+        throw new Error('Character load failed');
+      }
+
+      const selectedCharacter = characterResponse.data;
+      const mergedCharacters = mergeSelectedIntoList(activeCharacters, selectedCharacter);
+      set({
+        character: selectedCharacter,
+        selectedCharacter,
+        selectedCharacterId: selectedCharacter.id,
+        characters: mergedCharacters,
+        isLoading: false,
+        needsCreation: false,
+      });
+      persistSelectedCharacterId(selectedCharacter.id);
     } catch (error) {
-      // If no character exists, need to create one
       const err = error as Error;
       if (err.message.includes('No active character') || err.message.includes('not found')) {
-        set({ isLoading: false, needsCreation: true, character: null });
+        set({
+          character: null,
+          selectedCharacter: null,
+          characters: [],
+          selectedCharacterId: null,
+          isLoading: false,
+          needsCreation: true,
+        });
+        persistSelectedCharacterId(null);
       } else {
         set({ isLoading: false });
       }
@@ -141,8 +277,12 @@ export const useCharacterStore = create<CharacterState>((set) => ({
       set({ isLoading: true });
       const response = await api.post<Character>('/character', data);
       if (response.success && response.data) {
-        set({ character: response.data, isLoading: false, needsCreation: false });
-        return response.data;
+        await get().fetchCharacter(response.data.id);
+        const freshCharacter = get().character;
+        if (!freshCharacter) {
+          throw new Error('Character creation failed');
+        }
+        return freshCharacter;
       }
       throw new Error('Character creation failed');
     } catch (error) {
@@ -157,7 +297,12 @@ export const useCharacterStore = create<CharacterState>((set) => ({
   updateMood: (mood: string) => {
     set((state) => {
       if (!state.character) return state;
-      return { character: { ...state.character, mood } };
+      const nextCharacter = { ...state.character, mood };
+      return {
+        character: nextCharacter,
+        selectedCharacter: nextCharacter,
+        characters: state.characters.map((item) => item.id === nextCharacter.id ? { ...item, mood } : item),
+      };
     });
   },
 
@@ -165,7 +310,12 @@ export const useCharacterStore = create<CharacterState>((set) => ({
     set((state) => {
       if (!state.character) return state;
       const newAffection = Math.max(0, Math.min(1000, state.character.affection + change));
-      return { character: { ...state.character, affection: newAffection } };
+      const nextCharacter = { ...state.character, affection: newAffection };
+      return {
+        character: nextCharacter,
+        selectedCharacter: nextCharacter,
+        characters: state.characters.map((item) => item.id === nextCharacter.id ? { ...item, affection: newAffection } : item),
+      };
     });
   },
 
@@ -174,7 +324,12 @@ export const useCharacterStore = create<CharacterState>((set) => ({
     set((state) => {
       if (!state.character) return state;
       const clampedAffection = Math.max(0, Math.min(1000, affection));
-      return { character: { ...state.character, affection: clampedAffection } };
+      const nextCharacter = { ...state.character, affection: clampedAffection };
+      return {
+        character: nextCharacter,
+        selectedCharacter: nextCharacter,
+        characters: state.characters.map((item) => item.id === nextCharacter.id ? { ...item, affection: clampedAffection } : item),
+      };
     });
   },
 
@@ -192,7 +347,14 @@ export const useCharacterStore = create<CharacterState>((set) => ({
         xpNeeded = 100 + (newLevel - 1) * 50;
       }
 
-      return { character: { ...state.character, experience: newXp, level: newLevel } };
+      const nextCharacter = { ...state.character, experience: newXp, level: newLevel };
+      return {
+        character: nextCharacter,
+        selectedCharacter: nextCharacter,
+        characters: state.characters.map((item) => item.id === nextCharacter.id
+          ? { ...item, level: newLevel, experience: newXp }
+          : item),
+      };
     });
   },
 
@@ -201,6 +363,15 @@ export const useCharacterStore = create<CharacterState>((set) => ({
   },
 
   clear: () => {
-    set({ character: null, isLoading: true, needsCreation: false, moodInfo: null });
+    set({
+      character: null,
+      selectedCharacter: null,
+      characters: [],
+      selectedCharacterId: null,
+      isLoading: true,
+      needsCreation: false,
+      moodInfo: null,
+    });
+    persistSelectedCharacterId(null);
   },
 }));

@@ -16,6 +16,7 @@ characterRouter.use(attachPremiumInfo);
 
 // Primary routes
 characterRouter.get('/', characterController.getMyCharacter);
+characterRouter.get('/active', characterController.getActiveCharacters);
 characterRouter.post('/', characterController.createCharacter);
 characterRouter.patch('/', characterController.updateCharacter);
 

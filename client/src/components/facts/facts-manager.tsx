@@ -20,6 +20,11 @@ interface Fact {
   importance: number;
   source: string;
   updatedAt: string;
+  character?: {
+    id: string;
+    name: string;
+    avatarUrl?: string | null;
+  };
 }
 
 interface GroupedFacts {
@@ -161,7 +166,23 @@ function FactItem({ fact, onEdit, onDelete }: FactItemProps) {
   );
 }
 
-export function FactsManager() {
+interface FactsManagerProps {
+  characterId?: string | null;
+  characterName?: string;
+}
+
+interface FactsResponseData {
+  facts: Fact[];
+  grouped: GroupedFacts;
+  total: number;
+  character?: {
+    id: string;
+    name: string;
+    avatarUrl?: string | null;
+  };
+}
+
+export function FactsManager({ characterId, characterName }: FactsManagerProps) {
   const { toast } = useToast();
   const [facts, setFacts] = useState<Fact[]>([]);
   const [grouped, setGrouped] = useState<GroupedFacts>({});
@@ -170,13 +191,30 @@ export function FactsManager() {
   const [newFact, setNewFact] = useState({ key: '', value: '', category: 'other' });
   const [isAdding, setIsAdding] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [resolvedCharacterName, setResolvedCharacterName] = useState<string>(characterName || '');
+
+  const getFactsEndpoint = useCallback(() => {
+    if (!characterId) {
+      return '/character/facts';
+    }
+    return `/character/facts?characterId=${encodeURIComponent(characterId)}`;
+  }, [characterId]);
+
+  const getFactMutationEndpoint = useCallback((factId?: string) => {
+    const basePath = factId ? `/character/facts/${factId}` : '/character/facts';
+    if (!characterId) {
+      return basePath;
+    }
+    return `${basePath}?characterId=${encodeURIComponent(characterId)}`;
+  }, [characterId]);
 
   const fetchFacts = useCallback(async () => {
     try {
-      const response = await api.get<{ facts: Fact[]; grouped: GroupedFacts }>('/character/facts');
+      const response = await api.get<FactsResponseData>(getFactsEndpoint());
       if (response.success) {
-        setFacts(response.data.facts);
-        setGrouped(response.data.grouped);
+        setFacts(response.data.facts || []);
+        setGrouped(response.data.grouped || {});
+        setResolvedCharacterName(response.data.character?.name || characterName || '');
       }
     } catch {
       toast({
@@ -187,18 +225,19 @@ export function FactsManager() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [characterName, getFactsEndpoint, toast]);
 
   useEffect(() => {
+    setIsLoading(true);
+    setFacts([]);
+    setGrouped({});
     void fetchFacts();
-  }, [fetchFacts]);
+  }, [characterId, fetchFacts]);
 
   const handleEdit = async (fact: Fact, newValue: string) => {
     try {
-      await api.patch(`/character/facts/${fact.id}`, { value: newValue });
-      setFacts(prev => prev.map(f => 
-        f.id === fact.id ? { ...f, value: newValue, source: 'user_edited' } : f
-      ));
+      await api.patch(getFactMutationEndpoint(fact.id), { value: newValue });
+      await fetchFacts();
       toast({ title: 'Đã cập nhật', description: 'Thông tin đã được lưu' });
     } catch {
       toast({
@@ -211,8 +250,8 @@ export function FactsManager() {
 
   const handleDelete = async (factId: string) => {
     try {
-      await api.delete(`/character/facts/${factId}`);
-      setFacts(prev => prev.filter(f => f.id !== factId));
+      await api.delete(getFactMutationEndpoint(factId));
+      await fetchFacts();
       toast({ title: 'Đã xóa', description: 'Thông tin đã được xóa' });
     } catch {
       toast({
@@ -228,7 +267,7 @@ export function FactsManager() {
     
     setIsAdding(true);
     try {
-      const response = await api.post<Fact>('/character/facts', newFact);
+      const response = await api.post<Fact>(getFactMutationEndpoint(), newFact);
       if (response.success) {
         await fetchFacts();
         setNewFact({ key: '', value: '', category: 'other' });
@@ -272,6 +311,9 @@ export function FactsManager() {
           <div>
             <h2 className="text-lg font-semibold text-white">Trí nhớ AI</h2>
             <p className="text-sm text-white/60">{facts.length} thông tin đã học</p>
+            {resolvedCharacterName && (
+              <p className="text-xs text-love/90 mt-0.5">Companion: {resolvedCharacterName}</p>
+            )}
           </div>
         </div>
         

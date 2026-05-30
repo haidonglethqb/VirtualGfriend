@@ -13,8 +13,9 @@ import AppLayout from '@/components/layout/app-layout';
 import { AdBanner } from '@/components/ads/ad-banner';
 import { useAuthStore } from '@/store/auth-store';
 import { useCharacterStore, getRankTitle, getXpProgress } from '@/store/character-store';
+import { CompanionSwitcher } from '@/components/companion/companion-switcher';
 import { useLanguageStore } from '@/store/language-store';
-import { formatNumber, getRelationshipLabel } from '@/lib/utils';
+import { getRelationshipLabel } from '@/lib/utils';
 import api from '@/services/api';
 
 const DASHBOARD_I18N = {
@@ -149,16 +150,6 @@ interface Memory {
   createdAt: string;
 }
 
-interface RelationshipCharacter {
-  id: string;
-  name: string;
-  avatarUrl?: string | null;
-  relationshipStage: string;
-  affection: number;
-  isEnded: boolean;
-  isExPersona: boolean;
-}
-
 interface CanStartRelationshipInfo {
   canStart: boolean;
   currentCount: number;
@@ -168,13 +159,19 @@ interface CanStartRelationshipInfo {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
-  const { character, fetchCharacter, isLoading: characterLoading } = useCharacterStore();
+  const {
+    character,
+    characters,
+    selectedCharacterId,
+    setSelectedCharacterId,
+    fetchCharacter,
+    isLoading: characterLoading,
+  } = useCharacterStore();
   const { language } = useLanguageStore();
   const t = DASHBOARD_I18N[language];
   const [greeting, setGreeting] = useState('');
   const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([]);
   const [recentMemories, setRecentMemories] = useState<Memory[]>([]);
-  const [activeRelationships, setActiveRelationships] = useState<RelationshipCharacter[]>([]);
   const [canStartRelationship, setCanStartRelationship] = useState<CanStartRelationshipInfo | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     messagesToday: 0,
@@ -184,12 +181,11 @@ export default function DashboardPage() {
 
   const fetchDashboardData = useCallback(async () => {
     // Fetch all dashboard data in parallel for faster load
-    const [questsResult, chatResult, giftResult, memoriesResult, relationshipsResult, canStartResult] = await Promise.allSettled([
+    const [questsResult, chatResult, giftResult, memoriesResult, canStartResult] = await Promise.allSettled([
       api.get<DailyQuest[]>('/quests/daily'),
       api.get<{ messages: Array<{ createdAt: string }> }>('/chat/history?limit=100'),
       api.get<{ items: unknown[]; total: number }>('/shop/history'),
       api.get<{ items: Memory[] }>('/memories?limit=3'),
-      api.get<RelationshipCharacter[]>('/character/relationship/history'),
       api.get<CanStartRelationshipInfo>('/character/relationship/can-start-new'),
     ]);
 
@@ -212,12 +208,6 @@ export default function DashboardPage() {
 
     if (memoriesResult.status === 'fulfilled' && memoriesResult.value.success) {
       setRecentMemories(memoriesResult.value.data.items?.slice(0, 3) || []);
-    }
-
-    if (relationshipsResult.status === 'fulfilled' && relationshipsResult.value.success) {
-      setActiveRelationships(
-        relationshipsResult.value.data.filter((item) => !item.isEnded && !item.isExPersona)
-      );
     }
 
     if (canStartResult.status === 'fulfilled' && canStartResult.value.success) {
@@ -273,10 +263,20 @@ export default function DashboardPage() {
   }
 
   const affectionPercentage = character ? (character.affection / 1000) * 100 : 0;
+  const activeRelationships = characters;
   const primaryActionHref = character?.id
     ? `/chat?characterId=${encodeURIComponent(character.id)}`
     : '/onboarding';
   const primaryActionLabel = character?.id ? t.chatNow : t.createNewCharacter;
+  const giftHref = character?.id ? `/shop?characterId=${encodeURIComponent(character.id)}` : '/shop';
+
+  const handleSelectCompanion = async (characterId: string) => {
+    if (characterId === selectedCharacterId) {
+      return;
+    }
+    setSelectedCharacterId(characterId);
+    await fetchCharacter(characterId);
+  };
 
   return (
     <AppLayout>
@@ -304,6 +304,12 @@ export default function DashboardPage() {
             transition={{ delay: 0.1 }}
             className="lg:col-span-1"
           >
+            <CompanionSwitcher
+              companions={characters}
+              selectedCharacterId={selectedCharacterId}
+              onSelect={handleSelectCompanion}
+              className="mb-4"
+            />
             <div className="relative overflow-hidden rounded-2xl bg-[#271b21] border border-[#392830]">
               {/* Character Header with gradient */}
               <div className="relative h-48 bg-gradient-to-br from-love/80 via-love/60 to-purple-600/60">
@@ -407,7 +413,7 @@ export default function DashboardPage() {
                       {primaryActionLabel}
                     </button>
                   </Link>
-                  <Link href="/shop" className="w-full">
+                  <Link href={giftHref} className="w-full">
                     <button className="w-full flex items-center justify-center gap-2 h-12 rounded-full bg-[#392830] hover:bg-[#392830]/80 text-white font-bold transition-all border border-[#392830]">
                       <Gift className="w-5 h-5" />
                       {t.giveGift}
@@ -484,7 +490,13 @@ export default function DashboardPage() {
                 {activeRelationships.length > 0 ? (
                   <div className="grid sm:grid-cols-2 gap-3">
                     {activeRelationships.map((item) => (
-                      <div key={item.id} className="flex items-center gap-3 rounded-xl bg-[#181114] border border-[#392830] p-3 hover:border-love/50 transition-colors">
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-3 rounded-xl bg-[#181114] border border-[#392830] p-3 hover:border-love/50 transition-colors"
+                        onClick={() => {
+                          void handleSelectCompanion(item.id);
+                        }}
+                      >
                         <Link href={`/chat?characterId=${encodeURIComponent(item.id)}`} className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center overflow-hidden text-white font-bold">
                             {item.avatarUrl ? (

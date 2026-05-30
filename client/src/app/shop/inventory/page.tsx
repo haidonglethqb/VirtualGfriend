@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
+import { useCharacterStore } from '@/store/character-store';
 import { useToast } from '@/hooks/use-toast';
 import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 import api from '@/services/api';
@@ -41,10 +42,12 @@ export default function InventoryPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
+  const { selectedCharacterId } = useCharacterStore();
   const { language } = useLanguageStore();
   const tr = useCallback((vi: string, en: string) => (language === 'vi' ? vi : en), [language]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const chatHref = selectedCharacterId ? `/chat?characterId=${encodeURIComponent(selectedCharacterId)}` : '/chat';
 
   const fetchInventory = useCallback(async () => {
     try {
@@ -98,7 +101,7 @@ export default function InventoryPage() {
                 {tr('Cửa hàng', 'Shop')}
               </button>
             </Link>
-            <Link href="/chat">
+            <Link href={chatHref}>
               <button className="flex items-center gap-2 h-10 px-4 rounded-full bg-love hover:bg-love/90 text-white text-sm font-bold transition-colors">
                 <Gift className="w-4 h-4" />
                 {tr('Đi tặng quà', 'Send gifts')}
