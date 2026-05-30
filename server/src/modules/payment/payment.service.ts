@@ -82,9 +82,13 @@ export async function createCheckoutSession(
   const pricing = await getPricingConfig()
   const tierPricing = pricing[tier]
 
-  const priceId = billingCycle === 'MONTHLY'
+  let priceId: string | null = billingCycle === 'MONTHLY'
     ? tierPricing.stripePriceIdMonthly
     : tierPricing.stripePriceIdYearly
+
+  if (!priceId) {
+    priceId = await recoverMissingPriceId(tier, billingCycle, tierPricing)
+  }
 
   if (!priceId) {
     const err = new Error(`Payment not available: Stripe Price ID not configured for ${tier} ${billingCycle}. Please contact support.`) as Error & { statusCode?: number }
@@ -122,6 +126,51 @@ export async function createCheckoutSession(
   }
 
   return session.url
+}
+
+async function recoverMissingPriceId(
+  tier: Exclude<PremiumTier, 'FREE'>,
+  billingCycle: 'MONTHLY' | 'YEARLY',
+  tierPricing: StripePricingConfig[Exclude<PremiumTier, 'FREE'>],
+): Promise<string | null> {
+  if (!tierPricing.stripeProductId) {
+    return null
+  }
+
+  const stripe = getStripeOrThrow()
+  const expectedAmount = billingCycle === 'MONTHLY' ? tierPricing.monthlyPrice : tierPricing.yearlyPrice
+  const interval = billingCycle === 'MONTHLY' ? 'month' : 'year'
+
+  try {
+    const prices = await stripe.prices.list({
+      product: tierPricing.stripeProductId,
+      active: true,
+      currency: 'vnd',
+      type: 'recurring',
+      limit: 100,
+    })
+
+    const exactMatch = prices.data.find((p) => p.recurring?.interval === interval && p.unit_amount === expectedAmount)
+    const intervalMatch = prices.data.find((p) => p.recurring?.interval === interval)
+    const resolved = exactMatch ?? intervalMatch
+
+    if (!resolved) {
+      return null
+    }
+
+    const patch = billingCycle === 'MONTHLY'
+      ? { stripePriceIdMonthly: resolved.id }
+      : { stripePriceIdYearly: resolved.id }
+
+    await updatePricingConfig(tier, patch)
+    log.warn(`Recovered missing Stripe Price ID for ${tier} ${billingCycle}: ${resolved.id}`)
+
+    return resolved.id
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown Stripe lookup error'
+    log.warn(`Failed to recover Stripe Price ID for ${tier} ${billingCycle}: ${message}`)
+    return null
+  }
 }
 
 async function getOrCreateStripeCustomer(userId: string, email: string): Promise<string> {

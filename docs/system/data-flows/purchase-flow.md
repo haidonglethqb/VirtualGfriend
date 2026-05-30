@@ -48,6 +48,8 @@ interface StripePricingConfig {
 }
 ```
 
+If a required `stripePriceId*` is empty during checkout, backend attempts a runtime recovery from Stripe using saved `stripeProductId` and expected interval/amount, then persists the recovered price ID back to DB config.
+
 ## Webhook Events
 
 | Event | Action |
