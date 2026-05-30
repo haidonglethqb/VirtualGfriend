@@ -172,8 +172,8 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          # Timeout tăng để tránh ngắt SSH khi pull image lớn hoặc mạng chập chờn
-          command_timeout: 20m
+          # Timeout 10 phút là đủ khi các services ready đúng cách
+          command_timeout: 10m
           script: |
             set -e
 
@@ -304,60 +304,12 @@ jobs:
             echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin 2>&1 | tail -1
             echo "DONE: GHCR login successful"
 
-            # ── Bước 2.5: Network preflight diagnostics ───────────
-            echo ""
-            echo "Step 2.5: Network diagnostics for GHCR..."
-            echo "GHCR IPv4 endpoints (first 3):"
-            getent ahostsv4 ghcr.io | awk '{print $1}' | sort -u | head -3 || echo "  (cannot resolve IPv4)"
-            if command -v ip >/dev/null 2>&1; then
-              if ip -6 route show default >/dev/null 2>&1 && [ -n "$(ip -6 route show default)" ]; then
-                echo "IPv6 default route: present"
-              else
-                echo "IPv6 default route: missing"
-              fi
-            fi
-            echo "DONE: Network diagnostics captured"
-
-            retry_cmd() {
-              name="$1"
-              max_attempts="$2"
-              delay="$3"
-              shift 3
-
-              attempt=1
-              while [ "$attempt" -le "$max_attempts" ]; do
-                echo "   [$name] attempt $attempt/$max_attempts"
-                if "$@"; then
-                  echo "   [$name] succeeded"
-                  return 0
-                fi
-
-                if [ "$attempt" -eq "$max_attempts" ]; then
-                  echo "   [$name] failed after $max_attempts attempts"
-                  return 1
-                fi
-
-                echo "   [$name] failed, retrying in ${delay}s..."
-                sleep "$delay"
-                attempt=$((attempt + 1))
-                delay=$((delay * 2))
-              done
-            }
-
             # ── Bước 3: Pull images mới ────────────────────────────
             echo ""
             echo "Step 3: Pulling new Docker images..."
-            SERVER_IMAGE="ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/server:latest"
-            CLIENT_IMAGE="ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/client:latest"
-
-            echo "   Pulling server image: $SERVER_IMAGE"
-            retry_cmd "pull server image" 4 5 docker pull "$SERVER_IMAGE"
-
-            echo "   Pulling client image: $CLIENT_IMAGE"
-            retry_cmd "pull client image" 4 5 docker pull "$CLIENT_IMAGE"
-
-            echo "   Pulling remaining compose images..."
-            retry_cmd "docker compose pull" 3 5 docker compose pull
+            echo "   Pulling server image: ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/server:latest"
+            echo "   Pulling client image: ghcr.io/${{ needs.type-check.outputs.image_name_lower }}/client:latest"
+            docker compose pull 2>&1
             echo "DONE: Images pulled"
             echo ""
             echo "Pulled images:"

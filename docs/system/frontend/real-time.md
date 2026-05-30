@@ -104,7 +104,8 @@ private reRegisterExternalListeners() {
 ## Ex-Persona Routing
 
 - `comeback_message` notifications can deep-link the user to `/chat?characterId=...`.
-- The chat page now treats query-param `characterId` as the source of truth for history + sends, so an ended ex-persona can still be opened even when there is no active relationship.
+- The chat page treats query-param `characterId` as primary target for history + sends, but falls back to the active character in store when both IDs match to avoid null-target send states.
+- If no valid chat target can be resolved, send actions are blocked with a destructive toast instead of failing silently.
 
 ## Related
 

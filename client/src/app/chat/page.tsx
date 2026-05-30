@@ -202,8 +202,10 @@ function ChatPageContent() {
   const previousRequestedCharacterIdRef = useRef<string | null>(null)
   const handledMissingCharacterIdRef = useRef<string | null>(null)
 
-  const activeChatCharacter = requestedCharacterId ? chatCharacter : character;
-  const activeChatCharacterId = requestedCharacterId ? chatCharacter?.id : character?.id;
+  const activeChatCharacter = requestedCharacterId
+    ? (chatCharacter ?? (character?.id === requestedCharacterId ? character : null))
+    : character;
+  const activeChatCharacterId = activeChatCharacter?.id;
 
   // Memoize fetchMessages for useCallback
   const handleFetchMessages = useCallback(() => {
@@ -405,7 +407,16 @@ function ChatPageContent() {
   const sendingRef = useRef(false)
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || sendingRef.current || isSending || !activeChatCharacterId) return;
+    if (!activeChatCharacterId) {
+      toast({
+        title: t.missingCharacter,
+        description: t.missingCharacterDesc,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!inputMessage.trim() || sendingRef.current || isSending) return;
 
     const content = inputMessage.trim();
     const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -878,7 +889,7 @@ function ChatPageContent() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyPress}
-              disabled={isSending}
+              disabled={isSending || !activeChatCharacterId}
               className="w-full bg-[#392830]/40 hover:bg-[#392830]/60 focus:bg-[#392830]/60 border border-[#4a3640] focus:border-love/50 text-white placeholder-white/40 rounded-full py-4 pl-6 pr-40 outline-none transition-all shadow-lg backdrop-blur-md"
               placeholder={t.typeMessage.replace('{name}', displayCharacterName)}
               type="text"
@@ -910,7 +921,7 @@ function ChatPageContent() {
               </button>
               <button
                 onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isSending}
+                disabled={!inputMessage.trim() || isSending || !activeChatCharacterId}
                 className="w-10 h-10 flex items-center justify-center rounded-full bg-love text-white shadow-[0_0_15px_rgba(244,37,140,0.4)] hover:bg-love/90 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"
               >
                 <Send className="w-5 h-5" />

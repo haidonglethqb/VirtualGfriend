@@ -21,6 +21,8 @@ Complete API endpoint reference. Base path: `/api`.
 | POST | `/change-password` | Yes — Change current password |
 | GET | `/me` | Yes — Current user profile |
 
+Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields used by frontend gates: `isPremium`, `premiumTier`, `userGender`, `datingPreference`.
+
 ### Users (`/users`) — Auth required
 | Method | Path | Description |
 |---|---|---|
