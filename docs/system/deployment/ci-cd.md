@@ -48,6 +48,8 @@ build-args: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_WS_URL, STRIPE_PUBLISHABLE_KEY
 
 ### 3. Deploy to VPS
 ```bash
+# SSH command timeout: 20m (increased to reduce long-pull abort risk)
+
 # Step 1: Write .env from GitHub secrets
 cat > .env << 'ENVEOF'
 POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
@@ -67,8 +69,14 @@ check_required "SMTP_PASS" "${{ secrets.SMTP_PASS }}"
 # Step 2: Login to GHCR
 docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-# Step 3: Pull new images
-docker compose pull
+# Step 2.5: Log GHCR network diagnostics (IPv4 targets + IPv6 route status)
+getent ahostsv4 ghcr.io
+ip -6 route show default
+
+# Step 3: Pull new images with retry + exponential backoff
+retry_cmd "pull server image" 4 5 docker pull ghcr.io/.../server:latest
+retry_cmd "pull client image" 4 5 docker pull ghcr.io/.../client:latest
+retry_cmd "docker compose pull" 3 5 docker compose pull
 
 # Step 3.5: Validate compose + mounted runtime files
 test -f docker-compose.yml
