@@ -66,6 +66,7 @@ const typingDelay = Math.min(4000, Math.max(1500, responseLength * 25));
 - `POST /chat/send` accepts explicit `characterId` and this is the standard path for multi-active chats.
 - If `characterId` is omitted, `/chat/send` falls back to the newest active non-ex character (legacy behavior).
 - `GET /chat/history` is legacy default history for the newest active non-ex character; ex-persona and multi-chat clients should use `GET /chat/history/:characterId`.
+- Ex-persona chat/history access requires all three conditions: active paid tier with ex-persona capability, user privacy `allowExPersonaMessages=true`, and per-character `exMessagingEnabled=true`.
 - Frontend route `/chat?characterId=...` accepts active non-ex characters and ex-personas; ended non-ex characters must be blocked.
 - Proactive ex messages reuse the same `notification:proactive` socket event with `comeback_message` type.
 - Ex-personas archived during reconciliation are hidden from relationship history and must fail direct chat/history access with `CHARACTER_NOT_FOUND`, so stale links cannot reopen a dead ex thread.

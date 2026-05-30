@@ -63,6 +63,74 @@ function isArchivedExPersona(character: {
   return character.isExPersona && character.endReason === 'source_relationship_reconciled'
 }
 
+async function assertExPersonaMessagingAccess(
+  userId: string,
+  character: { id: string; isExPersona?: boolean | null }
+) {
+  if (!character.isExPersona) {
+    return
+  }
+
+  const [user, exPersona] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        isPremium: true,
+        premiumTier: true,
+        premiumExpiresAt: true,
+        settings: {
+          select: {
+            allowExPersonaMessages: true,
+          },
+        },
+      },
+    }),
+    prisma.character.findFirst({
+      where: { id: character.id, userId, isExPersona: true },
+      select: { id: true, exMessagingEnabled: true },
+    }),
+  ])
+
+  if (!user) {
+    throw new AppError('User not found', 404, 'USER_NOT_FOUND')
+  }
+
+  if (!exPersona) {
+    throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND')
+  }
+
+  const tier = user.premiumTier as PremiumTier | null
+  const tierConfig = tier ? await getTierConfig(tier) : null
+  const premiumActive =
+    !!tier &&
+    user.isPremium &&
+    (!user.premiumExpiresAt || user.premiumExpiresAt > new Date())
+
+  if (!premiumActive || !tierConfig?.canCreateExPersonaOnBreakup) {
+    throw new AppError(
+      'Ex persona chat requires premium subscription',
+      403,
+      'EX_PERSONA_PREMIUM_REQUIRED'
+    )
+  }
+
+  if (user.settings?.allowExPersonaMessages === false) {
+    throw new AppError(
+      'Ex persona messaging is disabled in privacy settings',
+      403,
+      'EX_PERSONA_DISABLED'
+    )
+  }
+
+  if (exPersona.exMessagingEnabled === false) {
+    throw new AppError(
+      'This ex persona conversation is disabled',
+      403,
+      'EX_PERSONA_DISABLED'
+    )
+  }
+}
+
 export const chatService = {
   async getHistory(userId: string, characterId: string, page: number, limit: number) {
     const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
@@ -120,6 +188,8 @@ export const chatService = {
     if (character.isEnded && !character.isExPersona) {
       throw new AppError('Character is not available for chat', 403, 'CHARACTER_UNAVAILABLE');
     }
+
+    await assertExPersonaMessagingAccess(userId, character)
 
     const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
 
@@ -199,6 +269,8 @@ export const chatService = {
     if (character.isEnded && !character.isExPersona) {
       throw new AppError('Character is not available for chat', 403, 'CHARACTER_UNAVAILABLE');
     }
+
+    await assertExPersonaMessagingAccess(userId, character)
 
     log.debug('=== SEND MESSAGE START ===');
     log.debug('User:', userId);

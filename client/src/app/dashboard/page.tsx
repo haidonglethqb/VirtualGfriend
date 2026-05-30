@@ -168,7 +168,7 @@ interface CanStartRelationshipInfo {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
-  const { character, fetchCharacter, isLoading: characterLoading, needsCreation } = useCharacterStore();
+  const { character, fetchCharacter, isLoading: characterLoading } = useCharacterStore();
   const { language } = useLanguageStore();
   const t = DASHBOARD_I18N[language];
   const [greeting, setGreeting] = useState('');
@@ -245,13 +245,6 @@ export default function DashboardPage() {
     setStats((prev) => ({ ...prev, streak: user.streak || 1 }));
   }, [user?.streak]);
 
-  // Redirect to onboarding if no character
-  useEffect(() => {
-    if (needsCreation && !characterLoading && user) {
-      router.push('/onboarding');
-    }
-  }, [needsCreation, characterLoading, user, router]);
-
   if (!isAuthenticated || !user) {
     return null;
   }
@@ -280,6 +273,10 @@ export default function DashboardPage() {
   }
 
   const affectionPercentage = character ? (character.affection / 1000) * 100 : 0;
+  const primaryActionHref = character?.id
+    ? `/chat?characterId=${encodeURIComponent(character.id)}`
+    : '/onboarding';
+  const primaryActionLabel = character?.id ? t.chatNow : t.createNewCharacter;
 
   return (
     <AppLayout>
@@ -404,10 +401,10 @@ export default function DashboardPage() {
 
                 {/* Quick actions */}
                 <div className="grid grid-cols-2 gap-3">
-                  <Link href={character?.id ? `/chat?characterId=${encodeURIComponent(character.id)}` : '/chat'} className="w-full">
+                  <Link href={primaryActionHref} className="w-full">
                     <button className="w-full flex items-center justify-center gap-2 h-12 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all shadow-[0_0_20px_rgba(244,37,140,0.3)]">
-                      <MessageCircle className="w-5 h-5" />
-                      {t.chatNow}
+                      {character?.id ? <MessageCircle className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
+                      {primaryActionLabel}
                     </button>
                   </Link>
                   <Link href="/shop" className="w-full">
@@ -517,7 +514,17 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-[#ba9cab]">{t.noActiveChats}</p>
+                  <div className="space-y-3">
+                    <p className="text-sm text-[#ba9cab]">{t.noActiveChats}</p>
+                    {canStartRelationship?.canStart && (
+                      <Link href="/onboarding" className="inline-flex">
+                        <button className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-love/15 border border-love/40 text-love hover:bg-love/25 transition-colors text-sm font-semibold">
+                          <UserPlus className="w-4 h-4" />
+                          {t.createNewCharacter}
+                        </button>
+                      </Link>
+                    )}
+                  </div>
                 )}
               </div>
             </motion.div>

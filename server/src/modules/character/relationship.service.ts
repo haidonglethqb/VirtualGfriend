@@ -435,6 +435,36 @@ export const relationshipService = {
       throw new AppError('Ex persona not found', 404, 'CHARACTER_NOT_FOUND')
     }
 
+    if (input.exMessagingEnabled) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          isPremium: true,
+          premiumTier: true,
+          premiumExpiresAt: true,
+        },
+      })
+
+      if (!user) {
+        throw new AppError('User not found', 404, 'USER_NOT_FOUND')
+      }
+
+      const tier = user.premiumTier as PremiumTier | null
+      const tierConfig = tier ? await getTierConfig(tier) : null
+      const premiumActive =
+        !!tier &&
+        user.isPremium &&
+        (!user.premiumExpiresAt || user.premiumExpiresAt > new Date())
+
+      if (!premiumActive || !tierConfig?.canCreateExPersonaOnBreakup) {
+        throw new AppError(
+          'Nâng cấp VIP để bật nhắn tin với người yêu cũ',
+          403,
+          'EX_PERSONA_PREMIUM_REQUIRED'
+        )
+      }
+    }
+
     const updatedCharacter = await prisma.character.update({
       where: { id: character.id },
       data: { exMessagingEnabled: input.exMessagingEnabled },
@@ -445,7 +475,11 @@ export const relationshipService = {
       },
     })
 
-    await cache.del(CacheKeys.character(userId))
+    await cache.del(
+      CacheKeys.character(userId),
+      CacheKeys.characterById(character.id),
+      CacheKeys.characterWithFacts(character.id)
+    )
 
     return {
       message: input.exMessagingEnabled

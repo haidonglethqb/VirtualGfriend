@@ -50,16 +50,16 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 | GET | `/relationship/history` | Full relationship list, including live ex-personas and per-character messaging state |
 | POST | `/relationship/end` | Break up with default active character (newest active non-ex), or a specific one via optional body `characterId`; also accepts optional `reason`, `exPersonaConsent` |
 | POST | `/relationship/reconcile/:characterId` | Restore an ended non-ex relationship and archive any linked ex-persona (also enforces tier `maxCharacters`; FREE additionally requires gems) |
-| PATCH | `/relationship/ex-personas/:characterId` | Update ex-persona settings such as `exMessagingEnabled` |
+| PATCH | `/relationship/ex-personas/:characterId` | Update ex-persona settings such as `exMessagingEnabled` (enabling messaging requires active paid tier with ex-persona feature) |
 | DELETE | `/relationship/ex-personas/:characterId` | Permanently delete an ex-persona and its character-bound history |
 
 ### Chat (`/chat`) — Auth required
 | Method | Path | Description |
 |---|---|---|
 | GET | `/history` | Legacy default history for newest active non-ex character |
-| GET | `/history/:characterId` | Paginated messages for a specific character; archived reconciled ex-personas must return not found |
+| GET | `/history/:characterId` | Paginated messages for a specific character; archived reconciled ex-personas must return not found; ex-persona access also requires premium + user privacy opt-in + per-ex toggle |
 | GET | `/daily-usage` | Premium-aware daily usage counters |
-| POST | `/send` | Send (REST fallback, socket preferred). `characterId` is the standard multi-chat target; when omitted, server falls back to newest active non-ex character |
+| POST | `/send` | Send (REST fallback, socket preferred). `characterId` is the standard multi-chat target; when omitted, server falls back to newest active non-ex character. Ex-persona sends are blocked unless premium and both ex-message flags are enabled |
 | DELETE | `/message/:messageId` | Delete a message |
 | GET | `/search` | Search messages |
 

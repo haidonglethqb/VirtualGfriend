@@ -54,6 +54,10 @@ Next.js 14 App Router with protected routes, auth guards, and public auth pages.
 
 ## Route Protection
 
+Dashboard behavior note:
+- `/dashboard` no longer forces immediate redirect to onboarding when no active character.
+- Users can stay on dashboard and start onboarding via explicit "Create new companion" CTA.
+
 ```mermaid
 flowchart TD
   A[User visits route] --> B{Is route protected?}
