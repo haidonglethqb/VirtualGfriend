@@ -24,6 +24,15 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 280 83% 55%;
     --radius: 0.75rem;
+    --glow-rgb: 173 43 238;
+    --glow-alpha-ambient: 0.12;
+    --glow-alpha-interactive: 0.2;
+    --glow-alpha-emphasis: 0.3;
+    --glow-blur-ambient: 18px;
+    --glow-blur-interactive: 24px;
+    --glow-blur-emphasis: 32px;
+    --glow-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --glow-duration: 220ms;
   }
 
   .dark {
@@ -46,6 +55,13 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 280 83% 55%;
+    --glow-rgb: 173 43 238;
+    --glow-alpha-ambient: 0.14;
+    --glow-alpha-interactive: 0.22;
+    --glow-alpha-emphasis: 0.32;
+    --glow-blur-ambient: 18px;
+    --glow-blur-interactive: 24px;
+    --glow-blur-emphasis: 32px;
   }
 }
 
@@ -80,11 +96,43 @@
   }
 
   .shadow-love {
-    box-shadow: 0 0 30px rgba(173, 43, 238, 0.3);
+    box-shadow: 0 0 20px rgba(var(--glow-rgb), var(--glow-alpha-ambient));
   }
 
   .shadow-love-strong {
-    box-shadow: 0 0 50px rgba(173, 43, 238, 0.5);
+    box-shadow: 0 0 30px rgba(var(--glow-rgb), var(--glow-alpha-emphasis));
+  }
+
+  .light-ambient {
+    box-shadow: 0 0 var(--glow-blur-ambient) rgba(var(--glow-rgb), var(--glow-alpha-ambient));
+  }
+
+  .light-interactive {
+    transition:
+      box-shadow var(--glow-duration) var(--glow-ease),
+      border-color var(--glow-duration) var(--glow-ease),
+      background-color var(--glow-duration) var(--glow-ease),
+      color var(--glow-duration) var(--glow-ease),
+      transform var(--glow-duration) var(--glow-ease);
+  }
+
+  .light-interactive:hover,
+  .light-interactive:focus-visible {
+    box-shadow: 0 0 var(--glow-blur-interactive) rgba(var(--glow-rgb), var(--glow-alpha-interactive));
+  }
+
+  .light-emphasis {
+    box-shadow: 0 0 var(--glow-blur-emphasis) rgba(var(--glow-rgb), var(--glow-alpha-emphasis));
+  }
+
+  .aura-bg-subtle {
+    background-image: radial-gradient(
+      70% 60% at 50% 0%,
+      rgba(var(--glow-rgb), 0.14) 0%,
+      rgba(var(--glow-rgb), 0.08) 32%,
+      rgba(var(--glow-rgb), 0) 100%
+    );
+    background-repeat: no-repeat;
   }
 }
 
@@ -191,6 +239,20 @@
   }
   50% {
     opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-glow,
+  .animate-float,
+  .animate-pulse-love,
+  .heart-float,
+  .typing-indicator span {
+    animation: none !important;
+  }
+
+  .light-interactive {
+    transition: none !important;
   }
 }
 

@@ -23,8 +23,6 @@ interface User {
   coins: number;
   gems: number;
   streak?: number;
-  accountLevel?: number;
-  accountXp?: number;
 }
 
 interface AuthResponseData {

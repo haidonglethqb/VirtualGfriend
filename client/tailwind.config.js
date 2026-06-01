@@ -76,8 +76,8 @@ module.exports = {
           "50%": { transform: "translateY(-10px)" },
         },
         "glow": {
-          "0%, 100%": { boxShadow: "0 0 20px rgba(173, 43, 238, 0.3)" },
-          "50%": { boxShadow: "0 0 40px rgba(173, 43, 238, 0.6)" },
+          "0%, 100%": { boxShadow: "0 0 16px rgba(173, 43, 238, 0.18)" },
+          "50%": { boxShadow: "0 0 24px rgba(173, 43, 238, 0.28)" },
         },
       },
       animation: {
@@ -85,11 +85,18 @@ module.exports = {
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-love": "pulse-love 2s ease-in-out infinite",
         "float": "float 3s ease-in-out infinite",
-        "glow": "glow 2s ease-in-out infinite",
+        "glow": "glow 2.8s ease-in-out infinite",
+      },
+      boxShadow: {
+        "light-ambient": "0 0 18px rgba(173, 43, 238, 0.12)",
+        "light-interactive": "0 0 24px rgba(173, 43, 238, 0.2)",
+        "light-emphasis": "0 0 32px rgba(173, 43, 238, 0.3)",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "love-gradient": "linear-gradient(135deg, #ad2bee 0%, #ff6b9d 50%, #ffa8a8 100%)",
+        "aura-subtle":
+          "radial-gradient(70% 60% at 50% 0%, rgba(173,43,238,0.14) 0%, rgba(173,43,238,0.08) 32%, rgba(173,43,238,0) 100%)",
       },
     },
   },

@@ -21,7 +21,7 @@ Complete API endpoint reference. Base path: `/api`.
 | POST | `/change-password` | Yes — Change current password |
 | GET | `/me` | Yes — Current user profile |
 
-Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields used by frontend gates: `isPremium`, `premiumTier`, `userGender`, `datingPreference`, plus account progression fields `accountLevel`, `accountXp`.
+Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields used by frontend gates: `isPremium`, `premiumTier`, `userGender`, `datingPreference`.
 
 ### Users (`/users`) — Auth required
 | Method | Path | Description |
@@ -29,7 +29,7 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 | GET/PATCH | `/profile` | Get/update profile |
 | GET/PATCH | `/settings` | Get/update settings |
 | GET/PATCH | `/privacy` | Get/update privacy (`allowMessages`, `allowExPersonaMessages`, profile visibility) |
-| GET | `/stats` | User stats summary (account progression + character progression snapshot) |
+| GET | `/stats` | User stats summary |
 | GET | `/notifications` | List notifications |
 | POST | `/notifications/read` | Mark notifications as read |
 | GET | `/premium-status` | Current premium tier, features, expiry |

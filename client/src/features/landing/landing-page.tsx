@@ -271,7 +271,7 @@ function Header() {
           <div className="flex h-16 lg:h-20 items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group cursor-pointer">
-              <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-love via-purple-500 to-love text-white shadow-lg shadow-love/25 group-hover:shadow-love/40 transition-all duration-300 group-hover:scale-105">
+              <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-love via-purple-500 to-love text-white shadow-love light-interactive transition-all duration-300 group-hover:scale-105">
                 <Heart className="w-5 h-5 fill-white" />
                 <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
@@ -445,7 +445,7 @@ function HeroSection() {
               className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
             >
               <Link href="/auth/register">
-                <button className="group relative flex items-center justify-center gap-3 h-14 px-8 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-base font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-xl shadow-love/20 hover:shadow-love/30">
+                <button className="group relative flex items-center justify-center gap-3 h-14 px-8 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-base font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-love light-interactive light-emphasis">
                   <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <Heart className="relative z-10 w-5 h-5 fill-white group-hover:scale-110 transition-transform duration-300" />
                   <span className="relative z-10">Bắt Đầu Trò Chuyện</span>
@@ -493,7 +493,7 @@ function HeroSection() {
               <div className="absolute -inset-4 bg-gradient-to-r from-love/20 via-purple-500/20 to-pink-500/20 rounded-[3rem] blur-2xl opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
 
               <TiltCard className="rounded-[2.5rem]" glowColor="#f4258c" intensity={10}>
-                <div className="relative rounded-[2.5rem] border border-white/10 bg-gradient-to-b from-[#150a24]/90 to-[#0a0518]/90 p-3 shadow-2xl shadow-love/20 backdrop-blur-sm overflow-hidden">
+                <div className="relative rounded-[2.5rem] border border-white/10 bg-gradient-to-b from-[#150a24]/90 to-[#0a0518]/90 p-3 shadow-lg shadow-love/10 backdrop-blur-sm overflow-hidden">
                   {/* Notch */}
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-[#030014] rounded-b-2xl z-10" />
 
@@ -554,7 +554,7 @@ function HeroSection() {
                 <motion.div
                   animate={prefersReducedMotion ? {} : { y: [-8, 8, -8] }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute -top-3 -right-3 px-3 py-2 rounded-xl bg-[#150a24]/95 border border-love/30 backdrop-blur-xl shadow-xl shadow-love/20"
+                  className="absolute -top-3 -right-3 px-3 py-2 rounded-xl bg-[#150a24]/95 border border-love/30 backdrop-blur-xl shadow-love"
                 >
                   <div className="flex items-center gap-2">
                     <Heart className="w-4 h-4 text-love fill-love" />
@@ -776,7 +776,7 @@ function TrustOutcomesSection() {
 
   return (
     <section className="py-24 relative">
-      <div className="absolute right-0 top-1/3 w-[520px] h-[520px] bg-purple-500/5 rounded-full blur-[160px] pointer-events-none" />
+      <div className="absolute right-0 top-1/3 w-[420px] h-[420px] bg-purple-500/5 rounded-full blur-[110px] pointer-events-none" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -890,7 +890,7 @@ function FeaturesSection() {
   return (
     <section id="features" className="py-24 relative">
       {/* Background decoration */}
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-96 h-96 bg-love/5 rounded-full blur-[150px] pointer-events-none" />
+      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-80 h-80 bg-love/5 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <motion.div
@@ -983,7 +983,7 @@ function ChatDemoSection() {
 
   return (
     <section id="demo" className="py-24 relative overflow-hidden">
-      <div className="absolute right-0 top-0 w-[700px] h-[700px] bg-purple-600/5 rounded-full blur-[150px] pointer-events-none" />
+      <div className="absolute right-0 top-0 w-[560px] h-[560px] bg-purple-600/5 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="flex flex-col lg:flex-row items-center gap-16">
@@ -1224,7 +1224,7 @@ function TestimonialsSection() {
 
   return (
     <section id="stories" className="py-24 relative">
-      <div className="absolute left-0 top-1/2 w-[500px] h-[500px] bg-love/5 rounded-full blur-[150px] pointer-events-none -translate-y-1/2" />
+      <div className="absolute left-0 top-1/2 w-[420px] h-[420px] bg-love/5 rounded-full blur-[100px] pointer-events-none -translate-y-1/2" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.div
@@ -1399,7 +1399,7 @@ function PricingSection() {
 
   return (
     <section id="pricing" className="py-24 relative">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-love/5 rounded-full blur-[200px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[620px] h-[620px] bg-love/5 rounded-full blur-[105px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.div
@@ -1456,7 +1456,7 @@ function PricingSection() {
               <TiltCard className="group h-full" glowColor={t.glowColor} intensity={t.highlight ? 8 : 6}>
                 <div className={`relative h-full flex flex-col p-6 rounded-2xl border ${t.borderClass} ${t.bgClass} backdrop-blur-sm transition-all duration-500 overflow-hidden ${t.highlight ? 'pt-8' : ''}`}>
                   {t.highlight && (
-                    <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-[80px] pointer-events-none" />
+                    <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/18 rounded-full blur-[56px] pointer-events-none" />
                   )}
 
                   <div className="relative z-10">
@@ -1503,7 +1503,7 @@ function CTASection() {
     <section className="py-24 relative overflow-hidden">
       {/* Enhanced background effects */}
       <div className="absolute inset-0 bg-gradient-to-r from-love/5 via-purple-600/5 to-love/5" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-love/10 rounded-full blur-[180px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[640px] h-[640px] bg-love/7 rounded-full blur-[100px] pointer-events-none" />
 
       {/* Animated spotlight ring */}
       <motion.div
@@ -1520,7 +1520,7 @@ function CTASection() {
         viewport={{ once: true }}
         className="max-w-3xl mx-auto px-4 relative z-10 text-center"
       >
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-love/20 to-purple-500/20 text-love mb-8 border border-love/20 shadow-xl shadow-love/10">
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-love/20 to-purple-500/20 text-love mb-8 border border-love/20 shadow-love">
           <Heart className="w-10 h-10 fill-love" />
         </div>
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-6" style={{ textShadow: '0 0 80px rgba(244,37,140,0.12)' }}>
@@ -1532,7 +1532,7 @@ function CTASection() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link href="/auth/register">
-            <button className="group relative flex items-center justify-center gap-3 h-14 px-10 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-lg font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-xl shadow-love/20 hover:shadow-love/30">
+            <button className="group relative flex items-center justify-center gap-3 h-14 px-10 rounded-2xl bg-gradient-to-r from-love to-purple-500 text-white text-lg font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-love light-interactive light-emphasis">
               <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <Heart className="relative z-10 w-5 h-5 fill-white group-hover:scale-110 transition-transform duration-300" />
               <span className="relative z-10">Bắt Đầu Miễn Phí</span>

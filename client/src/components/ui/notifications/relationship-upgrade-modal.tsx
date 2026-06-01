@@ -39,7 +39,7 @@ export function RelationshipUpgradeModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-4"
           onClick={onClose}
         >
           {/* Hearts floating animation */}
@@ -75,7 +75,7 @@ export function RelationshipUpgradeModal({
             exit={{ scale: 0.5, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 200, damping: 20 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative bg-gradient-to-b from-[#2d1f26] to-[#271b21] border border-love/30 rounded-3xl p-8 max-w-sm w-full shadow-[0_0_80px_rgba(244,37,140,0.4)]"
+            className="relative bg-gradient-to-b from-[#2d1f26] to-[#271b21] border border-love/30 rounded-3xl p-8 max-w-sm w-full shadow-[0_0_34px_rgba(244,37,140,0.22)] light-ambient"
           >
             {/* Close button */}
             <button 
@@ -95,7 +95,7 @@ export function RelationshipUpgradeModal({
                   duration: 1,
                   repeat: Infinity,
                 }}
-                className={`w-28 h-28 rounded-full bg-gradient-to-br ${newInfo.color} flex items-center justify-center shadow-[0_0_50px_rgba(244,37,140,0.5)]`}
+                className={`w-28 h-28 rounded-full bg-gradient-to-br ${newInfo.color} flex items-center justify-center shadow-[0_0_26px_rgba(244,37,140,0.32)]`}
               >
                 <EmojiSvgIcon emoji={newInfo.emoji} className="w-12 h-12 text-white" />
               </motion.div>
@@ -171,7 +171,7 @@ export function RelationshipUpgradeModal({
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.7 }}
               onClick={onClose}
-              className={`w-full h-14 rounded-full bg-gradient-to-r ${newInfo.color} text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105`}
+              className={`w-full h-14 rounded-full bg-gradient-to-r ${newInfo.color} text-white font-bold text-lg shadow-md hover:shadow-lg transition-all hover:scale-105 light-interactive`}
             >
               Tiếp tục bên nhau
             </motion.button>

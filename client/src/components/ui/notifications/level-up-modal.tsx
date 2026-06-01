@@ -42,7 +42,7 @@ export function LevelUpModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-[2px] z-50 flex items-center justify-center p-4"
           onClick={onClose}
         >
           {/* Confetti effect */}
@@ -81,7 +81,7 @@ export function LevelUpModal({
             exit={{ scale: 0.5, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative bg-gradient-to-b from-[#2d1f26] to-[#271b21] border border-love/30 rounded-3xl p-8 max-w-sm w-full shadow-[0_0_60px_rgba(244,37,140,0.3)]"
+            className="relative bg-gradient-to-b from-[#2d1f26] to-[#271b21] border border-love/30 rounded-3xl p-8 max-w-sm w-full shadow-[0_0_36px_rgba(244,37,140,0.22)] light-ambient"
           >
             {/* Close button */}
             <button 
@@ -103,7 +103,7 @@ export function LevelUpModal({
                   repeat: Infinity,
                   repeatType: 'reverse'
                 }}
-                className="w-24 h-24 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-[0_0_40px_rgba(251,191,36,0.5)]"
+                className="w-24 h-24 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-[0_0_24px_rgba(251,191,36,0.35)]"
               >
                 <Star className="w-12 h-12 text-white fill-white" />
               </motion.div>
@@ -190,7 +190,7 @@ export function LevelUpModal({
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.7 }}
               onClick={onClose}
-              className="w-full h-14 rounded-full bg-gradient-to-r from-love to-pink-500 text-white font-bold text-lg shadow-[0_4px_20px_rgba(244,37,140,0.4)] hover:shadow-[0_4px_30px_rgba(244,37,140,0.6)] transition-all hover:scale-105"
+              className="w-full h-14 rounded-full bg-gradient-to-r from-love to-pink-500 text-white font-bold text-lg shadow-[0_4px_14px_rgba(244,37,140,0.28)] hover:shadow-[0_4px_20px_rgba(244,37,140,0.38)] transition-all hover:scale-105 light-interactive"
             >
               Tuyệt vời!
             </motion.button>

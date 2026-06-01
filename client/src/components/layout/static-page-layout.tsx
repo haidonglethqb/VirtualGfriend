@@ -12,12 +12,12 @@ interface StaticPageLayoutProps {
 
 export function StaticPageLayout({ children, title, subtitle }: StaticPageLayoutProps) {
   return (
-    <div className="min-h-screen bg-[#030014] text-white font-sans antialiased">
+    <div className="min-h-screen bg-[#030014] text-white font-sans antialiased aura-bg-subtle">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#030014]/90 backdrop-blur-2xl border-b border-white/[0.03]">
+      <header className="sticky top-0 z-50 bg-[#030014]/90 backdrop-blur-2xl border-b border-white/[0.03] light-ambient">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-love via-purple-500 to-love text-white shadow-lg shadow-love/20 group-hover:shadow-love/40 transition-all duration-300 group-hover:scale-105">
+            <div className="relative flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-love via-purple-500 to-love text-white shadow-love light-interactive group-hover:scale-105">
               <Heart className="w-4 h-4 fill-white" />
             </div>
             <span className="text-lg font-bold">
@@ -38,8 +38,8 @@ export function StaticPageLayout({ children, title, subtitle }: StaticPageLayout
       {/* Hero */}
       <section className="relative py-20 lg:py-28 overflow-hidden">
         {/* Background effects */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-love/8 rounded-full blur-[150px] pointer-events-none" />
-        <div className="absolute top-1/2 left-0 w-[300px] h-[300px] bg-purple-600/5 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[720px] h-[320px] bg-love/6 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute top-1/2 left-0 w-[240px] h-[240px] bg-purple-600/5 rounded-full blur-[80px] pointer-events-none" />
         
         {/* Grid pattern */}
         <div
@@ -96,7 +96,7 @@ export function StaticPageLayout({ children, title, subtitle }: StaticPageLayout
               Bắt đầu miễn phí ngay hôm nay. Không cần thẻ tín dụng.
             </p>
             <Link href="/auth/register">
-              <button className="group inline-flex items-center gap-2 h-12 px-8 rounded-xl bg-gradient-to-r from-love to-purple-500 text-white font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-love/25 hover:shadow-love/40">
+              <button className="group inline-flex items-center gap-2 h-12 px-8 rounded-xl bg-gradient-to-r from-love to-purple-500 text-white font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-love light-interactive light-emphasis">
                 Bắt đầu miễn phí
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>

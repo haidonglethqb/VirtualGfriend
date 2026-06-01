@@ -43,6 +43,17 @@ export function cn(...inputs: ClassValue[]) {
 }
 ```
 
+## Global Light Effect Primitives
+
+Shared subtle-light utilities live in `client/src/app/globals.css` and are used across shell, auth, landing, dashboard, chat, and notification modals:
+
+- `light-ambient`: low static glow for surfaces and badges.
+- `light-interactive`: hover/focus glow transition for interactive controls.
+- `light-emphasis`: limited medium glow for primary CTA emphasis only.
+- `aura-bg-subtle`: low-contrast radial ambient background layer.
+
+Motion safety: `prefers-reduced-motion: reduce` disables heavy glow/float animations (`animate-glow`, `animate-float`, `animate-pulse-love`, `heart-float`, typing dots).
+
 ## Framer Motion Patterns
 
 ### Page Transitions
@@ -98,12 +109,6 @@ components/
 ├── shop/            → Shop items & inventory
 └── error/           → Error boundary & fallbacks
 ```
-
-## Sidebar Profile Card
-
-- Global card lives in `components/layout/app-layout.tsx`.
-- Identity shown on the card is account identity (`displayName`/`username`), not companion identity.
-- Card level bar is account progression (`accountLevel`, `accountXp`) while premium badge still uses `premiumTier`.
 
 ## Chart.js Integration
 

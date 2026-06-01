@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Brain, Loader2 } from 'lucide-react';
+import { ArrowLeft, Brain } from 'lucide-react';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/app-layout';
 import { useAuthStore } from '@/store/auth-store';
@@ -89,20 +89,9 @@ function FactsSettingsPageContent() {
   );
 }
 
-function FactsSettingsFallback() {
-  return (
-    <AppLayout>
-      <div className="max-w-2xl mx-auto py-20 flex items-center justify-center text-[#ba9cab]">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-        <span>Loading facts...</span>
-      </div>
-    </AppLayout>
-  );
-}
-
 export default function FactsSettingsPage() {
   return (
-    <Suspense fallback={<FactsSettingsFallback />}>
+    <Suspense fallback={null}>
       <FactsSettingsPageContent />
     </Suspense>
   );

@@ -612,7 +612,7 @@ function ChatPageContent() {
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6 flex flex-col items-center">
             {/* Avatar */}
             <div className="relative mb-4">
-              <div className="w-32 h-32 rounded-full border-4 border-love/30 shadow-[0_0_40px_rgba(244,37,140,0.3)] overflow-hidden bg-gradient-to-br from-love to-pink-600 flex items-center justify-center">
+              <div className="w-32 h-32 rounded-full border-4 border-love/30 shadow-[0_0_22px_rgba(244,37,140,0.22)] overflow-hidden bg-gradient-to-br from-love to-pink-600 flex items-center justify-center">
                 {displayCharacter?.avatarUrl ? (
                   <Image
                     src={displayCharacter.avatarUrl}
@@ -671,7 +671,7 @@ function ChatPageContent() {
               </button>
               <button
                 onClick={openGiftModal}
-                className="w-12 h-12 rounded-full bg-love/20 border border-love/30 flex items-center justify-center hover:bg-love hover:text-white text-love transition-all"
+                className="w-12 h-12 rounded-full bg-love/20 border border-love/30 flex items-center justify-center hover:bg-love hover:text-white text-love light-interactive"
                 title={t.giveGift}
               >
                 <Gift className="w-5 h-5" />
@@ -710,7 +710,7 @@ function ChatPageContent() {
           <div className="lg:hidden flex items-center justify-between p-3 border-b border-[#392830] bg-gradient-to-r from-[#271b21] to-[#2d1f26]">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(244,37,140,0.3)] overflow-hidden">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl shadow-[0_0_10px_rgba(244,37,140,0.22)] overflow-hidden">
                   {displayCharacter?.avatarUrl ? (
                     <Image
                       src={displayCharacter.avatarUrl}
@@ -752,7 +752,7 @@ function ChatPageContent() {
               </button>
               <button
                 onClick={openGiftModal}
-                className="w-10 h-10 rounded-full bg-love/20 border border-love/30 flex items-center justify-center text-love hover:bg-love hover:text-white transition-all"
+                className="w-10 h-10 rounded-full bg-love/20 border border-love/30 flex items-center justify-center text-love hover:bg-love hover:text-white transition-all light-interactive"
               >
                 <Gift className="w-5 h-5" />
               </button>
@@ -811,7 +811,7 @@ function ChatPageContent() {
           {/* Welcome message if no messages */}
           {!messagesLoading && messages.length === 0 && (
             <div className="relative z-10 flex flex-col items-center justify-center h-full text-center">
-              <div className="w-24 h-24 rounded-full gradient-love flex items-center justify-center mb-6 shadow-love-strong">
+              <div className="w-24 h-24 rounded-full gradient-love flex items-center justify-center mb-6 shadow-love">
                 <Sparkles className="w-12 h-12 text-white" />
               </div>
               <h2 className="text-xl font-semibold mb-2">{t.startConversation}</h2>
@@ -878,7 +878,7 @@ function ChatPageContent() {
                       <div
                         className={`px-5 py-3 text-sm md:text-base leading-relaxed ${
                           isUser
-                            ? 'bg-love text-white rounded-2xl rounded-br-sm shadow-[0_4px_20px_rgba(244,37,140,0.4)]'
+                            ? 'bg-love text-white rounded-2xl rounded-br-sm shadow-[0_4px_12px_rgba(244,37,140,0.28)]'
                             : 'bg-[#271b21]/90 backdrop-blur-md text-white rounded-2xl rounded-bl-sm border border-white/10 shadow-lg'
                         }`}
                       >
@@ -1023,7 +1023,7 @@ function ChatPageContent() {
               <button
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isSending || !activeChatCharacterId}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-love text-white shadow-[0_0_15px_rgba(244,37,140,0.4)] hover:bg-love/90 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-love text-white shadow-[0_0_10px_rgba(244,37,140,0.28)] hover:bg-love/90 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100 light-interactive"
               >
                 <Send className="w-5 h-5" />
               </button>

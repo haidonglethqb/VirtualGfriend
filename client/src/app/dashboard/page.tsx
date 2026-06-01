@@ -250,7 +250,7 @@ export default function DashboardPage() {
             {/* Middle ring */}
             <span className="absolute inset-2 rounded-full bg-love/30 animate-pulse" />
             {/* Core */}
-            <div className="absolute inset-4 rounded-full bg-gradient-to-br from-love to-pink-600 shadow-[0_0_30px_rgba(244,37,140,0.6)] flex items-center justify-center">
+            <div className="absolute inset-4 rounded-full bg-gradient-to-br from-love to-pink-600 shadow-[0_0_20px_rgba(244,37,140,0.32)] flex items-center justify-center">
               <Heart className="w-5 h-5 text-white fill-white" />
             </div>
           </div>
@@ -408,7 +408,7 @@ export default function DashboardPage() {
                 {/* Quick actions */}
                 <div className="grid grid-cols-2 gap-3">
                   <Link href={primaryActionHref} className="w-full">
-                    <button className="w-full flex items-center justify-center gap-2 h-12 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all shadow-[0_0_20px_rgba(244,37,140,0.3)]">
+                    <button className="w-full flex items-center justify-center gap-2 h-12 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all shadow-love light-interactive">
                       {character?.id ? <MessageCircle className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
                       {primaryActionLabel}
                     </button>

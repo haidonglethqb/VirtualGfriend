@@ -3,26 +3,6 @@ import { cache } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { getTierConfig } from '../admin/tier-config.service';
 
-const DAILY_ACCOUNT_XP_REWARD = 30;
-
-function getAccountXpRequiredForLevel(level: number): number {
-  return 100 + (Math.max(level, 1) - 1) * 50;
-}
-
-function resolveAccountProgress(currentLevel: number, currentXp: number, gainedXp: number): { level: number; xp: number } {
-  let level = Math.max(1, currentLevel);
-  let xp = Math.max(0, currentXp) + Math.max(0, gainedXp);
-  let xpNeeded = getAccountXpRequiredForLevel(level);
-
-  while (xp >= xpNeeded) {
-    xp -= xpNeeded;
-    level += 1;
-    xpNeeded = getAccountXpRequiredForLevel(level);
-  }
-
-  return { level, xp };
-}
-
 export const dailyRewardService = {
   // 7-day cycle rewards
   DAILY_REWARDS: [
@@ -102,24 +82,6 @@ export const dailyRewardService = {
       const reward = this.DAILY_REWARDS[day - 1];
       const finalValue = Math.round(reward.value * bonusMultiplier);
 
-      const accountProgress = await tx.user.findUnique({
-        where: { id: userId },
-        select: {
-          accountLevel: true,
-          accountXp: true,
-        },
-      });
-
-      if (!accountProgress) {
-        throw new AppError('User not found', 404, 'USER_NOT_FOUND');
-      }
-
-      const nextAccountProgress = resolveAccountProgress(
-        accountProgress.accountLevel,
-        accountProgress.accountXp,
-        DAILY_ACCOUNT_XP_REWARD
-      );
-
       await tx.dailyReward.create({
         data: { userId, day, rewardType: reward.type, rewardValue: finalValue },
       });
@@ -128,22 +90,11 @@ export const dailyRewardService = {
       if (reward.type === 'coins') updates.coins = { increment: finalValue };
       else if (reward.type === 'gems') updates.gems = { increment: finalValue };
 
-      updates.accountLevel = nextAccountProgress.level;
-      updates.accountXp = nextAccountProgress.xp;
-
       if (Object.keys(updates).length > 0) {
         await tx.user.update({ where: { id: userId }, data: updates });
       }
 
-      return {
-        day,
-        rewardType: reward.type,
-        value: finalValue,
-        bonusMultiplier,
-        accountLevel: nextAccountProgress.level,
-        accountXp: nextAccountProgress.xp,
-        accountXpGained: DAILY_ACCOUNT_XP_REWARD,
-      };
+      return { day, rewardType: reward.type, value: finalValue, bonusMultiplier };
     });
 
     // Cache to prevent double-claim (TTL: 24 hours)

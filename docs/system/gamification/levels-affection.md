@@ -1,7 +1,7 @@
 # Levels & Affection System
 
 ## Overview
-Dual progression system: character levels (XP-based) and affection (0-1000 scale) drive relationship stages, AI behavior, pet names, and language formality. Account progression (`User.accountLevel`, `User.accountXp`) is a separate track used for user profile progression in shared UI surfaces.
+Dual progression system: character levels (XP-based) and affection (0-1000 scale) drive relationship stages, AI behavior, pet names, and language formality.
 
 ## Affection Scale (0-1000)
 
@@ -58,13 +58,6 @@ characterService.updateAffection(characterId, amount)
 characterService.addExperience(characterId, xp)
 // → Handles level-up loop, milestone rewards, auto-memory creation
 ```
-
-## Account Progression (User)
-
-- Stored on `User.accountLevel` and `User.accountXp`.
-- XP scaling follows: `100 + (level - 1) * 50`.
-- XP sources: message send, gift send, quest reward claim, and daily reward claim.
-- This progression is independent from character affection/relationship stages.
 
 ## Related
 - [Gifts & Shop](./gifts-shop.md)

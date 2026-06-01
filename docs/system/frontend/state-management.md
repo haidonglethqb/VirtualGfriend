@@ -32,7 +32,7 @@ flowchart TB
 
 | Store | Persistence Key | Key State |
 |---|---|---|
-| **auth-store** | `vgfriend-auth` (partialize: `accessToken` only) | user, accessToken, isAuthenticated, isLoading (`user` includes `displayName/username`, `premiumTier`, `accountLevel`, `accountXp`) |
+| **auth-store** | `vgfriend-auth` (partialize: `accessToken` only) | user, accessToken, isAuthenticated, isLoading |
 | **chat-store** | `vgfriend-chat` (max 100 messages) | messages, isTyping, isConnected, isLoading |
 | **character-store** | None | character, mood, isLoading |
 | **scene-store** | None | scenes, activeScene, isLoading |
@@ -91,12 +91,6 @@ Listens to `vgfriend-auth` storage changes, validates JWT structure (3 base64 se
 ## Server State: React Query
 
 `@tanstack/react-query` for API caching with `staleTime: 5 * 60 * 1000`. Socket events call `queryClient.invalidateQueries()` on affection change, level up, mood change.
-
-## Account Identity In Layout
-
-- Global sidebar profile card in `AppLayout` reads from `auth-store.user` (account identity), not `character-store`.
-- Display name priority: `displayName` → `username` → localized fallback.
-- Sidebar level/XP bar uses `user.accountLevel` and `user.accountXp`.
 
 ## State Update Flow
 

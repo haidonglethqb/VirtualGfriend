@@ -134,8 +134,8 @@ export default function LoginPage() {
             <div className="absolute inset-0 bg-gradient-to-br from-love/20 via-purple-900/30 to-[#030014]" />
             
             {/* Background orbs */}
-            <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-love/20 rounded-full blur-[120px]" />
-            <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[100px]" />
+            <div className="absolute top-1/4 left-1/4 w-[420px] h-[420px] bg-love/14 rounded-full blur-[90px]" />
+            <div className="absolute bottom-1/4 right-1/4 w-[340px] h-[340px] bg-purple-600/14 rounded-full blur-[72px]" />
             
             {/* Grid pattern */}
             <div
@@ -160,7 +160,7 @@ export default function LoginPage() {
               >
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-3 mb-10 group">
-                  <div className="relative flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-love via-purple-500 to-love text-white shadow-lg shadow-love/30 group-hover:shadow-love/50 transition-all duration-300">
+                  <div className="relative flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-love via-purple-500 to-love text-white shadow-love light-interactive transition-all duration-300">
                     <Heart className="w-6 h-6 fill-white" />
                   </div>
                   <span className="text-2xl font-bold">
@@ -210,7 +210,7 @@ export default function LoginPage() {
                 transition={{ duration: 0.8, delay: 0.4 }}
                 className="flex-shrink-0 ml-8"
               >
-                <div className="relative w-[260px] xl:w-[280px] rounded-[2.5rem] border border-white/10 bg-gradient-to-b from-[#150a24]/90 to-[#0a0518]/90 p-3 shadow-2xl shadow-love/10">
+                <div className="relative w-[260px] xl:w-[280px] rounded-[2.5rem] border border-white/10 bg-gradient-to-b from-[#150a24]/90 to-[#0a0518]/90 p-3 shadow-lg shadow-love/10">
                   {/* Notch */}
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-5 bg-[#030014] rounded-b-2xl z-10" />
                   
@@ -292,7 +292,7 @@ export default function LoginPage() {
               {/* Mobile logo */}
               <div className="lg:hidden flex justify-center mb-8">
                 <Link href="/" className="flex items-center gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-love to-purple-600 text-white shadow-lg shadow-love/30">
+                  <div className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-love to-purple-600 text-white shadow-love">
                     <Heart className="w-5 h-5 fill-white" />
                   </div>
                   <span className="text-xl font-bold">
@@ -305,7 +305,7 @@ export default function LoginPage() {
               {/* Form card */}
               <div className="relative">
                 {/* Glow effect */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-love/20 via-purple-500/20 to-pink-500/20 rounded-3xl blur-xl opacity-50" />
+                <div className="absolute -inset-1 bg-gradient-to-r from-love/12 via-purple-500/12 to-pink-500/12 rounded-3xl blur-lg opacity-45" />
                 
                 <div className="relative bg-[#0a0518]/80 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-6 sm:p-8">
                   <div className="text-center mb-6 sm:mb-8">
@@ -377,7 +377,7 @@ export default function LoginPage() {
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="group relative w-full h-11 sm:h-12 rounded-xl bg-gradient-to-r from-love to-purple-500 text-white font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 shadow-lg shadow-love/25 hover:shadow-love/40"
+                      className="group relative w-full h-11 sm:h-12 rounded-xl bg-gradient-to-r from-love to-purple-500 text-white font-bold overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 shadow-love light-interactive light-emphasis"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-love opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                       <span className="relative z-10 flex items-center justify-center gap-2 text-sm sm:text-base">

@@ -9,13 +9,14 @@ import {
   BookOpen, Calendar, BarChart3,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
-import { useCharacterStore } from '@/store/character-store';
+import { useCharacterStore, getRankTitle, getXpProgress } from '@/store/character-store';
 import { useLanguageStore } from '@/store/language-store';
 import { useNotificationStore } from '@/store/notification-store';
 import { formatNumber } from '@/lib/utils';
 import api from '@/services/api';
 import { socketService } from '@/services/socket';
 import { PremiumBadge } from '@/components/PremiumGate';
+import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 import { PremiumTier } from '@/lib/premium';
 
 interface AppLayoutProps {
@@ -51,7 +52,6 @@ const APP_LAYOUT_I18N = {
       memories: 'Kỷ niệm',
     },
     level: 'Cấp',
-    account: 'Tài khoản',
     navigateTitle: 'Điều hướng',
     navigateSubtitle: 'Chọn trang bạn muốn',
     subscription: 'Gói đăng ký',
@@ -72,7 +72,6 @@ const APP_LAYOUT_I18N = {
       memories: 'Memories',
     },
     level: 'Level',
-    account: 'Account',
     navigateTitle: 'Navigation',
     navigateSubtitle: 'Choose your destination',
     subscription: 'Subscription',
@@ -81,32 +80,14 @@ const APP_LAYOUT_I18N = {
   },
 } as const;
 
-function getAccountXpProgress(level: number, accountXp: number) {
-  const safeLevel = Math.max(1, level || 1);
-  const safeXp = Math.max(0, accountXp || 0);
-  const needed = 100 + (safeLevel - 1) * 50;
-  const percent = Math.min(100, (safeXp / needed) * 100);
-
-  return {
-    current: safeXp,
-    needed,
-    percent,
-  };
-}
-
 export default function AppLayout({ children, showSidebar = true }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout, isAuthenticated, accessToken } = useAuthStore();
-  const { selectedCharacterId } = useCharacterStore();
+  const { character, selectedCharacterId } = useCharacterStore();
   const { language, toggleLanguage } = useLanguageStore();
   const { generalNotification, showGeneralNotification, hideGeneralNotification } = useNotificationStore();
   const t = APP_LAYOUT_I18N[language] || APP_LAYOUT_I18N.vi;
-  const accountName = user?.displayName || user?.username || t.account;
-  const accountLevel = user?.accountLevel || 1;
-  const accountXp = user?.accountXp || 0;
-  const accountProgress = getAccountXpProgress(accountLevel, accountXp);
-  const avatarInitial = accountName.slice(0, 1).toUpperCase();
 
   const [unreadDmCount, setUnreadDmCount] = useState(0);
   const [activeQuestCount, setActiveQuestCount] = useState(0);
@@ -263,9 +244,9 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
   };
 
   return (
-    <div className="min-h-screen bg-[#181114] text-white font-sans">
+    <div className="min-h-screen bg-[#181114] text-white font-sans aura-bg-subtle">
       {/* Header - Simplified */}
-      <header className="sticky top-0 z-50 flex items-center justify-between border-b border-[#392830] bg-[#181114]/95 backdrop-blur-sm px-6 py-4 lg:px-10">
+      <header className="sticky top-0 z-50 flex items-center justify-between border-b border-[#392830] bg-[#181114]/95 backdrop-blur-sm px-6 py-4 lg:px-10 light-ambient">
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="flex items-center gap-4">
             <div className="flex items-center justify-center text-love">
@@ -305,7 +286,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
         <div className="flex items-center gap-3">
           <button
             onClick={toggleLanguage}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-[#271b21] border border-[#392830] text-[#d8c1cd] hover:text-white hover:border-love/40 transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-[#271b21] border border-[#392830] text-[#d8c1cd] hover:text-white hover:border-love/40 light-interactive"
             title={language === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt'}
           >
             <Languages className="w-4 h-4" />
@@ -325,34 +306,33 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
             <div className="flex flex-col gap-6">
               {/* User Profile in Sidebar */}
               <Link href="/subscription">
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-[#271b21] border border-[#392830] hover:border-love/30 transition-colors cursor-pointer">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl border-2 border-love/30">
-                    {user?.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={user.avatar}
-                        alt={accountName}
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-base font-bold text-white">{avatarInitial}</span>
-                    )}
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-[#271b21] border border-[#392830] hover:border-love/30 light-interactive cursor-pointer">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl border-2 border-love/30 light-ambient">
+                    <EmojiSvgIcon
+                      emoji={character?.gender === 'FEMALE' ? '👩' : '👨'}
+                      className="w-6 h-6 text-white"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm truncate">{accountName}</p>
+                    <p className="font-bold text-sm truncate">{character?.name || (language === 'vi' ? 'Người yêu' : 'Companion')}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-xs text-[#ba9cab]">{t.level} {accountLevel} · {t.account}</p>
+                        <p className="text-xs text-[#ba9cab]">{t.level} {character?.level || 1} · {getRankTitle(character?.level || 1)}</p>
                       <PremiumBadge tier={user?.premiumTier as PremiumTier} />
                     </div>
-                    <div className="mt-1.5 w-full">
-                      <div className="h-1.5 rounded-full bg-[#392830] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-love to-pink-500 transition-all duration-500"
-                          style={{ width: `${accountProgress.percent}%` }}
-                        />
-                      </div>
-                      <p className="text-[10px] text-[#8a7580] mt-0.5">{accountProgress.current}/{accountProgress.needed} XP</p>
-                    </div>
+                    {character && (() => {
+                      const xp = getXpProgress(character.level, character.experience);
+                      return (
+                        <div className="mt-1.5 w-full">
+                          <div className="h-1.5 rounded-full bg-[#392830] overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-love to-pink-500 transition-all duration-500"
+                              style={{ width: `${xp.percent}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-[#8a7580] mt-0.5">{xp.current}/{xp.needed} XP</p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </Link>
@@ -371,16 +351,16 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                     <Link
                       key={item.href}
                       href={href}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group relative ${
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group relative light-interactive ${
                         isActive 
-                          ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]' 
-                          : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
+                          ? 'bg-love/10 text-love border border-love/20 light-ambient' 
+                          : 'hover:bg-[#392830] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
                       }`}
                     >
                       <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
                       <span className={`text-sm flex-1 ${isActive ? 'font-bold' : 'font-medium'}`}>{t.nav[item.key as keyof typeof t.nav]}</span>
                       {badge > 0 && (
-                        <span className="min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full bg-love text-white text-[10px] font-bold shadow-[0_0_8px_rgba(173,43,238,0.4)]">
+                        <span className="min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full bg-love text-white text-[10px] font-bold light-ambient">
                           {badge > 99 ? '99+' : badge}
                         </span>
                       )}
@@ -393,10 +373,10 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
               <div className="mt-4 pt-4 border-t border-[#392830]">
                 <Link
                   href="/subscription"
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group light-interactive ${
                     pathname === '/subscription'
-                      ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]'
-                      : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
+                      ? 'bg-love/10 text-love border border-love/20 light-ambient'
+                      : 'hover:bg-[#392830] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
                   }`}
                 >
                   <Crown className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
@@ -404,10 +384,10 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                 </Link>
                 <Link
                   href="/settings"
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group light-interactive ${
                     pathname === '/settings'
-                      ? 'bg-love/10 text-love border border-love/20 shadow-[0_0_12px_rgba(173,43,238,0.15)]'
-                      : 'hover:bg-[#392830] hover:shadow-[0_0_8px_rgba(173,43,238,0.08)] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
+                      ? 'bg-love/10 text-love border border-love/20 light-ambient'
+                      : 'hover:bg-[#392830] text-[#ba9cab] hover:text-white border border-transparent hover:border-[#4a3040] hover:translate-x-1'
                   }`}
                 >
                   <Settings className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
@@ -415,7 +395,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
                 </Link>
                 <button 
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group hover:bg-red-500/10 text-[#ba9cab] hover:text-red-400 border border-transparent hover:border-red-500/20 hover:translate-x-1 hover:shadow-[0_0_8px_rgba(239,68,68,0.1)]"
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-200 group hover:bg-red-500/10 text-[#ba9cab] hover:text-red-400 border border-transparent hover:border-red-500/20 hover:translate-x-1 light-interactive"
                 >
                   <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
                   <span className="text-sm font-medium">{t.logout}</span>
@@ -432,7 +412,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
       </div>
 
       {/* Mobile Bottom Nav — only on mobile (below md), header nav covers md-lg, sidebar covers lg+ */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#181114]/95 backdrop-blur-sm border-t border-[#392830] z-20">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#181114]/95 backdrop-blur-sm border-t border-[#392830] z-20 light-ambient">
         <div className="flex items-center justify-around py-3">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
@@ -464,7 +444,7 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
       </nav>
 
       {generalNotification && (
-        <div className="fixed bottom-20 right-4 z-50 w-[min(92vw,420px)] rounded-2xl border border-[#4f3644] bg-[#23171d]/95 p-4 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+        <div className="fixed bottom-20 right-4 z-50 w-[min(92vw,420px)] rounded-2xl border border-[#4f3644] bg-[#23171d]/95 p-4 shadow-[0_12px_30px_rgba(0,0,0,0.4)] backdrop-blur-sm light-ambient">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 rounded-full bg-love/20 p-2 text-love">
               <Bell className="h-4 w-4" />

@@ -31,8 +31,6 @@ model User {
   coins             Int       @default(0)
   gems              Int       @default(0)
   streak            Int       @default(0)       // Daily login streak
-  accountLevel      Int       @default(1)       // Global account progression level
-  accountXp         Int       @default(0)       // XP progress toward next account level
   lastActiveAt      DateTime?                   // Last activity for streak calculation
   lastLoginAt       DateTime?
 

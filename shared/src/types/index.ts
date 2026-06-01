@@ -13,8 +13,6 @@ export interface User {
   premiumExpiresAt?: Date;
   coins: number;
   gems: number;
-  accountLevel?: number;
-  accountXp?: number;
   lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
