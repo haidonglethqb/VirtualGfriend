@@ -99,6 +99,12 @@ components/
 └── error/           → Error boundary & fallbacks
 ```
 
+## Sidebar Profile Card
+
+- Global card lives in `components/layout/app-layout.tsx`.
+- Identity shown on the card is account identity (`displayName`/`username`), not companion identity.
+- Card level bar is account progression (`accountLevel`, `accountXp`) while premium badge still uses `premiumTier`.
+
 ## Chart.js Integration
 
 Used in analytics dashboard and leaderboard:

@@ -4,6 +4,51 @@ import { AppError } from '../../middlewares/error.middleware';
 import { characterService } from '../character/character.service';
 import { getTierConfig } from '../admin/tier-config.service';
 
+function getAccountXpRequiredForLevel(level: number): number {
+  return 100 + (Math.max(level, 1) - 1) * 50;
+}
+
+function resolveAccountProgress(currentLevel: number, currentXp: number, gainedXp: number): { level: number; xp: number } {
+  let level = Math.max(1, currentLevel);
+  let xp = Math.max(0, currentXp) + Math.max(0, gainedXp);
+  let xpNeeded = getAccountXpRequiredForLevel(level);
+
+  while (xp >= xpNeeded) {
+    xp -= xpNeeded;
+    level += 1;
+    xpNeeded = getAccountXpRequiredForLevel(level);
+  }
+
+  return { level, xp };
+}
+
+async function addAccountExperience(userId: string, gainedXp: number): Promise<void> {
+  if (gainedXp <= 0) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`account_xp:${userId}`}))`;
+
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: {
+        accountLevel: true,
+        accountXp: true,
+      },
+    });
+
+    if (!user) return;
+
+    const next = resolveAccountProgress(user.accountLevel, user.accountXp, gainedXp);
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        accountLevel: next.level,
+        accountXp: next.xp,
+      },
+    });
+  });
+}
+
 export const questService = {
   async getAllQuests() {
     const allQuests = await cache.getOrSet(
@@ -232,6 +277,10 @@ export const questService = {
         gems: { increment: quest.rewardGems },
       },
     });
+
+    if (quest.rewardXp > 0) {
+      await addAccountExperience(userId, quest.rewardXp);
+    }
 
     // Update character XP/affection (outside transaction as these are non-critical)
     const character = await prisma.character.findFirst({

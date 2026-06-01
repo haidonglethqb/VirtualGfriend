@@ -15,6 +15,29 @@ const log = createModuleLogger('GameEvent');
 // Recursion guard: max depth for processAction calls
 const MAX_RECURSION_DEPTH = 3;
 
+const ACCOUNT_XP_REWARDS: Partial<Record<GameAction, number>> = {
+  SEND_MESSAGE: 5,
+  SEND_GIFT: 20,
+};
+
+function getAccountXpRequiredForLevel(level: number): number {
+  return 100 + (Math.max(level, 1) - 1) * 50;
+}
+
+function resolveAccountProgress(currentLevel: number, currentXp: number, gainedXp: number): { level: number; xp: number } {
+  let level = Math.max(1, currentLevel);
+  let xp = Math.max(0, currentXp) + Math.max(0, gainedXp);
+  let xpNeeded = getAccountXpRequiredForLevel(level);
+
+  while (xp >= xpNeeded) {
+    xp -= xpNeeded;
+    level += 1;
+    xpNeeded = getAccountXpRequiredForLevel(level);
+  }
+
+  return { level, xp };
+}
+
 // Action types that can trigger quest progress
 export type GameAction =
   | 'SEND_MESSAGE'
@@ -157,6 +180,12 @@ export const gameEventService = {
 
     // 6. Update user stats
     await this.updateUserStats(userId, action);
+
+    // 7. Update account progression for supported actions.
+    const accountXpReward = ACCOUNT_XP_REWARDS[action] ?? 0;
+    if (accountXpReward > 0) {
+      await this.addAccountExperience(userId, accountXpReward);
+    }
 
     return result;
   },
@@ -369,6 +398,10 @@ export const gameEventService = {
         gems: { increment: quest.rewardGems },
       },
     });
+
+    if (quest.rewardXp > 0) {
+      await this.addAccountExperience(userId, quest.rewardXp);
+    }
 
     // Update character
     const character = await prisma.character.findFirst({
@@ -686,6 +719,50 @@ export const gameEventService = {
 
     // Set debounce flag for 60 seconds
     await cache.set(debounceKey, true, 60);
+  },
+
+  async addAccountExperience(userId: string, gainedXp: number): Promise<{ level: number; xp: number } | null> {
+    if (gainedXp <= 0) return null;
+
+    return prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`account_xp:${userId}`}))`;
+
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: {
+          accountLevel: true,
+          accountXp: true,
+        },
+      });
+
+      if (!user) return null;
+
+      const next = resolveAccountProgress(user.accountLevel, user.accountXp, gainedXp);
+
+      if (next.level === user.accountLevel && next.xp === user.accountXp) {
+        return {
+          level: user.accountLevel,
+          xp: user.accountXp,
+        };
+      }
+
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: {
+          accountLevel: next.level,
+          accountXp: next.xp,
+        },
+        select: {
+          accountLevel: true,
+          accountXp: true,
+        },
+      });
+
+      return {
+        level: updated.accountLevel,
+        xp: updated.accountXp,
+      };
+    });
   },
 
   /**

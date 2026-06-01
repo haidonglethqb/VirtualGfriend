@@ -21,6 +21,8 @@ model User {
   coins             Int           @default(0)
   gems              Int           @default(0)
   streak            Int           @default(0)       // Daily login streak
+  accountLevel      Int           @default(1)       // Global account level
+  accountXp         Int           @default(0)       // XP toward next account level
   lastActiveAt      DateTime?
   lastLoginAt       DateTime?
   userGender        UserGender    @default(NOT_SPECIFIED)
@@ -66,6 +68,12 @@ model UserSettings {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 ```
+
+## Account Progression
+
+- `accountLevel` and `accountXp` belong to the user account (not to character relationship progression).
+- Account XP increases from key engagement actions: chat messages, gift sends, quest rewards, and daily reward claims.
+- Account level formula mirrors character scaling: `100 + (level - 1) * 50` XP.
 
 ## PasswordResetOTP
 

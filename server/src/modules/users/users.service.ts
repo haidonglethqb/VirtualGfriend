@@ -45,6 +45,8 @@ export const userService = {
         coins: true,
         gems: true,
         streak: true,
+        accountLevel: true,
+        accountXp: true,
         createdAt: true,
       },
     });
@@ -130,6 +132,7 @@ export const userService = {
       totalQuests,
       completedQuests,
       totalGiftsSent,
+      user,
       character,
     ] = await Promise.all([
       prisma.message.count({ where: { userId } }),
@@ -137,6 +140,13 @@ export const userService = {
       prisma.userQuest.count({ where: { userId, status: 'CLAIMED' } }),
       prisma.giftHistory.count({
         where: { userId },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          accountLevel: true,
+          accountXp: true,
+        },
       }),
       prisma.character.findFirst({
         where: { userId, isActive: true },
@@ -153,6 +163,8 @@ export const userService = {
       totalQuests,
       completedQuests,
       totalGiftsSent,
+      accountLevel: user?.accountLevel || 1,
+      accountXp: user?.accountXp || 0,
       characterLevel: character?.level || 1,
       affectionLevel: character?.affection || 0,
       relationshipStage: character?.relationshipStage || 'STRANGER',

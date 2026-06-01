@@ -9,14 +9,13 @@ import {
   BookOpen, Calendar, BarChart3,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
-import { useCharacterStore, getRankTitle, getXpProgress } from '@/store/character-store';
+import { useCharacterStore } from '@/store/character-store';
 import { useLanguageStore } from '@/store/language-store';
 import { useNotificationStore } from '@/store/notification-store';
 import { formatNumber } from '@/lib/utils';
 import api from '@/services/api';
 import { socketService } from '@/services/socket';
 import { PremiumBadge } from '@/components/PremiumGate';
-import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
 import { PremiumTier } from '@/lib/premium';
 
 interface AppLayoutProps {
@@ -52,6 +51,7 @@ const APP_LAYOUT_I18N = {
       memories: 'Kỷ niệm',
     },
     level: 'Cấp',
+    account: 'Tài khoản',
     navigateTitle: 'Điều hướng',
     navigateSubtitle: 'Chọn trang bạn muốn',
     subscription: 'Gói đăng ký',
@@ -72,6 +72,7 @@ const APP_LAYOUT_I18N = {
       memories: 'Memories',
     },
     level: 'Level',
+    account: 'Account',
     navigateTitle: 'Navigation',
     navigateSubtitle: 'Choose your destination',
     subscription: 'Subscription',
@@ -80,14 +81,32 @@ const APP_LAYOUT_I18N = {
   },
 } as const;
 
+function getAccountXpProgress(level: number, accountXp: number) {
+  const safeLevel = Math.max(1, level || 1);
+  const safeXp = Math.max(0, accountXp || 0);
+  const needed = 100 + (safeLevel - 1) * 50;
+  const percent = Math.min(100, (safeXp / needed) * 100);
+
+  return {
+    current: safeXp,
+    needed,
+    percent,
+  };
+}
+
 export default function AppLayout({ children, showSidebar = true }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout, isAuthenticated, accessToken } = useAuthStore();
-  const { character, selectedCharacterId } = useCharacterStore();
+  const { selectedCharacterId } = useCharacterStore();
   const { language, toggleLanguage } = useLanguageStore();
   const { generalNotification, showGeneralNotification, hideGeneralNotification } = useNotificationStore();
   const t = APP_LAYOUT_I18N[language] || APP_LAYOUT_I18N.vi;
+  const accountName = user?.displayName || user?.username || t.account;
+  const accountLevel = user?.accountLevel || 1;
+  const accountXp = user?.accountXp || 0;
+  const accountProgress = getAccountXpProgress(accountLevel, accountXp);
+  const avatarInitial = accountName.slice(0, 1).toUpperCase();
 
   const [unreadDmCount, setUnreadDmCount] = useState(0);
   const [activeQuestCount, setActiveQuestCount] = useState(0);
@@ -308,31 +327,32 @@ export default function AppLayout({ children, showSidebar = true }: AppLayoutPro
               <Link href="/subscription">
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-[#271b21] border border-[#392830] hover:border-love/30 transition-colors cursor-pointer">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-love to-pink-600 flex items-center justify-center text-xl border-2 border-love/30">
-                    <EmojiSvgIcon
-                      emoji={character?.gender === 'FEMALE' ? '👩' : '👨'}
-                      className="w-6 h-6 text-white"
-                    />
+                    {user?.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={user.avatar}
+                        alt={accountName}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-base font-bold text-white">{avatarInitial}</span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm truncate">{character?.name || (language === 'vi' ? 'Người yêu' : 'Companion')}</p>
+                    <p className="font-bold text-sm truncate">{accountName}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-xs text-[#ba9cab]">{t.level} {character?.level || 1} · {getRankTitle(character?.level || 1)}</p>
+                      <p className="text-xs text-[#ba9cab]">{t.level} {accountLevel} · {t.account}</p>
                       <PremiumBadge tier={user?.premiumTier as PremiumTier} />
                     </div>
-                    {character && (() => {
-                      const xp = getXpProgress(character.level, character.experience);
-                      return (
-                        <div className="mt-1.5 w-full">
-                          <div className="h-1.5 rounded-full bg-[#392830] overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-love to-pink-500 transition-all duration-500"
-                              style={{ width: `${xp.percent}%` }}
-                            />
-                          </div>
-                          <p className="text-[10px] text-[#8a7580] mt-0.5">{xp.current}/{xp.needed} XP</p>
-                        </div>
-                      );
-                    })()}
+                    <div className="mt-1.5 w-full">
+                      <div className="h-1.5 rounded-full bg-[#392830] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-love to-pink-500 transition-all duration-500"
+                          style={{ width: `${accountProgress.percent}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-[#8a7580] mt-0.5">{accountProgress.current}/{accountProgress.needed} XP</p>
+                    </div>
                   </div>
                 </div>
               </Link>
