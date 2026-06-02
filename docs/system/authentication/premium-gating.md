@@ -130,6 +130,8 @@ model Scene {
 }
 ```
 
+VIP monthly gift packs are claimable only by active paid users. Claim rows are unique per `userId + claimMonth + tier`, so upgrading from BASIC to PRO/ULTIMATE in the same month grants only the newly unlocked segment.
+
 ## Daily Message Quotas
 
 - `FREE` users are limited by daily chat quota from tier config

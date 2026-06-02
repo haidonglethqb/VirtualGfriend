@@ -45,6 +45,50 @@ function rewardText(quest: ArcQuest, isVi: boolean) {
   return parts.join(' · ');
 }
 
+function localText(value: { vi: string; en: string } | undefined, isVi: boolean) {
+  if (!value) return '';
+  return isVi ? value.vi : value.en;
+}
+
+function lockReasonText(reason: ArcQuest['lockReason'], isVi: boolean) {
+  if (reason === 'START_ARC_FIRST') return isVi ? 'Bắt đầu Arc trước' : 'Start the arc first';
+  if (reason === 'COMPLETE_PREVIOUS_QUEST') return isVi ? 'Hoàn thành nhiệm vụ trước' : 'Complete the previous quest';
+  return null;
+}
+
+function QuestActionButton({ quest, isVi, className }: { quest: ArcQuest; isVi: boolean; className?: string }) {
+  const label = quest.ctaDisabled
+    ? isVi ? 'Đang khóa' : 'Locked'
+    : localText(quest.ctaLabel, isVi);
+
+  if (quest.ctaDisabled) {
+    return (
+      <Button variant="outline" disabled className={className || 'gap-2'}>
+        <Lock className="h-4 w-4" />
+        {label}
+      </Button>
+    );
+  }
+
+  return (
+    <Button asChild variant="outline" className={className || 'gap-2'}>
+      <Link href={quest.ctaHref}>
+        <Play className="h-4 w-4" />
+        {label}
+      </Link>
+    </Button>
+  );
+}
+
+function RewardItem({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-sm text-gray-200">
+      <span className="text-amber-300">{icon}</span>
+      <span className="truncate">{label}</span>
+    </div>
+  );
+}
+
 export default function ArcDetailPage() {
   const params = useParams<{ arcId: string }>();
   const router = useRouter();
@@ -65,7 +109,7 @@ export default function ArcDetailPage() {
     } catch (error) {
       toast({
         title: isVi ? 'Lỗi' : 'Error',
-        description: error instanceof Error ? error.message : isVi ? 'Không thể tải arc' : 'Failed to load arc',
+        description: error instanceof Error ? error.message : isVi ? 'Không thể tải Arc' : 'Failed to load arc',
         variant: 'destructive',
       });
       router.push('/arc');
@@ -86,9 +130,13 @@ export default function ArcDetailPage() {
     () => arc?.quests.find((quest) => quest.id === arc.finalQuestId) ?? null,
     [arc]
   );
+  const currentQuest = useMemo(
+    () => arc?.quests.find((quest) => quest.isCurrentQuest) ??
+      arc?.quests.find((quest) => quest.userProgress?.status !== 'CLAIMED') ??
+      null,
+    [arc]
+  );
 
-  const canClaimFinalQuest =
-    finalQuest?.userProgress?.status === 'COMPLETED' && finalQuest.isArcFinalQuest;
   const canClaimArc =
     arc?.canClaimArc || (finalQuest?.userProgress?.status === 'CLAIMED' && !arc?.completedAt);
 
@@ -98,13 +146,13 @@ export default function ArcDetailPage() {
       const response = await arcApi.startArc(params.arcId);
       setArc(response.data);
       toast({
-        title: isVi ? 'Đã bắt đầu arc' : 'Arc started',
-        description: isVi ? 'Tất cả nhiệm vụ trong arc đã sẵn sàng.' : 'All arc quests are ready.',
+        title: isVi ? 'Đã bắt đầu Arc' : 'Arc started',
+        description: isVi ? 'Tất cả nhiệm vụ trong Arc đã sẵn sàng.' : 'All arc quests are ready.',
       });
     } catch (error) {
       toast({
         title: isVi ? 'Lỗi' : 'Error',
-        description: error instanceof Error ? error.message : isVi ? 'Không thể bắt đầu arc' : 'Failed to start arc',
+        description: error instanceof Error ? error.message : isVi ? 'Không thể bắt đầu Arc' : 'Failed to start arc',
         variant: 'destructive',
       });
     } finally {
@@ -145,7 +193,7 @@ export default function ArcDetailPage() {
     } catch (error) {
       toast({
         title: isVi ? 'Lỗi' : 'Error',
-        description: error instanceof Error ? error.message : isVi ? 'Không thể nhận thưởng arc' : 'Failed to claim arc reward',
+        description: error instanceof Error ? error.message : isVi ? 'Không thể nhận thưởng Arc' : 'Failed to claim arc reward',
         variant: 'destructive',
       });
     } finally {
@@ -208,7 +256,9 @@ export default function ArcDetailPage() {
           >
             <div className="flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-amber-300" />
-              <span className="font-semibold">{isVi ? 'Hành trình đã tiến thêm một chương.' : 'Your journey advanced to the next chapter.'}</span>
+              <span className="font-semibold">
+                {isVi ? 'Hành trình đã tiến thêm một chương.' : 'Your journey advanced to the next chapter.'}
+              </span>
             </div>
           </motion.div>
         )}
@@ -244,6 +294,36 @@ export default function ArcDetailPage() {
           )}
         </div>
 
+        {currentQuest && !arc.completedAt && (
+          <section className="mb-5 rounded-2xl border border-love/30 bg-love/10 p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center gap-2 text-love">
+                  <Sparkles className="h-5 w-5" />
+                  <h2 className="text-lg font-bold text-white">{isVi ? 'Nhiệm vụ tiếp theo' : 'Next quest'}</h2>
+                </div>
+                <h3 className="font-semibold text-white">{currentQuest.title}</h3>
+                <p className="mt-1 text-sm text-gray-300">{localText(currentQuest.requirementText, isVi)}</p>
+                <p className="mt-1 text-sm text-gray-400">
+                  {lockReasonText(currentQuest.lockReason, isVi) || localText(currentQuest.guidanceText, isVi)}
+                </p>
+                <div className="mt-3 max-w-xl">
+                  <Progress value={progressPercent(currentQuest)} className="h-2" />
+                  <div className="mt-1 text-xs text-gray-400">{localText(currentQuest.progressText, isVi)}</div>
+                </div>
+              </div>
+              {currentQuest.userProgress?.status === 'COMPLETED' && currentQuest.isArcFinalQuest ? (
+                <Button onClick={() => handleClaimQuest(currentQuest.id)} disabled={actionLoading === currentQuest.id} className="gap-2">
+                  {actionLoading === currentQuest.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
+                  {isVi ? 'Nhận thưởng quest' : 'Claim quest'}
+                </Button>
+              ) : (
+                <QuestActionButton quest={currentQuest} isVi={isVi} />
+              )}
+            </div>
+          </section>
+        )}
+
         <div className="space-y-4">
           {arc.quests.map((quest, index) => {
             const started = !!quest.userProgress;
@@ -258,7 +338,11 @@ export default function ArcDetailPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.04 }}
-                className="rounded-2xl border border-white/10 bg-white/[0.035] p-5"
+                className={`rounded-2xl border p-5 ${
+                  quest.isCurrentQuest
+                    ? 'border-love/30 bg-love/10'
+                    : 'border-white/10 bg-white/[0.035]'
+                }`}
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                   <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border ${
@@ -275,15 +359,21 @@ export default function ArcDetailPage() {
                       <h3 className="font-semibold text-white">{quest.title}</h3>
                       {quest.isArcFinalQuest && (
                         <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-xs text-amber-200">
-                          {isVi ? 'Cuối arc' : 'Final'}
+                          {isVi ? 'Cuối Arc' : 'Final'}
                         </span>
                       )}
                     </div>
-                    <p className="mb-3 text-sm text-gray-400">{quest.description}</p>
+                    <p className="mb-2 text-sm text-gray-400">{quest.description}</p>
+                    <div className="mb-3 rounded-xl border border-white/10 bg-black/10 px-3 py-2">
+                      <div className="text-sm font-medium text-white">{localText(quest.requirementText, isVi)}</div>
+                      <div className="mt-1 text-xs text-gray-400">
+                        {lockReasonText(quest.lockReason, isVi) || localText(quest.guidanceText, isVi)}
+                      </div>
+                    </div>
                     <Progress value={percent} className="h-2" />
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
                       <span>
-                        {quest.userProgress?.progress ?? 0}/{quest.userProgress?.maxProgress ?? quest.target}
+                        {localText(quest.progressText, isVi) || `${quest.userProgress?.progress ?? 0}/${quest.userProgress?.maxProgress ?? quest.target}`}
                       </span>
                       <span>{rewardText(quest, isVi)}</span>
                     </div>
@@ -299,6 +389,8 @@ export default function ArcDetailPage() {
                         {actionLoading === quest.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
                         {isVi ? 'Nhận' : 'Claim'}
                       </Button>
+                    ) : !claimed && !completed ? (
+                      <QuestActionButton quest={quest} isVi={isVi} className="w-full gap-2" />
                     ) : (
                       <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-center text-xs text-gray-400">
                         {claimed
@@ -318,14 +410,5 @@ export default function ArcDetailPage() {
         </div>
       </div>
     </AppLayout>
-  );
-}
-
-function RewardItem({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-sm text-gray-200">
-      <span className="text-amber-300">{icon}</span>
-      <span className="truncate">{label}</span>
-    </div>
   );
 }

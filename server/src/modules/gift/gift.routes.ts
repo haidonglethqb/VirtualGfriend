@@ -7,6 +7,8 @@ export const giftRouter = Router();
 giftRouter.use(authenticate);
 
 giftRouter.get('/', giftController.getGifts);
+giftRouter.get('/vip-pack/status', giftController.getVipPackStatus);
+giftRouter.post('/vip-pack/claim', giftController.claimVipPack);
 giftRouter.get('/inventory', giftController.getInventory);
 giftRouter.post('/buy', giftController.buyGift);
 giftRouter.post('/send', giftController.sendGift);

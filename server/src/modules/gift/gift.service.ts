@@ -1,4 +1,4 @@
-import { prisma } from '../../lib/prisma';
+import { prisma, Prisma } from '../../lib/prisma';
 import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { characterService } from '../character/character.service';
@@ -18,19 +18,161 @@ interface SendGiftData {
   message?: string;
 }
 
-export const giftService = {
-  async getGifts(category?: string) {
-    return cache.getOrSet(
-      CacheKeys.gifts(category),
-      () => prisma.gift.findMany({
-        where: {
-          isActive: true,
-          ...(category && { category }),
+const TIER_HIERARCHY = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'] as const;
+type PremiumTierName = typeof TIER_HIERARCHY[number];
+type VipSegment = Exclude<PremiumTierName, 'FREE'>;
+
+const VIP_GIFT_POOLS: Record<VipSegment, string[]> = {
+  BASIC: ['Hoa Hồng Pha Lê', 'Socola Hoàng Gia', 'Gấu Bông VIP'],
+  PRO: ['Vòng Tay Ánh Sao', 'Hộp Nhạc Kỷ Niệm', 'Bữa Tối Ánh Nến'],
+  ULTIMATE: ['Nhẫn Kim Cương Vĩnh Cửu', 'Kỳ Nghỉ Thiên Đường', 'Ngôi Sao Mang Tên Em'],
+};
+
+const VIP_SEGMENTS_BY_TIER: Record<VipSegment, VipSegment[]> = {
+  BASIC: ['BASIC'],
+  PRO: ['BASIC', 'PRO'],
+  ULTIMATE: ['BASIC', 'PRO', 'ULTIMATE'],
+};
+
+function normalizeTier(tier?: string | null): PremiumTierName {
+  return TIER_HIERARCHY.includes(tier as PremiumTierName) ? tier as PremiumTierName : 'FREE';
+}
+
+function tierIndex(tier?: string | null) {
+  return TIER_HIERARCHY.indexOf(normalizeTier(tier));
+}
+
+function canAccessTier(userTier: string | null | undefined, requiredTier: string | null | undefined) {
+  return tierIndex(userTier) >= tierIndex(requiredTier || 'FREE');
+}
+
+function getClaimWindow(now = new Date()) {
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth() + 1;
+  const claimMonth = `${year}-${String(month).padStart(2, '0')}`;
+  const nextClaimAt = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+  const secondsUntilNextClaim = Math.max(0, Math.ceil((nextClaimAt.getTime() - now.getTime()) / 1000));
+  const monthIndex = year * 12 + (month - 1);
+
+  return { claimMonth, nextClaimAt, secondsUntilNextClaim, monthIndex };
+}
+
+function segmentsForTier(tier: PremiumTierName): VipSegment[] {
+  return tier === 'FREE' ? [] : VIP_SEGMENTS_BY_TIER[tier];
+}
+
+function giftNameForSegment(segment: VipSegment, monthIndex: number) {
+  const pool = VIP_GIFT_POOLS[segment];
+  return pool[monthIndex % pool.length];
+}
+
+function isActivePremiumUser(user: {
+  isPremium: boolean;
+  premiumTier: string;
+  premiumExpiresAt: Date | null;
+  subscription?: {
+    status: string;
+    currentPeriodEnd: Date;
+  } | null;
+}) {
+  const tier = normalizeTier(user.premiumTier);
+  if (tier === 'FREE' || !user.isPremium) return false;
+
+  const now = new Date();
+  if (user.premiumExpiresAt && user.premiumExpiresAt <= now) return false;
+
+  if (!user.subscription) return true;
+  return ['ACTIVE', 'TRIALING'].includes(user.subscription.status) &&
+    user.subscription.currentPeriodEnd > now;
+}
+
+async function getEffectiveUserTier(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      premiumTier: true,
+      isPremium: true,
+      premiumExpiresAt: true,
+      subscription: {
+        select: {
+          status: true,
+          currentPeriodEnd: true,
         },
-        orderBy: [{ rarity: 'asc' }, { sortOrder: 'asc' }],
-      }),
-      CacheTTL.GIFTS
-    );
+      },
+    },
+  });
+
+  if (!user) throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+
+  return {
+    user,
+    tier: isActivePremiumUser(user) ? normalizeTier(user.premiumTier) : 'FREE' as PremiumTierName,
+  };
+}
+
+function giftAccessPayload(
+  gift: { requiresPremium: boolean; minimumTier: string },
+  userTier: PremiumTierName,
+  canAccessPremiumGifts: boolean
+) {
+  const requiredTier = normalizeTier(gift.minimumTier || (gift.requiresPremium ? 'BASIC' : 'FREE'));
+  const lacksPremiumFeature = gift.requiresPremium && !canAccessPremiumGifts;
+  const lacksTier = !canAccessTier(userTier, requiredTier);
+  const isLocked = lacksPremiumFeature || lacksTier;
+
+  return {
+    requiredTier,
+    isLocked,
+    canBuy: !isLocked,
+    lockReason: lacksPremiumFeature ? 'VIP_REQUIRED' : lacksTier ? 'TIER_REQUIRED' : null,
+  };
+}
+
+async function getVipPackSegments(tier: PremiumTierName, claimMonth: string, monthIndex: number) {
+  const previewTier = tier === 'FREE' ? 'BASIC' : tier;
+  const segments = segmentsForTier(previewTier);
+  const namesBySegment = new Map(segments.map((segment) => [segment, giftNameForSegment(segment, monthIndex)]));
+  const gifts = await prisma.gift.findMany({
+    where: {
+      name: { in: Array.from(namesBySegment.values()) },
+      isActive: true,
+    },
+  });
+  const giftsByName = new Map(gifts.map((gift) => [gift.name, gift]));
+
+  return segments.map((segment) => {
+    const giftName = namesBySegment.get(segment)!;
+    return {
+      segment,
+      claimMonth,
+      quantity: 1,
+      gift: giftsByName.get(giftName) ?? null,
+    };
+  });
+}
+
+export const giftService = {
+  async getGifts(userId: string, category?: string) {
+    const [gifts, { tier }] = await Promise.all([
+      cache.getOrSet(
+        CacheKeys.gifts(category),
+        () => prisma.gift.findMany({
+          where: {
+            isActive: true,
+            ...(category && { category }),
+          },
+          orderBy: [{ rarity: 'asc' }, { sortOrder: 'asc' }],
+        }),
+        CacheTTL.GIFTS
+      ),
+      getEffectiveUserTier(userId),
+    ]);
+    const tierConfig = await getTierConfig(tier);
+
+    return gifts.map((gift) => ({
+      ...gift,
+      ...giftAccessPayload(gift, tier, tierConfig.canAccessPremiumGifts),
+    }));
   },
 
   async getInventory(userId: string) {
@@ -54,36 +196,44 @@ export const giftService = {
       throw new AppError('Gift not found', 404, 'GIFT_NOT_FOUND');
     }
 
-    // Check premium access for premium gifts
     const tierUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { premiumTier: true, coins: true, gems: true },
+      select: {
+        premiumTier: true,
+        isPremium: true,
+        premiumExpiresAt: true,
+        coins: true,
+        gems: true,
+        subscription: {
+          select: {
+            status: true,
+            currentPeriodEnd: true,
+          },
+        },
+      },
     });
-    const userTier = tierUser?.premiumTier || 'FREE';
-    const tierConfig = await getTierConfig(userTier);
-
-    if (gift.requiresPremium && !tierConfig.canAccessPremiumGifts) {
-      throw new AppError('Nâng cấp VIP để mua quà này!', 403, 'PREMIUM_GIFT_REQUIRED');
-    }
-    if (gift.minimumTier && gift.minimumTier !== 'FREE') {
-      const TIER_HIERARCHY = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
-      const userTierIndex = TIER_HIERARCHY.indexOf(userTier);
-      const requiredTierIndex = TIER_HIERARCHY.indexOf(gift.minimumTier);
-      if (userTierIndex < requiredTierIndex) {
-        throw new AppError(`Cần tier ${gift.minimumTier} để mua quà này`, 403, 'TIER_GIFT_REQUIRED');
-      }
-    }
 
     if (!tierUser) {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
+    const userTier = isActivePremiumUser(tierUser) ? normalizeTier(tierUser.premiumTier) : 'FREE';
+    const tierConfig = await getTierConfig(userTier);
+
+    if (gift.requiresPremium && !tierConfig.canAccessPremiumGifts) {
+      throw new AppError('Nâng cấp VIP để mua quà này!', 403, 'PREMIUM_GIFT_REQUIRED');
+    }
+    if (gift.minimumTier && gift.minimumTier !== 'FREE' && !canAccessTier(userTier, gift.minimumTier)) {
+      throw new AppError(`Cần tier ${gift.minimumTier} để mua quà này`, 403, 'TIER_GIFT_REQUIRED');
+    }
+
     const price = data.paymentMethod === 'coins' ? gift.priceCoins : gift.priceGems;
+    if (price <= 0) {
+      throw new AppError(`Gift cannot be purchased with ${data.paymentMethod}`, 400, 'INVALID_PAYMENT_METHOD');
+    }
     const totalPrice = price * data.quantity;
 
-    // Use transaction for atomicity
     const result = await prisma.$transaction(async (tx) => {
-      // Deduct balance atomically with a balance guard to prevent concurrent overspending
       const balanceDebit = await tx.user.updateMany({
         where: {
           id: userId,
@@ -104,7 +254,6 @@ export const giftService = {
         );
       }
 
-      // Add to inventory
       const userGift = await tx.userGift.upsert({
         where: { userId_giftId: { userId, giftId: data.giftId } },
         update: { quantity: { increment: data.quantity } },
@@ -120,7 +269,6 @@ export const giftService = {
       return { userGift, updatedUser };
     });
 
-    // Invalidate inventory cache
     await cache.del(CacheKeys.giftInventory(userId));
 
     return {
@@ -137,7 +285,6 @@ export const giftService = {
   },
 
   async sendGift(userId: string, data: SendGiftData) {
-    // Check character ownership
     const character = await prisma.character.findFirst({
       where: { id: data.characterId, userId },
     });
@@ -151,10 +298,8 @@ export const giftService = {
       select: { displayName: true, username: true, userGender: true },
     });
 
-    // Use transaction with atomic quantity check to prevent double-spend
     let reaction = '';
     const result = await prisma.$transaction(async (tx) => {
-      // Load gift and verify ownership inside transaction
       const userGift = await tx.userGift.findUnique({
         where: { userId_giftId: { userId, giftId: data.giftId } },
         include: { gift: true },
@@ -165,20 +310,34 @@ export const giftService = {
       }
 
       const gift = userGift.gift;
-
-      // Check premium access for premium gifts
-      const sendUser = await prisma.user.findUnique({
+      const sendUser = await tx.user.findUnique({
         where: { id: userId },
-        select: { premiumTier: true },
+        select: {
+          premiumTier: true,
+          isPremium: true,
+          premiumExpiresAt: true,
+          subscription: {
+            select: {
+              status: true,
+              currentPeriodEnd: true,
+            },
+          },
+        },
       });
-      const sendUserTier = sendUser?.premiumTier || 'FREE';
+      if (!sendUser) {
+        throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+      }
+
+      const sendUserTier = isActivePremiumUser(sendUser) ? normalizeTier(sendUser.premiumTier) : 'FREE';
       const sendTierConfig = await getTierConfig(sendUserTier);
 
       if (gift.requiresPremium && !sendTierConfig.canAccessPremiumGifts) {
         throw new AppError('Nâng cấp VIP để gửi quà này!', 403, 'PREMIUM_GIFT_REQUIRED');
       }
+      if (gift.minimumTier && gift.minimumTier !== 'FREE' && !canAccessTier(sendUserTier, gift.minimumTier)) {
+        throw new AppError(`Cần tier ${gift.minimumTier} để gửi quà này`, 403, 'TIER_GIFT_REQUIRED');
+      }
 
-      // Generate AI reaction for gift (with fallback)
       try {
         const aiResponse = await aiService.generateResponse({
           characterId: data.characterId,
@@ -202,7 +361,6 @@ export const giftService = {
         reaction = `Wow, ${gift.name} luôn hả? Cảm ơn nhiều nha 💕`;
       }
 
-      // Atomically decrement quantity — concurrent requests: only one will succeed
       const updated = await tx.userGift.updateMany({
         where: { id: userGift.id, quantity: { gte: 1 } },
         data: { quantity: { decrement: 1 } },
@@ -212,7 +370,6 @@ export const giftService = {
         throw new AppError('Gift not in inventory', 400, 'GIFT_NOT_OWNED');
       }
 
-      // Record gift history
       await tx.giftHistory.create({
         data: {
           userId,
@@ -223,7 +380,6 @@ export const giftService = {
         },
       });
 
-      // Save as message
       await tx.message.create({
         data: {
           userId,
@@ -250,15 +406,11 @@ export const giftService = {
     });
 
     const gift = result.gift;
-
-    // Update affection (outside transaction as it has its own logic)
     const updatedCharacter = await characterService.updateAffection(data.characterId, gift.affectionBonus, userId);
 
-    // Invalidate caches
     await cache.del(CacheKeys.giftInventory(userId));
     await cache.del(CacheKeys.characterWithFacts(data.characterId));
 
-    // Process game event for quest progress and milestones
     const gameResult = await gameEventService.processAction({
       userId,
       characterId: data.characterId,
@@ -277,10 +429,9 @@ export const giftService = {
   },
 
   async getGiftHistory(userId: string, page: number, limit: number) {
-    const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
+    const safeLimit = Math.min(Math.max(1, limit), 100);
     const skip = (page - 1) * safeLimit;
 
-    // Use direct userId filter instead of nested relation filter
     const [history, total] = await Promise.all([
       prisma.giftHistory.findMany({
         where: { userId },
@@ -301,6 +452,122 @@ export const giftService = {
       page,
       pageSize: safeLimit,
       hasMore: skip + history.length < total,
+    };
+  },
+
+  async getVipPackStatus(userId: string) {
+    const { claimMonth, nextClaimAt, secondsUntilNextClaim, monthIndex } = getClaimWindow();
+    const { user, tier } = await getEffectiveUserTier(userId);
+    const eligibleSegments = segmentsForTier(tier);
+    const claimedRows = await prisma.vipGiftClaim.findMany({
+      where: { userId, claimMonth },
+      select: { tier: true, claimedAt: true },
+    });
+    const claimedSegments = claimedRows.map((row) => row.tier as VipSegment);
+    const claimedSet = new Set(claimedSegments);
+    const claimableSegments = eligibleSegments.filter((segment) => !claimedSet.has(segment));
+    const packSegments = await getVipPackSegments(tier, claimMonth, monthIndex);
+    const claimableSet = new Set(claimableSegments);
+    const packPreview = packSegments.map(({ segment, quantity, gift }) => ({
+      segment,
+      quantity,
+      gift,
+      isClaimable: claimableSet.has(segment),
+      claimedAt: claimedRows.find((row) => row.tier === segment)?.claimedAt ?? null,
+    }));
+    const isEligible = isActivePremiumUser(user);
+
+    return {
+      tier,
+      isEligible,
+      canClaim: isEligible && claimableSegments.length > 0,
+      claimMonth,
+      eligibleSegments,
+      claimedSegments,
+      claimableSegments,
+      nextClaimAt,
+      secondsUntilNextClaim,
+      lockReason: isEligible ? null : 'VIP_REQUIRED',
+      packPreview,
+    };
+  },
+
+  async claimVipPack(userId: string) {
+    const { claimMonth, monthIndex } = getClaimWindow();
+    const { user, tier } = await getEffectiveUserTier(userId);
+    if (!isActivePremiumUser(user) || tier === 'FREE') {
+      throw new AppError('VIP subscription required to claim this gift pack', 403, 'VIP_REQUIRED');
+    }
+
+    const eligibleSegments = segmentsForTier(tier);
+    const existingClaims = await prisma.vipGiftClaim.findMany({
+      where: { userId, claimMonth },
+      select: { tier: true },
+    });
+    const claimedSet = new Set(existingClaims.map((claim) => claim.tier as VipSegment));
+    const claimableSegments = eligibleSegments.filter((segment) => !claimedSet.has(segment));
+    if (claimableSegments.length === 0) {
+      throw new AppError('VIP gift pack already claimed for this month', 400, 'VIP_GIFT_ALREADY_CLAIMED');
+    }
+
+    const namesBySegment = new Map(claimableSegments.map((segment) => [segment, giftNameForSegment(segment, monthIndex)]));
+    const gifts = await prisma.gift.findMany({
+      where: {
+        name: { in: Array.from(namesBySegment.values()) },
+        isActive: true,
+      },
+    });
+    const giftsByName = new Map(gifts.map((gift) => [gift.name, gift]));
+    const grants = claimableSegments.map((segment) => {
+      const gift = giftsByName.get(namesBySegment.get(segment)!);
+      if (!gift) {
+        throw new AppError('VIP gift pack is not configured correctly', 500, 'VIP_GIFT_CONFIG_INVALID');
+      }
+      return { segment, gift, quantity: 1 };
+    });
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        for (const grant of grants) {
+          await tx.vipGiftClaim.create({
+            data: {
+              userId,
+              claimMonth,
+              tier: grant.segment,
+              grantedGifts: [{
+                giftId: grant.gift.id,
+                name: grant.gift.name,
+                quantity: grant.quantity,
+              }],
+            },
+          });
+
+          await tx.userGift.upsert({
+            where: { userId_giftId: { userId, giftId: grant.gift.id } },
+            update: { quantity: { increment: grant.quantity } },
+            create: { userId, giftId: grant.gift.id, quantity: grant.quantity },
+          });
+        }
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new AppError('VIP gift pack already claimed for this month', 400, 'VIP_GIFT_ALREADY_CLAIMED');
+      }
+      throw error;
+    }
+
+    await cache.del(CacheKeys.giftInventory(userId));
+
+    return {
+      claimed: true,
+      tier,
+      claimMonth,
+      claimedSegments: claimableSegments,
+      granted: grants.map((grant) => ({
+        segment: grant.segment,
+        quantity: grant.quantity,
+        gift: grant.gift,
+      })),
     };
   },
 };

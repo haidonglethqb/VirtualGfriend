@@ -86,6 +86,8 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 | Gifts | `POST /gifts/buy` | Buy with coins/gems (atomic debit with balance guard) |
 | Gifts | `POST /gifts/send` | Send to character |
 | Gifts | `GET /gifts/history` | Gift history |
+| Gifts | `GET /gifts/vip-pack/status` | VIP monthly pack preview, claim state, countdown |
+| Gifts | `POST /gifts/vip-pack/claim` | Claim unclaimed eligible VIP pack segments |
 
 ### Daily Reward (`/daily-reward`) — Auth required
 | Method | Path | Description |

@@ -340,6 +340,82 @@ export interface ArcQuest {
   rewardAffection: number;
   target: number;
   userProgress: ArcQuestProgress | null;
+  requirementText: LocalizedText;
+  guidanceText: LocalizedText;
+  progressText: LocalizedText;
+  remaining: number;
+  cta: {
+    label: LocalizedText;
+    href: string;
+    disabled: boolean;
+  };
+  ctaLabel: LocalizedText;
+  ctaHref: string;
+  ctaDisabled: boolean;
+  lockReason: 'START_ARC_FIRST' | 'COMPLETE_PREVIOUS_QUEST' | null;
+  statusReason: 'START_ARC_FIRST' | 'COMPLETE_PREVIOUS_QUEST' | null;
+  isCurrentQuest: boolean;
+}
+
+export interface LocalizedText {
+  vi: string;
+  en: string;
+}
+
+export type PremiumTierName = 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE';
+export type VipGiftSegment = Exclude<PremiumTierName, 'FREE'>;
+
+export interface GiftCatalogItem {
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  imageUrl?: string;
+  category: string;
+  rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
+  requiresPremium: boolean;
+  minimumTier: PremiumTierName;
+  requiredTier: PremiumTierName;
+  isLocked: boolean;
+  canBuy: boolean;
+  lockReason: 'VIP_REQUIRED' | 'TIER_REQUIRED' | null;
+  priceCoins: number;
+  priceGems: number;
+  affectionBonus: number;
+}
+
+export interface VipPackPreviewItem {
+  segment: VipGiftSegment;
+  quantity: number;
+  gift: GiftCatalogItem | null;
+  isClaimable: boolean;
+  claimedAt: string | null;
+}
+
+export interface VipGiftPackStatus {
+  tier: PremiumTierName;
+  isEligible: boolean;
+  canClaim: boolean;
+  claimMonth: string;
+  eligibleSegments: VipGiftSegment[];
+  claimedSegments: VipGiftSegment[];
+  claimableSegments: VipGiftSegment[];
+  nextClaimAt: string;
+  secondsUntilNextClaim: number;
+  lockReason: 'VIP_REQUIRED' | null;
+  packPreview: VipPackPreviewItem[];
+}
+
+export interface VipGiftPackClaimResult {
+  claimed: boolean;
+  tier: PremiumTierName;
+  claimMonth: string;
+  claimedSegments: VipGiftSegment[];
+  granted: Array<{
+    segment: VipGiftSegment;
+    quantity: number;
+    gift: GiftCatalogItem;
+  }>;
 }
 
 export interface ArcRewardSummary {

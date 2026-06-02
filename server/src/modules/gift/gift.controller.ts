@@ -20,8 +20,26 @@ export const giftController = {
   async getGifts(req: Request, res: Response, next: NextFunction) {
     try {
       const category = req.query.category as string;
-      const gifts = await giftService.getGifts(category);
+      const gifts = await giftService.getGifts(req.user!.id, category);
       res.json({ success: true, data: gifts });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getVipPackStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const status = await giftService.getVipPackStatus(req.user!.id);
+      res.json({ success: true, data: status });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async claimVipPack(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await giftService.claimVipPack(req.user!.id);
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

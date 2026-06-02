@@ -62,6 +62,7 @@ model User {
   userQuests        UserQuest[]
   userGifts         UserGift[]
   giftHistory       GiftHistory[]
+  vipGiftClaims     VipGiftClaim[]
   memories          Memory[]
   userAchievements  UserAchievement[]
   notifications     Notification[]
@@ -560,6 +561,22 @@ model GiftHistory {
   @@index([userId, createdAt])
   @@index([characterId, createdAt])
   @@map("gift_history")
+}
+
+model VipGiftClaim {
+  id           String      @id @default(uuid())
+  userId       String
+  claimMonth   String
+  tier         PremiumTier
+  grantedGifts Json
+  claimedAt    DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, claimMonth, tier])
+  @@index([userId, claimMonth])
+  @@index([claimedAt])
+  @@map("vip_gift_claims")
 }
 
 // ============================================

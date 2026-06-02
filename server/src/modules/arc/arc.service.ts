@@ -18,6 +18,176 @@ function completionFromClaimed(totalQuests: number, claimedQuests: number) {
   return totalQuests > 0 ? Math.round((claimedQuests / totalQuests) * 100) : 0;
 }
 
+function getQuestRequirement(requirements: Prisma.JsonValue) {
+  const value = requirements as { action?: string; count?: number };
+  return {
+    action: value?.action || 'unknown',
+    count: typeof value?.count === 'number' && value.count > 0 ? value.count : 1,
+  };
+}
+
+function actionCopy(action: string, count: number) {
+  const fallback = {
+    unitVi: 'lần',
+    unitEn: 'times',
+    requirementVi: `Hoàn thành ${count} lần`,
+    requirementEn: `Complete ${count} times`,
+    ctaLabelVi: 'Tiếp tục',
+    ctaLabelEn: 'Continue',
+    ctaHref: '/dashboard',
+    guidanceVi: (remaining: number) => `Làm thêm ${remaining} lần để hoàn thành nhiệm vụ này.`,
+    guidanceEn: (remaining: number) => `Complete ${remaining} more to finish this quest.`,
+  };
+
+  const copies: Record<string, typeof fallback> = {
+    send_message: {
+      unitVi: 'tin nhắn',
+      unitEn: 'messages',
+      requirementVi: `Gửi ${count} tin nhắn`,
+      requirementEn: `Send ${count} messages`,
+      ctaLabelVi: 'Đi chat',
+      ctaLabelEn: 'Go to chat',
+      ctaHref: '/chat',
+      guidanceVi: (remaining) => `Vào chat và gửi thêm ${remaining} tin nhắn cho cô ấy.`,
+      guidanceEn: (remaining) => `Open chat and send ${remaining} more messages to her.`,
+    },
+    send_gift: {
+      unitVi: 'món quà',
+      unitEn: 'gifts',
+      requirementVi: `Tặng ${count} món quà`,
+      requirementEn: `Send ${count} gifts`,
+      ctaLabelVi: 'Tặng quà',
+      ctaLabelEn: 'Send gift',
+      ctaHref: '/shop',
+      guidanceVi: (remaining) => `Vào shop hoặc túi đồ và tặng thêm ${remaining} món quà cho cô ấy.`,
+      guidanceEn: (remaining) => `Open the shop or inventory and send ${remaining} more gifts to her.`,
+    },
+    daily_login: {
+      unitVi: 'ngày đăng nhập',
+      unitEn: 'daily logins',
+      requirementVi: `Đăng nhập ${count} ngày`,
+      requirementEn: `Log in for ${count} days`,
+      ctaLabelVi: 'Về trang chính',
+      ctaLabelEn: 'Go home',
+      ctaHref: '/dashboard',
+      guidanceVi: (remaining) => `Quay lại mỗi ngày, còn ${remaining} ngày đăng nhập nữa là xong.`,
+      guidanceEn: (remaining) => `Come back daily; ${remaining} more logins to finish.`,
+    },
+    morning_greeting: {
+      unitVi: 'lời chào buổi sáng',
+      unitEn: 'morning greetings',
+      requirementVi: `Gửi ${count} lời chào buổi sáng`,
+      requirementEn: `Send ${count} morning greetings`,
+      ctaLabelVi: 'Đi chat',
+      ctaLabelEn: 'Go to chat',
+      ctaHref: '/chat',
+      guidanceVi: (remaining) => `Vào chat và gửi thêm ${remaining} lời chào buổi sáng thật ngọt ngào.`,
+      guidanceEn: (remaining) => `Open chat and send ${remaining} more sweet morning greetings.`,
+    },
+    goodnight_message: {
+      unitVi: 'lời chúc ngủ ngon',
+      unitEn: 'goodnight messages',
+      requirementVi: `Gửi ${count} lời chúc ngủ ngon`,
+      requirementEn: `Send ${count} goodnight messages`,
+      ctaLabelVi: 'Đi chat',
+      ctaLabelEn: 'Go to chat',
+      ctaHref: '/chat',
+      guidanceVi: (remaining) => `Vào chat và chúc cô ấy ngủ ngon thêm ${remaining} lần.`,
+      guidanceEn: (remaining) => `Open chat and send ${remaining} more goodnight messages.`,
+    },
+    romantic_message: {
+      unitVi: 'tin nhắn lãng mạn',
+      unitEn: 'romantic messages',
+      requirementVi: `Gửi ${count} tin nhắn lãng mạn`,
+      requirementEn: `Send ${count} romantic messages`,
+      ctaLabelVi: 'Đi chat',
+      ctaLabelEn: 'Go to chat',
+      ctaHref: '/chat',
+      guidanceVi: (remaining) => `Vào chat và gửi thêm ${remaining} tin nhắn lãng mạn cho cô ấy.`,
+      guidanceEn: (remaining) => `Open chat and send ${remaining} more romantic messages to her.`,
+    },
+    reach_level: {
+      unitVi: 'cấp',
+      unitEn: 'level',
+      requirementVi: `Đạt cấp ${count}`,
+      requirementEn: `Reach level ${count}`,
+      ctaLabelVi: 'Đi chat',
+      ctaLabelEn: 'Go to chat',
+      ctaHref: '/chat',
+      guidanceVi: (remaining) => `Tiếp tục trò chuyện để tăng thêm ${remaining} cấp.`,
+      guidanceEn: (remaining) => `Keep chatting to gain ${remaining} more levels.`,
+    },
+    reach_affection: {
+      unitVi: 'điểm thân mật',
+      unitEn: 'affection',
+      requirementVi: `Đạt ${count} thân mật`,
+      requirementEn: `Reach ${count} affection`,
+      ctaLabelVi: 'Đi chat',
+      ctaLabelEn: 'Go to chat',
+      ctaHref: '/chat',
+      guidanceVi: (remaining) => `Trò chuyện và tặng quà để tăng thêm ${remaining} điểm thân mật.`,
+      guidanceEn: (remaining) => `Chat and send gifts to gain ${remaining} more affection.`,
+    },
+  };
+
+  return copies[action] || fallback;
+}
+
+function questGuidancePayload(
+  quest: ArcWithQuests['quests'][number],
+  userQuest: ReturnType<typeof userProgressPayload>,
+  isStarted: boolean,
+  isCurrentQuest: boolean,
+  previousClaimed: boolean
+) {
+  const { action, count } = getQuestRequirement(quest.requirements);
+  const progress = Math.min(userQuest?.progress ?? 0, userQuest?.maxProgress ?? count);
+  const maxProgress = userQuest?.maxProgress || count;
+  const remaining = Math.max(0, maxProgress - progress);
+  const copy = actionCopy(action, maxProgress);
+  const lockReason = !isStarted
+    ? 'START_ARC_FIRST'
+    : !previousClaimed
+      ? 'COMPLETE_PREVIOUS_QUEST'
+      : null;
+  const ctaDisabled = !!lockReason || userQuest?.status === 'CLAIMED';
+  const progressTextVi = `${progress}/${maxProgress} ${copy.unitVi}${remaining > 0 ? `, còn ${remaining}` : ''}`;
+  const progressTextEn = `${progress}/${maxProgress} ${copy.unitEn}${remaining > 0 ? `, ${remaining} remaining` : ''}`;
+
+  return {
+    requirementText: {
+      vi: copy.requirementVi,
+      en: copy.requirementEn,
+    },
+    guidanceText: {
+      vi: remaining > 0 ? copy.guidanceVi(remaining) : 'Nhiệm vụ đã đủ tiến độ, nhận thưởng để tiếp tục hành trình.',
+      en: remaining > 0 ? copy.guidanceEn(remaining) : 'This quest is ready; claim the reward to continue your journey.',
+    },
+    progressText: {
+      vi: progressTextVi,
+      en: progressTextEn,
+    },
+    remaining,
+    cta: {
+      label: {
+        vi: copy.ctaLabelVi,
+        en: copy.ctaLabelEn,
+      },
+      href: copy.ctaHref,
+      disabled: ctaDisabled,
+    },
+    ctaLabel: {
+      vi: copy.ctaLabelVi,
+      en: copy.ctaLabelEn,
+    },
+    ctaHref: copy.ctaHref,
+    ctaDisabled,
+    lockReason,
+    statusReason: lockReason,
+    isCurrentQuest,
+  };
+}
+
 function userProgressPayload(userQuest?: {
   id: string;
   progress: number;
@@ -39,7 +209,16 @@ function userProgressPayload(userQuest?: {
   };
 }
 
-function questPayload(quest: ArcWithQuests['quests'][number], userQuest?: ReturnType<typeof userProgressPayload>) {
+function questPayload(
+  quest: ArcWithQuests['quests'][number],
+  userQuest: ReturnType<typeof userProgressPayload>,
+  options?: {
+    isStarted: boolean;
+    isCurrentQuest: boolean;
+    previousClaimed: boolean;
+  }
+) {
+  const target = getQuestTarget(quest.requirements);
   return {
     id: quest.id,
     title: quest.title,
@@ -54,9 +233,43 @@ function questPayload(quest: ArcWithQuests['quests'][number], userQuest?: Return
     rewardCoins: quest.rewardCoins,
     rewardGems: quest.rewardGems,
     rewardAffection: quest.rewardAffection,
-    target: getQuestTarget(quest.requirements),
+    target,
     userProgress: userQuest ?? null,
+    ...questGuidancePayload(
+      quest,
+      userQuest ?? null,
+      options?.isStarted ?? !!userQuest,
+      options?.isCurrentQuest ?? false,
+      options?.previousClaimed ?? true
+    ),
   };
+}
+
+function buildQuestPayloads(
+  quests: ArcWithQuests['quests'],
+  userQuestByQuestId: Map<string, Parameters<typeof userProgressPayload>[0]>,
+  isStarted: boolean
+) {
+  const claimedQuestIds = new Set(
+    Array.from(userQuestByQuestId.entries())
+      .filter(([, userQuest]) => userQuest?.status === 'CLAIMED')
+      .map(([questId]) => questId)
+  );
+  const currentQuest = quests.find((quest) => !claimedQuestIds.has(quest.id)) ?? null;
+
+  return quests.map((quest, index) => {
+    const previousQuest = index > 0 ? quests[index - 1] : null;
+    const previousClaimed = !previousQuest || claimedQuestIds.has(previousQuest.id);
+    return questPayload(
+      quest,
+      userProgressPayload(userQuestByQuestId.get(quest.id)),
+      {
+        isStarted,
+        isCurrentQuest: currentQuest?.id === quest.id,
+        previousClaimed,
+      }
+    );
+  });
 }
 
 async function getActiveCharacter(userId: string) {
@@ -153,10 +366,7 @@ export const arcService = {
           titleName: arc.rewardTitleName,
           sceneName: arc.rewardSceneName,
         },
-        quests: arc.quests.map((quest) => questPayload(
-          quest,
-          userProgressPayload(userQuestByQuestId.get(quest.id))
-        )),
+        quests: buildQuestPayloads(arc.quests, userQuestByQuestId, !!progress),
       };
     });
   },
@@ -213,10 +423,7 @@ export const arcService = {
         titleName: arc.rewardTitleName,
         sceneName: arc.rewardSceneName,
       },
-      quests: arc.quests.map((quest) => questPayload(
-        quest,
-        userProgressPayload(userQuestByQuestId.get(quest.id))
-      )),
+      quests: buildQuestPayloads(arc.quests, userQuestByQuestId, !!progress || userQuests.length > 0),
     };
   },
 

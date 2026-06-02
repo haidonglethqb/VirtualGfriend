@@ -1,25 +1,14 @@
 # Quests System
 
 ## Overview
-Quest system provides structured objectives for users to earn XP, coins, gems, and affection. Daily quests auto-start from game events; arc quests auto-start when the user starts an arc.
+Quests provide structured objectives for XP, coins, gems, and affection. Daily quests start from game events; arc quests start when the user starts an unlocked Arc.
 
-## Quest Types
-
-| Type | Description | Reset Cycle |
-|------|-------------|-------------|
-| `DAILY` | Everyday objectives (chat, greet, gift) | Daily |
-| `WEEKLY` | Longer-term objectives | Weekly |
-| `STORY` | Narrative and arc quests | One-time |
-| `ACHIEVEMENT` | Milestone-based objectives | Permanent |
-| `EVENT` | Time-limited seasonal quests | Event duration |
-| `RELATIONSHIP` | Bond-specific objectives | Per character |
-
-## Data Model
+## Quest Model
 
 ```prisma
 Quest {
-  id, type, title, description,
-  requirements: JSON,   // { action: "send_message", count: 10 }
+  id, title, description, type, category,
+  requirements,              // { action: "send_message", count: 10 }
   rewardXp, rewardCoins, rewardGems, rewardAffection,
   requiresPremium, minimumTier,
   arcId, isArcFinalQuest,
@@ -29,54 +18,50 @@ Quest {
 UserQuest {
   id, userId, questId,
   progress, maxProgress,
-  status: "IN_PROGRESS" | "COMPLETED" | "CLAIMED" | "EXPIRED",
+  status,                    // IN_PROGRESS, COMPLETED, CLAIMED, EXPIRED
   startedAt, completedAt, claimedAt
 }
 ```
 
-## Progress Flow
+## Arc Journey
+- Arcs are sequential and use `prerequisiteArcId`; the next Arc unlocks only after previous `ArcProgress.completedAt`.
+- `POST /api/arcs/:arcId/start` upserts all active quests in the Arc.
+- Completion percent is based on claimed Arc quests.
+- Non-final Arc quests auto-claim from game events.
+- `isArcFinalQuest=true` stays `COMPLETED` until the user manually claims it.
+- Arc completion reward is claimed separately after the final quest is claimed.
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant GameEvent
-    participant Quest
-    participant Arc
-    participant Character
+## Guidance Payload
+Arc quest responses include display-safe fields so the client can guide users without guessing:
 
-    User->>GameEvent: processAction(SEND_MESSAGE)
-    GameEvent->>Quest: update matching IN_PROGRESS quests
-    GameEvent->>Arc: sync reach_affection/reach_level quests
-    alt Non-final quest completed
-        GameEvent->>Quest: autoClaimQuest()
-        Quest->>Character: addExperience/updateAffection
-    else Final arc quest completed
-        GameEvent->>Quest: leave status COMPLETED
-    end
-    GameEvent->>Arc: update started arc progress
+```typescript
+ArcQuest {
+  requirementText: { vi, en },
+  guidanceText: { vi, en },
+  progressText: { vi, en },
+  remaining,
+  cta: { label: { vi, en }, href, disabled },
+  ctaLabel, ctaHref, ctaDisabled,
+  lockReason, statusReason,
+  isCurrentQuest
+}
 ```
 
-## Claiming
+Action mapping:
+- `send_message`, `morning_greeting`, `goodnight_message`, `romantic_message` -> `/chat`
+- `send_gift` -> `/shop`
+- `daily_login` -> `/dashboard`
+- `reach_level`, `reach_affection` -> `/chat`
 
-- Normal completed quests: auto-claimed by `gameEventService.autoClaimQuest()`.
-- Manual quest claim: `POST /api/quests/claim/:questId`.
-- Final arc quest: `POST /api/arcs/:arcId/quests/:questId/claim`.
-- Arc completion: `POST /api/arcs/:arcId/claim`, grants arc coins, gems, XP, affection, title, and scene once.
-- Quest API list/start/complete/claim endpoints exclude arc quests; arc quests must use Arc API so prerequisite order cannot be bypassed.
-
-## Arc Journey
-
-Seeded story arcs are sequential and FREE:
-`Làm Quen` -> `Xây Dựng Tình Bạn` -> `Rung Động` -> `Tình Yêu` -> `Mãi Bên Nhau`.
-
-Arc rules:
-- `POST /api/arcs/:arcId/start` upserts all active quests for that arc.
-- `prerequisiteArcId` blocks the next arc until the previous arc has `completedAt`.
-- Completion percent is based on claimed arc quests.
-- Only `isArcFinalQuest=true` requires manual user claim.
+## Endpoints
+- `GET /api/quests/*` - Non-arc quest list/start/complete/claim endpoints.
+- `GET /api/arcs` - Arc list with unlock state, progress, and quest summaries.
+- `GET /api/arcs/:arcId` - Arc detail with quest guidance metadata.
+- `POST /api/arcs/:arcId/start` - Auto-start Arc quests.
+- `POST /api/arcs/:arcId/quests/:questId/claim` - Claim final manual Arc quest.
+- `POST /api/arcs/:arcId/claim` - Claim once-only Arc completion rewards.
 
 ## Related
-
 - [Gifts & Shop](./gifts-shop.md)
 - [Levels & Affection](./levels-affection.md)
 - [Scenes](./scenes.md)

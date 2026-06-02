@@ -21,6 +21,7 @@ erDiagram
   User ||--o{ UserQuest : tracks
   User ||--o{ UserGift : owns
   User ||--o{ GiftHistory : sends
+  User ||--o{ VipGiftClaim : claims
   User ||--o{ Memory : keeps
   User ||--o{ UserAchievement : earns
   User ||--o{ Notification : receives
@@ -63,7 +64,7 @@ erDiagram
 | **Users & Auth** | User, UserSettings, RefreshToken, PasswordResetOTP, PasswordResetToken | Authentication and user profiles |
 | **Character** | Character, CharacterTemplate, CharacterFact, CharacterScene, RelationshipHistory | Virtual girlfriend system |
 | **Chat & Messages** | Message, ConversationSummary, AIPromptTemplate | AI chat with long-term memory |
-| **Gamification** | Quest, UserQuest, Gift, UserGift, GiftHistory, Scene, Memory, Achievement, UserAchievement, DailyReward | Game mechanics and rewards |
+| **Gamification** | Quest, UserQuest, Gift, UserGift, GiftHistory, VipGiftClaim, Scene, Memory, Achievement, UserAchievement, DailyReward | Game mechanics and rewards |
 | **Real-Time** | Conversation, ConversationMember, DirectMessage | User-to-user direct messaging |
 | **Payment** | Subscription, PaymentHistory | Stripe subscriptions and billing |
 | **Monitoring** | MonitoringEvent, MonitoringMetricRollup | Telemetry and analytics |

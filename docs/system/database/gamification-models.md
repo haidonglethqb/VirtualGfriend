@@ -127,7 +127,20 @@ model GiftHistory {
   reaction    String?  // AI's reaction
   createdAt   DateTime @default(now())
 }
+
+model VipGiftClaim {
+  id           String      @id @default(uuid())
+  userId       String
+  claimMonth   String      // UTC YYYY-MM
+  tier         PremiumTier // Claimed segment: BASIC, PRO, ULTIMATE
+  grantedGifts Json
+  claimedAt    DateTime    @default(now())
+
+  @@unique([userId, claimMonth, tier])
+}
 ```
+
+VIP monthly packs grant one claim segment per eligible tier. Upgrade in the same month grants only newly eligible segments.
 
 ### Rarity (5 tiers)
 

@@ -477,6 +477,8 @@ async function upsertGift(data: {
   priceGems?: number;
   affectionBonus?: number;
   unlockLevel?: number;
+  requiresPremium?: boolean;
+  minimumTier?: PremiumTier;
   sortOrder: number;
 }) {
   return prisma.gift.upsert({
@@ -490,6 +492,8 @@ async function upsertGift(data: {
       priceGems: data.priceGems || 0,
       affectionBonus: data.affectionBonus || 10,
       unlockLevel: data.unlockLevel || 1,
+      ...(data.requiresPremium !== undefined ? { requiresPremium: data.requiresPremium } : {}),
+      ...(data.minimumTier !== undefined ? { minimumTier: data.minimumTier } : {}),
       sortOrder: data.sortOrder,
     },
     create: {
@@ -498,6 +502,8 @@ async function upsertGift(data: {
       priceGems: data.priceGems || 0,
       affectionBonus: data.affectionBonus || 10,
       unlockLevel: data.unlockLevel || 1,
+      requiresPremium: data.requiresPremium ?? false,
+      minimumTier: data.minimumTier ?? 'FREE',
     },
   });
 }
@@ -1223,6 +1229,8 @@ async function main() {
     priceGems?: number;
     affectionBonus?: number;
     unlockLevel?: number;
+    requiresPremium?: boolean;
+    minimumTier?: PremiumTier;
     sortOrder: number;
   }> = [
     // Common gifts
@@ -1420,6 +1428,142 @@ async function main() {
       affectionBonus: 300,
       unlockLevel: 30,
       sortOrder: 15,
+    },
+    // VIP monthly pack gifts
+    {
+      name: 'Hoa Hồng Pha Lê',
+      description: 'Bông hồng pha lê lấp lánh dành riêng cho VIP Basic',
+      emoji: '🌹',
+      imageUrl: '/gifts/vip-crystal-rose.png',
+      category: 'flower',
+      rarity: 'RARE',
+      priceCoins: 0,
+      priceGems: 18,
+      affectionBonus: 35,
+      unlockLevel: 1,
+      requiresPremium: true,
+      minimumTier: 'BASIC',
+      sortOrder: 101,
+    },
+    {
+      name: 'Socola Hoàng Gia',
+      description: 'Hộp socola ngọt ngào dành riêng cho VIP Basic',
+      emoji: '🍫',
+      imageUrl: '/gifts/vip-royal-chocolate.png',
+      category: 'food',
+      rarity: 'RARE',
+      priceCoins: 0,
+      priceGems: 22,
+      affectionBonus: 40,
+      unlockLevel: 1,
+      requiresPremium: true,
+      minimumTier: 'BASIC',
+      sortOrder: 102,
+    },
+    {
+      name: 'Gấu Bông VIP',
+      description: 'Gấu bông phiên bản VIP ôm vào là thấy ấm áp',
+      emoji: '🧸',
+      imageUrl: '/gifts/vip-teddy.png',
+      category: 'toy',
+      rarity: 'RARE',
+      priceCoins: 0,
+      priceGems: 25,
+      affectionBonus: 45,
+      unlockLevel: 1,
+      requiresPremium: true,
+      minimumTier: 'BASIC',
+      sortOrder: 103,
+    },
+    {
+      name: 'Vòng Tay Ánh Sao',
+      description: 'Vòng tay ánh sao dành cho những khoảnh khắc thân mật hơn',
+      emoji: '💫',
+      imageUrl: '/gifts/vip-star-bracelet.png',
+      category: 'jewelry',
+      rarity: 'EPIC',
+      priceCoins: 0,
+      priceGems: 60,
+      affectionBonus: 75,
+      unlockLevel: 1,
+      requiresPremium: true,
+      minimumTier: 'PRO',
+      sortOrder: 111,
+    },
+    {
+      name: 'Hộp Nhạc Kỷ Niệm',
+      description: 'Hộp nhạc lưu lại giai điệu riêng của hai người',
+      emoji: '🎵',
+      imageUrl: '/gifts/vip-memory-music-box.png',
+      category: 'special',
+      rarity: 'EPIC',
+      priceCoins: 0,
+      priceGems: 70,
+      affectionBonus: 85,
+      unlockLevel: 1,
+      requiresPremium: true,
+      minimumTier: 'PRO',
+      sortOrder: 112,
+    },
+    {
+      name: 'Bữa Tối Ánh Nến',
+      description: 'Một buổi tối ánh nến lãng mạn dành riêng cho VIP Pro',
+      emoji: '🕯️',
+      imageUrl: '/gifts/vip-candle-dinner.png',
+      category: 'special',
+      rarity: 'EPIC',
+      priceCoins: 0,
+      priceGems: 80,
+      affectionBonus: 95,
+      unlockLevel: 1,
+      requiresPremium: true,
+      minimumTier: 'PRO',
+      sortOrder: 113,
+    },
+    {
+      name: 'Nhẫn Kim Cương Vĩnh Cửu',
+      description: 'Biểu tượng tình yêu vĩnh cửu dành riêng cho VIP Ultimate',
+      emoji: '💍',
+      imageUrl: '/gifts/vip-eternal-ring.png',
+      category: 'jewelry',
+      rarity: 'LEGENDARY',
+      priceCoins: 0,
+      priceGems: 150,
+      affectionBonus: 160,
+      unlockLevel: 1,
+      requiresPremium: true,
+      minimumTier: 'ULTIMATE',
+      sortOrder: 121,
+    },
+    {
+      name: 'Kỳ Nghỉ Thiên Đường',
+      description: 'Chuyến nghỉ dưỡng trong mơ dành riêng cho VIP Ultimate',
+      emoji: '🏝️',
+      imageUrl: '/gifts/vip-paradise-trip.png',
+      category: 'special',
+      rarity: 'LEGENDARY',
+      priceCoins: 0,
+      priceGems: 180,
+      affectionBonus: 190,
+      unlockLevel: 1,
+      requiresPremium: true,
+      minimumTier: 'ULTIMATE',
+      sortOrder: 122,
+    },
+    {
+      name: 'Ngôi Sao Mang Tên Em',
+      description: 'Một ngôi sao chỉ dành cho cô ấy trong hành trình của bạn',
+      emoji: '⭐',
+      imageUrl: '/gifts/vip-named-star.png',
+      category: 'special',
+      rarity: 'LEGENDARY',
+      priceCoins: 0,
+      priceGems: 220,
+      affectionBonus: 230,
+      unlockLevel: 1,
+      requiresPremium: true,
+      minimumTier: 'ULTIMATE',
+      sortOrder: 123,
     },
   ];
   for (const gift of giftsData) {

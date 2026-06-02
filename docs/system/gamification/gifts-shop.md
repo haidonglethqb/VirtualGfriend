@@ -1,86 +1,63 @@
 # Gifts & Shop System
 
 ## Overview
-Shop catalog with 5 rarity tiers. Users buy gifts with coins or gems, then send to their character for AI-generated reactions and affection boosts.
+Users buy gifts with coins/gems, store them in inventory, then send them to a character for affection and AI reactions. VIP tiers also get a monthly claimable gift pack with exact gift preview.
 
-## Rarity Tiers
-
-| Tier | Price Range | Affection Bonus |
-|------|-------------|-----------------|
-| Common | 50-200 coins | +1-5 |
-| Uncommon | 200-500 coins | +5-15 |
-| Rare | 500-1000 coins / 10-30 gems | +15-30 |
-| Epic | 30-80 gems | +30-60 |
-| Legendary | 80-200 gems | +60-100 |
-
-## Gift Properties
-
-```typescript
-Gift {
-  id, name, emoji, description,
-  category: string,        // "flowers", "jewelry", "food", etc.
-  rarity: "COMMON" | "UNCOMMON" | "RARE" | "EPIC" | "LEGENDARY",
-  priceCoins, priceGems,
-  affectionBonus,          // Amount added on send
-  requiresPremium, minimumTier,  // Premium gating
-  isActive, sortOrder
-}
-```
+## Gift Rules
+- Catalog gifts can be gated by `requiresPremium` and `minimumTier`.
+- `GET /api/gifts` and `/api/shop` return lock metadata: `isLocked`, `canBuy`, `requiredTier`, `lockReason`.
+- FREE users can see locked VIP gifts in the shop but cannot buy, claim, or send them.
+- Buy and send still enforce tier access server-side; UI locks are only presentation.
 
 ## Data Model
 
 ```prisma
+Gift {
+  id, name, emoji, description, imageUrl,
+  category, rarity,
+  requiresPremium, minimumTier,
+  priceCoins, priceGems, affectionBonus,
+  unlockLevel, isLimited, availableFrom, availableUntil,
+  sortOrder, isActive
+}
+
 UserGift {
-  id, userId, giftId, quantity  // Inventory
+  id, userId, giftId, quantity
 }
 
 GiftHistory {
   id, userId, characterId, giftId,
   message, reaction, createdAt
 }
+
+VipGiftClaim {
+  id, userId, claimMonth, tier,
+  grantedGifts, claimedAt
+}
 ```
 
-## Buy & Send Flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant GiftService
-    participant DB
-    participant AIService
-    participant CharacterService
-    participant GameEvent
-
-    User->>GiftService: buyGift(giftId, qty, coins|gems)
-    GiftService->>DB: Check balance, deduct currency
-    GiftService->>DB: Upsert UserGift (quantity += qty)
-    GiftService-->>User: Return purchase confirmation
-
-    User->>GiftService: sendGift(characterId, giftId, message?)
-    GiftService->>DB: Decrement UserGift quantity
-    GiftService->>AIService: Generate reaction (personality-aware)
-    AIService-->>GiftService: reaction text
-    GiftService->>DB: Create GiftHistory record
-    GiftService->>DB: Create SYSTEM + AI messages
-    GiftService->>CharacterService: updateAffection(+bonus)
-    GiftService->>GameEvent: processAction(SEND_GIFT)
-    GiftService-->>User: Return { reaction, affectionGained, questsCompleted }
-```
-
-## AI Gift Reaction
-- Groq generates personality-aware response in 1-2 Vietnamese sentences
-- Falls back to: `"Wow, {name} luôn hả? Cảm ơn nhiều nha 💕"`
-- Reaction saved as `GiftHistory.reaction` + auto-message in chat
+## VIP Monthly Pack
+- `claimMonth` uses UTC `YYYY-MM`; unclaimed packs do not roll over.
+- BASIC can claim the BASIC segment.
+- PRO can claim BASIC + PRO.
+- ULTIMATE can claim BASIC + PRO + ULTIMATE.
+- Unique `[userId, claimMonth, tier]` prevents duplicate segment claims.
+- Upgrading mid-month grants only newly eligible segments; downgrading does not remove inventory or claim records.
+- Claimed gifts are upserted into `UserGift` and increment quantity if already owned.
 
 ## Endpoints
-- `GET /api/gifts/` — List all active gifts (cached 1hr)
-- `GET /api/gifts/inventory` — User's gift inventory
-- `POST /api/gifts/buy` — Purchase with coins or gems
-- `POST /api/gifts/send` — Send to character
-- `GET /api/gifts/history?page=&limit=` — Paginated history
+- `GET /api/gifts` / `GET /api/shop` - Gift catalog with lock metadata.
+- `GET /api/gifts/inventory` - User gift inventory.
+- `POST /api/gifts/buy` - Buy with coins/gems using atomic balance debit.
+- `POST /api/gifts/send` - Send inventory gift to active/specified character.
+- `GET /api/gifts/history?page=&limit=` - Paginated gift history.
+- `GET /api/gifts/vip-pack/status` - VIP pack preview, claimed segments, countdown.
+- `POST /api/gifts/vip-pack/claim` - Claim unclaimed eligible tier segments.
+
+`/api/shop/*` is an alias for the same gift routes.
 
 ## Related
 - [Quests](./quests.md)
 - [Levels & Affection](./levels-affection.md)
-- [Scenes](./scenes.md)
+- [Premium Gating](../authentication/premium-gating.md)
 - Source: `server/src/modules/gift/`

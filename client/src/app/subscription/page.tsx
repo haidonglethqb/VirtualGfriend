@@ -12,6 +12,7 @@ import { usePremiumStore } from '@/store/premium-store';
 import { type PremiumTier, type PremiumFeatures } from '@/lib/premium';
 import api from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
+import { VipGiftPackCard } from '@/components/vip-gift-pack-card';
 
 interface PricingTier {
   monthlyPrice: number;
@@ -259,6 +260,10 @@ export default function SubscriptionPage() {
                 </div>
               </div>
             </motion.div>
+
+            <div className="mb-8">
+              <VipGiftPackCard onClaimed={refreshSubscriptionData} />
+            </div>
 
             {/* Billing Cycle Toggle */}
             <div className="flex items-center justify-center gap-3 mb-6">

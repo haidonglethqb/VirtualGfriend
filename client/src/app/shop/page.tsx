@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Gift, Star, Heart, ShoppingBag,
-  Sparkles, Clock, Check, X, Loader2,
-  Flower2, UtensilsCrossed, Gem, Gamepad2,
+  Sparkles, Check, X, Loader2,
+  Flower2, UtensilsCrossed, Gem, Gamepad2, Crown, Lock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,8 +18,9 @@ import { useCharacterStore } from '@/store/character-store';
 import { useLanguageStore } from '@/store/language-store';
 import { useToast } from '@/hooks/use-toast';
 import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
+import { VipGiftPackCard } from '@/components/vip-gift-pack-card';
 import { formatNumber } from '@/lib/utils';
-import api from '@/services/api';
+import api, { type PremiumTierName } from '@/services/api';
 
 const SHOP_I18N = {
   vi: {
@@ -108,6 +109,12 @@ interface ShopItem {
   affectionBonus: number;
   rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'EPIC' | 'LEGENDARY';
   category: 'flower' | 'food' | 'jewelry' | 'toy' | 'special';
+  requiresPremium: boolean;
+  minimumTier: PremiumTierName;
+  requiredTier: PremiumTierName;
+  isLocked: boolean;
+  canBuy: boolean;
+  lockReason: 'VIP_REQUIRED' | 'TIER_REQUIRED' | null;
 }
 
 const rarityColors = {
@@ -160,6 +167,16 @@ export default function ShopPage() {
     void fetchShopItems();
     fetchCharacter();
   }, [fetchCharacter, fetchShopItems, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!selectedItem) return;
+    if (paymentMethod === 'coins' && selectedItem.priceCoins <= 0 && selectedItem.priceGems > 0) {
+      setPaymentMethod('gems');
+    }
+    if (paymentMethod === 'gems' && selectedItem.priceGems <= 0 && selectedItem.priceCoins > 0) {
+      setPaymentMethod('coins');
+    }
+  }, [paymentMethod, selectedItem]);
 
   const filteredItems = activeTab === 'all' 
     ? items 
@@ -256,6 +273,8 @@ export default function ShopPage() {
           </div>
         </div>
 
+        <VipGiftPackCard compact onClaimed={fetchShopItems} />
+
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-love" />
@@ -286,10 +305,18 @@ export default function ShopPage() {
                     <Card 
                       className={`glass cursor-pointer hover:shadow-love transition-all border-2 ${
                         rarityColors[item.rarity]
-                      } ${selectedItem?.id === item.id ? 'ring-2 ring-love' : ''}`}
+                      } ${selectedItem?.id === item.id ? 'ring-2 ring-love' : ''} ${item.isLocked ? 'opacity-80' : ''}`}
                       onClick={() => setSelectedItem(item)}
                     >
                       <CardContent className="p-4 text-center">
+                        {item.requiresPremium && (
+                          <div className="mb-2 flex justify-center">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 text-[11px] font-semibold text-amber-200">
+                              {item.isLocked ? <Lock className="h-3 w-3" /> : <Crown className="h-3 w-3" />}
+                              VIP {item.requiredTier}
+                            </span>
+                          </div>
+                        )}
                         <div className="mb-3 flex justify-center">
                           <EmojiSvgIcon emoji={item.emoji} className="w-12 h-12" />
                         </div>
@@ -325,6 +352,11 @@ export default function ShopPage() {
                         }`}>
                           {t.rarity[item.rarity]}
                         </div>
+                        {item.isLocked && (
+                          <p className="mt-2 text-[11px] font-medium text-amber-200">
+                            {language === 'vi' ? 'Cần' : 'Requires'} VIP {item.requiredTier}
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
                   </motion.div>
@@ -390,6 +422,14 @@ export default function ShopPage() {
                     </div>
                     <h3 className="text-xl font-bold mb-2">{selectedItem.name}</h3>
                     <p className="text-[#ba9cab] mb-4">{selectedItem.description}</p>
+                    {selectedItem.isLocked && (
+                      <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
+                        <div className="flex items-center justify-center gap-2">
+                          <Lock className="h-4 w-4" />
+                          <span>{language === 'vi' ? 'Cần' : 'Requires'} VIP {selectedItem.requiredTier}</span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-center gap-4 mb-4">
                       <div className="text-center">
@@ -435,10 +475,20 @@ export default function ShopPage() {
                       const price = paymentMethod === 'coins' ? selectedItem.priceCoins : selectedItem.priceGems;
                       const balance = paymentMethod === 'coins' ? (user?.coins || 0) : (user?.gems || 0);
                       const insufficientFunds = balance < price;
+                      const invalidPaymentMethod = price <= 0;
                       
                       return (
                         <>
-                          {insufficientFunds && (
+                          {selectedItem.isLocked && (
+                            <Link href="/subscription">
+                              <button className="mb-3 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-amber-500 font-bold text-black transition-all hover:bg-amber-400">
+                                <Crown className="h-4 w-4" />
+                                {language === 'vi' ? 'Nâng cấp để mở khóa' : 'Upgrade to unlock'}
+                              </button>
+                            </Link>
+                          )}
+
+                          {insufficientFunds && !selectedItem.isLocked && (
                             <p className="text-red-400 text-sm mb-4">
                               {t.insufficientFundsDesc} {paymentMethod === 'coins' ? t.coins : t.gems} {t.insufficientFundsDescEnd}
                             </p>
@@ -447,7 +497,7 @@ export default function ShopPage() {
                           <button
                             className="w-full h-12 rounded-full bg-love hover:bg-love/90 text-white font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={handlePurchase}
-                            disabled={isPurchasing || insufficientFunds}
+                            disabled={isPurchasing || insufficientFunds || selectedItem.isLocked || invalidPaymentMethod}
                           >
                             {isPurchasing ? (
                               <>
