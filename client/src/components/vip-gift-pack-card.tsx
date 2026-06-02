@@ -58,7 +58,7 @@ export function VipGiftPackCard({ compact = false, onClaimed }: VipGiftPackCardP
     if (!status?.isEligible) return isVi ? 'Nâng cấp VIP' : 'Upgrade VIP';
     if (!status.canClaim) return isVi ? 'Đã nhận hết' : 'Claimed';
     if (status.claimedSegments.length > 0) return isVi ? 'Nhận quà nâng cấp' : 'Claim upgrade gifts';
-    return 'Claim';
+    return isVi ? 'Nhận quà' : 'Claim';
   }, [isVi, status]);
 
   async function handleClaim() {
@@ -70,7 +70,7 @@ export function VipGiftPackCard({ compact = false, onClaimed }: VipGiftPackCardP
       if (response.success) {
         toast({
           title: isVi ? 'Đã nhận quà VIP' : 'VIP gifts claimed',
-          description: isVi ? 'Quà đã được thêm vào túi đồ của bạn.' : 'Your gifts were added to inventory.',
+          description: isVi ? 'Quà đã được trao hoặc lưu vào kho của bạn.' : 'Your gifts were delivered or saved to inventory.',
         });
         await fetchStatus();
         onClaimed?.();
@@ -150,41 +150,59 @@ export function VipGiftPackCard({ compact = false, onClaimed }: VipGiftPackCardP
         </div>
       </div>
 
+      {status.configWarnings && status.configWarnings.length > 0 && (
+        <div className="mt-4 rounded-xl border border-red-300/25 bg-red-300/10 p-3 text-sm text-red-200">
+          {status.configWarnings[0].message}
+        </div>
+      )}
+
       <div className={`mt-4 grid gap-3 ${compact ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-        {status.packPreview.map((item) => (
-          <div
-            key={item.segment}
-            className={`rounded-xl border p-3 ${
-              item.isClaimable
-                ? 'border-amber-300/35 bg-amber-300/10'
-                : item.claimedAt
-                  ? 'border-green-300/25 bg-green-300/10'
-                  : 'border-white/10 bg-white/[0.035]'
-            }`}
-          >
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-amber-200">
-                VIP {segmentLabel(item.segment)}
-              </span>
-              {item.claimedAt && <Check className="h-4 w-4 text-green-300" />}
-            </div>
-            {item.gift ? (
-              <div className="flex items-center gap-3">
-                <EmojiSvgIcon emoji={item.gift.emoji} className="h-9 w-9 flex-shrink-0" />
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-white">{item.gift.name}</div>
-                  <div className="text-xs text-[#ba9cab]">
-                    +{item.gift.affectionBonus} affection · x{item.quantity}
-                  </div>
-                </div>
+        {status.packPreview.map((segment) => {
+          const packItems = segment.items?.length
+            ? segment.items
+            : segment.gift
+              ? [{ gift: segment.gift, quantity: segment.quantity }]
+              : [];
+
+          return (
+            <div
+              key={segment.segment}
+              className={`rounded-xl border p-3 ${
+                segment.isClaimable
+                  ? 'border-amber-300/35 bg-amber-300/10'
+                  : segment.claimedAt
+                    ? 'border-green-300/25 bg-green-300/10'
+                    : 'border-white/10 bg-white/[0.035]'
+              }`}
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-amber-200">
+                  VIP {segmentLabel(segment.segment)}
+                </span>
+                {segment.claimedAt && <Check className="h-4 w-4 text-green-300" />}
               </div>
-            ) : (
-              <p className="text-sm text-red-300">
-                {isVi ? 'Quà chưa được cấu hình' : 'Gift is not configured'}
-              </p>
-            )}
-          </div>
-        ))}
+              {packItems.length > 0 ? (
+                <div className="space-y-2">
+                  {packItems.map((item) => (
+                    <div key={item.gift.id} className="flex items-center gap-3">
+                      <EmojiSvgIcon emoji={item.gift.emoji} className="h-9 w-9 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-white">{item.gift.name}</div>
+                        <div className="text-xs text-[#ba9cab]">
+                          +{item.gift.affectionBonus} affection · x{item.quantity}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-red-300">
+                  {isVi ? 'Quà chưa được cấu hình' : 'Gift is not configured'}
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

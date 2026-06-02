@@ -27,12 +27,24 @@ UserGift {
 
 GiftHistory {
   id, userId, characterId, giftId,
-  message, reaction, createdAt
+  message, reaction,
+  quantity, source, sourceRefId,
+  createdAt
 }
 
 VipGiftClaim {
   id, userId, claimMonth, tier,
   grantedGifts, claimedAt
+}
+
+VipGiftPackSegment {
+  id, segmentTier, displayName, description,
+  isActive, sortOrder
+}
+
+VipGiftPackItem {
+  id, segmentId, giftId, quantity,
+  isActive, sortOrder
 }
 ```
 
@@ -43,7 +55,15 @@ VipGiftClaim {
 - ULTIMATE can claim BASIC + PRO + ULTIMATE.
 - Unique `[userId, claimMonth, tier]` prevents duplicate segment claims.
 - Upgrading mid-month grants only newly eligible segments; downgrading does not remove inventory or claim records.
-- Claimed gifts are upserted into `UserGift` and increment quantity if already owned.
+- Pack content is admin-configured in `VipGiftPackSegment` + `VipGiftPackItem`, not hardcoded in `gift.service.ts`.
+- Status returns `packPreview[].items[]`, `configWarnings`, claimed segments, claimable segments, and countdown.
+- Claim uses the shared reward grant service. If the user has an active character, gifts are written as silent `GiftHistory` rows (`source=VIP_PACK`) without chat messages, AI reaction, or `SEND_GIFT` quest progress. Without an active character, gifts fall back to `UserGift` inventory.
+- `VipGiftClaim.grantedGifts` stores the exact granted items for audit even if admin changes the pack later.
+
+## Admin Gift Pack
+- `GET /api/admin/vip-gift-pack` returns BASIC/PRO/ULTIMATE segments with concrete items.
+- `PUT /api/admin/vip-gift-pack` saves segment metadata and item lists.
+- `GET /api/admin/gift-catalog` is the gift picker endpoint; `/api/admin/gifts` remains gift history.
 
 ## Endpoints
 - `GET /api/gifts` / `GET /api/shop` - Gift catalog with lock metadata.

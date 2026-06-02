@@ -1571,6 +1571,42 @@ async function main() {
   }
   console.log(`[Seed] Upserted ${giftsData.length} gifts`);
 
+  const vipPackDefaults = [
+    { segmentTier: 'BASIC' as const, displayName: 'VIP Basic Monthly Pack', description: 'Qua thang danh cho VIP Basic', sortOrder: 1, giftSortOrders: [101, 102, 103] },
+    { segmentTier: 'PRO' as const, displayName: 'VIP Pro Monthly Pack', description: 'Qua nang cap danh cho VIP Pro', sortOrder: 2, giftSortOrders: [111, 112, 113] },
+    { segmentTier: 'ULTIMATE' as const, displayName: 'VIP Ultimate Monthly Pack', description: 'Qua cao cap danh cho VIP Ultimate', sortOrder: 3, giftSortOrders: [121, 122, 123] },
+  ];
+
+  for (const segment of vipPackDefaults) {
+    const existingSegment = await prisma.vipGiftPackSegment.findUnique({
+      where: { segmentTier: segment.segmentTier },
+    });
+
+    if (existingSegment) continue;
+
+    const gifts = await prisma.gift.findMany({
+      where: { sortOrder: { in: segment.giftSortOrders }, requiresPremium: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    await prisma.vipGiftPackSegment.create({
+      data: {
+        segmentTier: segment.segmentTier,
+        displayName: segment.displayName,
+        description: segment.description,
+        sortOrder: segment.sortOrder,
+        items: {
+          create: gifts.map((gift, index) => ({
+            giftId: gift.id,
+            quantity: segment.segmentTier === 'ULTIMATE' ? 2 : 1,
+            sortOrder: index + 1,
+          })),
+        },
+      },
+    });
+  }
+  console.log('[Seed] Ensured VIP monthly gift pack segments');
+
   // ============================================
   // AI TEMPLATES - Using upsert (safe)
   // ============================================

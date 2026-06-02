@@ -3,6 +3,7 @@ import { cache, CacheKeys, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { characterService } from '../character/character.service';
 import { getTierConfig } from '../admin/tier-config.service';
+import { applyCharacterRewardEffects, grantRewards } from '../reward/reward-grant.service';
 
 function isArcQuest(quest: { arcId?: string | null; category?: string | null }) {
   return !!quest.arcId || quest.category === 'arc';
@@ -18,12 +19,39 @@ function assertNotArcQuest(quest: { arcId?: string | null; category?: string | n
   }
 }
 
+function giftRewardPayload(
+  rewards?: Array<{ giftId: string; quantity: number; gift?: { id: string; name: string; emoji: string; imageUrl: string; rarity: string } }>
+) {
+  return (rewards || []).map((reward) => ({
+    giftId: reward.giftId,
+    quantity: reward.quantity,
+    gift: reward.gift || null,
+  }));
+}
+
+function rewardSummary(quest: {
+  rewardCoins: number;
+  rewardGems: number;
+  rewardXp: number;
+  rewardAffection: number;
+  giftRewards?: Array<{ quantity: number; gift?: { id: string; name: string; emoji: string; imageUrl: string; rarity: string } }>;
+}) {
+  return {
+    coins: quest.rewardCoins,
+    gems: quest.rewardGems,
+    xp: quest.rewardXp,
+    affection: quest.rewardAffection,
+    gifts: giftRewardPayload(quest.giftRewards as any),
+  };
+}
+
 export const questService = {
   async getAllQuests() {
     const allQuests = await cache.getOrSet(
       CacheKeys.quests(),
       () => prisma.quest.findMany({
         where: { isActive: true },
+        include: { giftRewards: { include: { gift: true }, orderBy: { sortOrder: 'asc' } } },
         orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
       }),
       CacheTTL.QUESTS
@@ -56,6 +84,8 @@ export const questService = {
       const requirements = quest.requirements as { count?: number; action?: string };
       return {
         ...quest,
+        giftRewards: giftRewardPayload((quest as any).giftRewards),
+        rewardSummary: rewardSummary(quest as any),
         userProgress: userProgress
           ? {
               id: userProgress.id,
@@ -98,6 +128,7 @@ export const questService = {
         arcId: null,
         NOT: { category: 'arc' },
       },
+      include: { giftRewards: { include: { gift: true }, orderBy: { sortOrder: 'asc' } } },
     });
 
     // Get user's progress on daily quests
@@ -115,6 +146,8 @@ export const questService = {
       const userProgress = userQuestMap.get(quest.id);
       return {
         ...quest,
+        giftRewards: giftRewardPayload((quest as any).giftRewards),
+        rewardSummary: rewardSummary(quest as any),
         userProgress: userProgress
           ? {
               id: userProgress.id,
@@ -227,6 +260,78 @@ export const questService = {
     }
     assertNotArcQuest(questForAccess);
 
+    const { quest, grantResult } = await prisma.$transaction(async (tx) => {
+      const updated = await tx.userQuest.updateMany({
+        where: { userId, questId, status: 'COMPLETED' },
+        data: { status: 'CLAIMED', claimedAt: new Date() },
+      });
+
+      if (updated.count === 0) {
+        const userQuest = await tx.userQuest.findFirst({
+          where: { userId, questId },
+          include: { quest: true },
+        });
+
+        if (!userQuest) {
+          throw new AppError('Quest not found', 404, 'QUEST_NOT_FOUND');
+        }
+        assertNotArcQuest(userQuest.quest);
+        if (userQuest.status === 'CLAIMED') {
+          throw new AppError('Reward already claimed', 400, 'REWARD_ALREADY_CLAIMED');
+        }
+        throw new AppError('Quest not completed', 400, 'QUEST_NOT_COMPLETED');
+      }
+
+      const userQuest = await tx.userQuest.findFirst({
+        where: { userId, questId },
+        include: {
+          quest: {
+            include: {
+              giftRewards: { include: { gift: true }, orderBy: { sortOrder: 'asc' } },
+            },
+          },
+        },
+      });
+
+      if (!userQuest) {
+        throw new AppError('Quest not found', 404, 'QUEST_NOT_FOUND');
+      }
+      assertNotArcQuest(userQuest.quest);
+
+      const quest = userQuest.quest;
+      const grantResult = await grantRewards({
+        userId,
+        coins: quest.rewardCoins,
+        gems: quest.rewardGems,
+        xp: quest.rewardXp,
+        affection: quest.rewardAffection,
+        gifts: giftRewardPayload(quest.giftRewards),
+        source: 'QUEST_REWARD',
+        sourceRefId: quest.id,
+        notificationTitle: 'Phan thuong nhiem vu',
+        message: `Ban da nhan thuong tu nhiem vu "${quest.title}".`,
+      }, tx);
+
+      return { quest, grantResult };
+    });
+
+    await applyCharacterRewardEffects(userId, grantResult);
+
+    return {
+      claimed: true,
+      rewards: {
+        coins: quest.rewardCoins,
+        gems: quest.rewardGems,
+        xp: quest.rewardXp,
+        affection: quest.rewardAffection,
+        items: quest.rewardItems,
+        gifts: giftRewardPayload(quest.giftRewards),
+        rewardSummary: rewardSummary(quest),
+      },
+    };
+
+/*
+    {
     // Atomic update: only transition COMPLETED -> CLAIMED
     const updated = await prisma.userQuest.updateMany({
       where: { userId, questId, status: 'COMPLETED' },
@@ -295,6 +400,8 @@ export const questService = {
         items: quest.rewardItems,
       },
     };
+    }
+*/
   },
 
   async updateQuestProgress(userId: string, action: string, increment: number = 1) {

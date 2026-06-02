@@ -9,6 +9,7 @@ import { cache, CacheKeys } from '../../lib/redis';
 import { questService } from '../quest/quest.service';
 import { characterService } from '../character/character.service';
 import { createModuleLogger } from '../../lib/logger';
+import { applyCharacterRewardEffects, grantRewards } from '../reward/reward-grant.service';
 
 const log = createModuleLogger('GameEvent');
 
@@ -382,6 +383,64 @@ export const gameEventService = {
       return;
     }
 
+    const claimResult = await prisma.$transaction(async (tx) => {
+      const updated = await tx.userQuest.updateMany({
+        where: { userId, questId, status: 'COMPLETED' },
+        data: { status: 'CLAIMED', claimedAt: new Date() },
+      });
+
+      if (updated.count === 0) {
+        return null;
+      }
+
+      const userQuest = await tx.userQuest.findFirst({
+        where: { userId, questId },
+        include: {
+          quest: {
+            include: {
+              giftRewards: { include: { gift: true }, orderBy: { sortOrder: 'asc' } },
+            },
+          },
+        },
+      });
+
+      if (!userQuest) {
+        return null;
+      }
+
+      const quest = userQuest.quest;
+      const grantResult = await grantRewards({
+        userId,
+        coins: quest.rewardCoins,
+        gems: quest.rewardGems,
+        xp: quest.rewardXp,
+        affection: quest.rewardAffection,
+        gifts: quest.giftRewards.map((reward) => ({ giftId: reward.giftId, quantity: reward.quantity })),
+        source: 'QUEST_REWARD',
+        sourceRefId: quest.id,
+        notificationTitle: 'Phan thuong nhiem vu',
+        message: `Ban da nhan thuong tu nhiem vu "${quest.title}".`,
+      }, tx);
+
+      return { quest, grantResult };
+    });
+
+    if (!claimResult) {
+      return;
+    }
+
+    await applyCharacterRewardEffects(userId, claimResult.grantResult);
+
+    await this.processAction({
+      userId,
+      characterId: claimResult.grantResult.characterId || undefined,
+      action: 'COMPLETE_QUEST',
+      metadata: { questId, questType: claimResult.quest.type },
+    }, _depth + 1);
+
+    return;
+
+/*
     // Atomic update: only transition COMPLETED -> CLAIMED, prevents double-claim
     const updated = await prisma.userQuest.updateMany({
       where: { userId, questId, status: 'COMPLETED' },
@@ -433,6 +492,7 @@ export const gameEventService = {
       action: 'COMPLETE_QUEST',
       metadata: { questId, questType: quest.type },
     }, _depth + 1);
+*/
   },
 
   /**

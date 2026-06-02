@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
-import { DatingPreference, PremiumTier, Prisma, UserGender } from '@prisma/client';
+import { DatingPreference, PremiumTier, Prisma, QuestType, UserGender } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { cache, CacheKeys } from '../../lib/redis';
 import { AdminRequest, verifyAdminPassword, generateAdminToken, isAdminUsername, isAdminConfigured } from './admin.middleware';
 import { io } from '../../index';
 import { templateService } from '../character/template.service';
+import { applyCharacterRewardEffects, grantRewards } from '../reward/reward-grant.service';
 
 const MIN_BROADCAST_DURATION_MS = 1000;
 const MAX_BROADCAST_DURATION_MS = 60000;
@@ -15,7 +17,18 @@ const PREMIUM_TIERS = Object.values(PremiumTier);
 const USER_GENDERS = Object.values(UserGender);
 const DATING_PREFERENCES = Object.values(DatingPreference);
 type AdminTargetType = 'all' | 'free' | 'premium' | 'tier' | 'selected_users';
-type AdminTarget = { type: AdminTargetType; tiers?: PremiumTier[]; userIds?: string[] };
+type AdminTarget = {
+  type: AdminTargetType;
+  tiers?: PremiumTier[];
+  userIds?: string[];
+  createdAfter?: Date;
+  createdBefore?: Date;
+  lastActiveAfter?: Date;
+  lastActiveBefore?: Date;
+  minStreak?: number;
+  minLevel?: number;
+  hasActiveCharacter?: boolean;
+};
 
 function parseTemplateGender(value: unknown): TemplateGender | null {
   const normalized = String(value || '').trim() as TemplateGender;
@@ -46,6 +59,40 @@ function parseNonNegativeInt(value: unknown, field: string, errors: string[]): n
   return parsed;
 }
 
+function parseBool(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return undefined;
+}
+
+function parseDate(value: unknown): Date | undefined {
+  if (!value) return undefined;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function parseOptionalPositiveInt(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) return undefined;
+  return Math.floor(parsed);
+}
+
+function normalizeGiftRewards(input: unknown) {
+  if (!Array.isArray(input)) return [];
+  const byGift = new Map<string, number>();
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue;
+    const item = raw as Record<string, unknown>;
+    const giftId = String(item.giftId || '').trim();
+    const quantity = parsePositiveInt(item.quantity);
+    if (!giftId || quantity <= 0) continue;
+    byGift.set(giftId, (byGift.get(giftId) || 0) + quantity);
+  }
+  return Array.from(byGift.entries()).map(([giftId, quantity], index) => ({ giftId, quantity, sortOrder: index + 1 }));
+}
+
 function normalizeAdminTarget(body: Record<string, unknown>): AdminTarget {
   const rawTarget = body.target && typeof body.target === 'object' ? body.target as Record<string, unknown> : null;
   const legacyTarget = String(body.targetFilter || 'all');
@@ -61,23 +108,68 @@ function normalizeAdminTarget(body: Record<string, unknown>): AdminTarget {
     ? rawTarget.userIds.map((id) => String(id).trim()).filter(Boolean)
     : [];
 
-  return { type, tiers, userIds };
+  return {
+    type,
+    tiers,
+    userIds,
+    createdAfter: parseDate(rawTarget?.createdAfter ?? body.createdAfter),
+    createdBefore: parseDate(rawTarget?.createdBefore ?? body.createdBefore),
+    lastActiveAfter: parseDate(rawTarget?.lastActiveAfter ?? body.lastActiveAfter),
+    lastActiveBefore: parseDate(rawTarget?.lastActiveBefore ?? body.lastActiveBefore),
+    minStreak: parseOptionalPositiveInt(rawTarget?.minStreak ?? body.minStreak),
+    minLevel: parseOptionalPositiveInt(rawTarget?.minLevel ?? body.minLevel),
+    hasActiveCharacter: parseBool(rawTarget?.hasActiveCharacter ?? body.hasActiveCharacter),
+  };
 }
 
 function buildUserTargetWhere(target: AdminTarget): Prisma.UserWhereInput {
+  const where: Prisma.UserWhereInput = {};
+
   switch (target.type) {
     case 'free':
-      return { isPremium: false };
+      where.isPremium = false;
+      break;
     case 'premium':
-      return { isPremium: true };
+      where.isPremium = true;
+      break;
     case 'tier':
-      return target.tiers?.length ? { premiumTier: { in: target.tiers } } : { id: { in: [] } };
+      if (target.tiers?.length) {
+        where.premiumTier = { in: target.tiers };
+      } else {
+        where.id = { in: [] };
+      }
+      break;
     case 'selected_users':
-      return target.userIds?.length ? { id: { in: target.userIds } } : { id: { in: [] } };
+      where.id = target.userIds?.length ? { in: target.userIds } : { in: [] };
+      break;
     case 'all':
     default:
-      return {};
+      break;
   }
+
+  if (target.createdAfter || target.createdBefore) {
+    where.createdAt = {
+      ...(target.createdAfter && { gte: target.createdAfter }),
+      ...(target.createdBefore && { lte: target.createdBefore }),
+    };
+  }
+
+  if (target.lastActiveAfter || target.lastActiveBefore) {
+    where.lastActiveAt = {
+      ...(target.lastActiveAfter && { gte: target.lastActiveAfter }),
+      ...(target.lastActiveBefore && { lte: target.lastActiveBefore }),
+    };
+  }
+
+  if (target.minStreak !== undefined) where.streak = { gte: target.minStreak };
+  if (target.minLevel !== undefined) where.level = { gte: target.minLevel };
+  if (target.hasActiveCharacter !== undefined) {
+    where.characters = target.hasActiveCharacter
+      ? { some: { isActive: true, isEnded: false, isExPersona: false } }
+      : { none: { isActive: true, isEnded: false, isExPersona: false } };
+  }
+
+  return where;
 }
 
 function validateTemplateInput(payload: Record<string, unknown>, isPatch: boolean) {
@@ -435,10 +527,90 @@ export async function resetUserPassword(req: AdminRequest, res: Response) {
 }
 
 export async function getQuests(req: AdminRequest, res: Response) {
+  const {
+    search,
+    type,
+    category,
+    isActive,
+    action,
+    minimumTier,
+    rewardType,
+    giftId,
+    startsAt,
+    endsAt,
+  } = req.query;
+
+  const where: Prisma.QuestWhereInput = {};
+  const searchText = String(search || '').trim();
+
+  if (searchText) {
+    where.OR = [
+      { title: { contains: searchText, mode: 'insensitive' } },
+      { description: { contains: searchText, mode: 'insensitive' } },
+      { category: { contains: searchText, mode: 'insensitive' } },
+    ];
+  }
+
+  if (Object.values(QuestType).includes(String(type) as QuestType)) where.type = String(type) as QuestType;
+  if (category) where.category = String(category);
+  const activeFilter = parseBool(isActive);
+  if (activeFilter !== undefined) where.isActive = activeFilter;
+  if (action) {
+    where.requirements = {
+      path: ['action'],
+      equals: String(action),
+    };
+  }
+  if (Object.values(PremiumTier).includes(String(minimumTier) as PremiumTier)) {
+    where.minimumTier = String(minimumTier) as PremiumTier;
+  }
+  if (giftId) where.giftRewards = { some: { giftId: String(giftId) } };
+  if (startsAt) where.startsAt = { gte: parseDate(startsAt) };
+  if (endsAt) where.endsAt = { lte: parseDate(endsAt) };
+
+  const rewardFilter = String(rewardType || '');
+  if (rewardFilter === 'coins') where.rewardCoins = { gt: 0 };
+  if (rewardFilter === 'gems') where.rewardGems = { gt: 0 };
+  if (rewardFilter === 'xp') where.rewardXp = { gt: 0 };
+  if (rewardFilter === 'affection') where.rewardAffection = { gt: 0 };
+  if (rewardFilter === 'gift') where.giftRewards = { some: {} };
+
   const quests = await prisma.quest.findMany({
-    orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }],
+    where,
+    include: { giftRewards: { include: { gift: true }, orderBy: { sortOrder: 'asc' } } },
+    orderBy: [{ type: 'asc' }, { category: 'asc' }, { sortOrder: 'asc' }],
   });
-  res.json(quests);
+
+  const enriched = quests.map((quest) => ({
+    ...quest,
+    rewardSummary: {
+      coins: quest.rewardCoins,
+      gems: quest.rewardGems,
+      xp: quest.rewardXp,
+      affection: quest.rewardAffection,
+      items: quest.rewardItems,
+      gifts: quest.giftRewards.map((reward) => ({
+        giftId: reward.giftId,
+        quantity: reward.quantity,
+        gift: reward.gift,
+      })),
+    },
+  }));
+
+  res.json({
+    quests: enriched,
+    summary: {
+      total: enriched.length,
+      active: enriched.filter((quest) => quest.isActive).length,
+      inactive: enriched.filter((quest) => !quest.isActive).length,
+      premium: enriched.filter((quest) => quest.requiresPremium || quest.minimumTier !== 'FREE').length,
+      withGiftReward: enriched.filter((quest) => quest.giftRewards.length > 0).length,
+      missingConfig: enriched.filter((quest) => {
+        const requirements = quest.requirements as { action?: string; count?: number };
+        return !requirements?.action || !requirements?.count;
+      }).length,
+    },
+  });
 }
 
 export async function getCharacterTemplates(req: AdminRequest, res: Response) {
@@ -564,6 +736,37 @@ export async function deleteMessagesBulk(req: AdminRequest, res: Response) {
 }
 
 // ============== QUEST MANAGEMENT ==============
+async function validateGiftRewardIds(giftRewards: Array<{ giftId: string; quantity: number }>) {
+  if (giftRewards.length === 0) return null;
+  const giftIds = giftRewards.map((reward) => reward.giftId);
+  const gifts = await prisma.gift.findMany({ where: { id: { in: giftIds }, isActive: true }, select: { id: true } });
+  const found = new Set(gifts.map((gift) => gift.id));
+  const missing = giftIds.filter((giftId) => !found.has(giftId));
+  return missing.length ? `Invalid or inactive gift reward: ${missing[0]}` : null;
+}
+
+function questRewardSummary(quest: {
+  rewardCoins: number;
+  rewardGems: number;
+  rewardXp: number;
+  rewardAffection: number;
+  rewardItems: string[];
+  giftRewards?: Array<{ giftId: string; quantity: number; gift?: unknown }>;
+}) {
+  return {
+    coins: quest.rewardCoins,
+    gems: quest.rewardGems,
+    xp: quest.rewardXp,
+    affection: quest.rewardAffection,
+    items: quest.rewardItems,
+    gifts: (quest.giftRewards || []).map((reward) => ({
+      giftId: reward.giftId,
+      quantity: reward.quantity,
+      gift: reward.gift,
+    })),
+  };
+}
+
 export async function createQuest(req: AdminRequest, res: Response) {
   const {
     title,
@@ -577,41 +780,137 @@ export async function createQuest(req: AdminRequest, res: Response) {
     rewardAffection,
     unlockLevel,
     requiresPremium,
+    minimumTier,
+    startsAt,
+    endsAt,
+    rewardItems,
+    giftRewards,
     sortOrder,
     isActive,
   } = req.body;
+  const normalizedGiftRewards = normalizeGiftRewards(giftRewards);
+  const giftRewardError = await validateGiftRewardIds(normalizedGiftRewards);
+  if (giftRewardError) {
+    return res.status(400).json({ error: giftRewardError });
+  }
 
   const quest = await prisma.quest.create({
     data: {
       title,
       description,
-      type: type || 'DAILY',
+      type: Object.values(QuestType).includes(String(type) as QuestType) ? type : 'DAILY',
       category: category || 'chat',
       requirements: requirements || {},
       rewardXp: rewardXp || 0,
       rewardCoins: rewardCoins || 0,
       rewardGems: rewardGems || 0,
       rewardAffection: rewardAffection || 0,
+      rewardItems: Array.isArray(rewardItems) ? rewardItems.map((item) => String(item)).filter(Boolean) : [],
       unlockLevel: unlockLevel || 1,
       requiresPremium: requiresPremium || false,
+      minimumTier: Object.values(PremiumTier).includes(String(minimumTier) as PremiumTier) ? minimumTier : 'FREE',
+      ...(startsAt && { startsAt: new Date(startsAt) }),
+      ...(endsAt && { endsAt: new Date(endsAt) }),
       sortOrder: sortOrder || 0,
       isActive: isActive !== false,
+      giftRewards: normalizedGiftRewards.length
+        ? {
+            create: normalizedGiftRewards.map((reward) => ({
+              giftId: reward.giftId,
+              quantity: reward.quantity,
+              sortOrder: reward.sortOrder,
+            })),
+          }
+        : undefined,
     },
+    include: { giftRewards: { include: { gift: true }, orderBy: { sortOrder: 'asc' } } },
   });
 
-  res.json({ message: 'Quest created', quest });
+  await cache.del(CacheKeys.quests());
+
+  res.json({ message: 'Quest created', quest: { ...quest, rewardSummary: questRewardSummary(quest) } });
 }
 
 export async function updateQuest(req: AdminRequest, res: Response) {
   const { id } = req.params;
-  const data = req.body;
+  const {
+    giftRewards,
+    title,
+    description,
+    type,
+    category,
+    requirements,
+    rewardXp,
+    rewardCoins,
+    rewardGems,
+    rewardAffection,
+    rewardItems,
+    unlockLevel,
+    requiresPremium,
+    minimumTier,
+    sortOrder,
+    isActive,
+    startsAt,
+    endsAt,
+  } = req.body;
 
-  const quest = await prisma.quest.update({
-    where: { id },
-    data,
+  const data: Prisma.QuestUpdateInput = {
+    ...(title !== undefined && { title: String(title).trim() }),
+    ...(description !== undefined && { description: String(description).trim() }),
+    ...(type !== undefined && { type }),
+    ...(category !== undefined && { category: String(category).trim() }),
+    ...(requirements !== undefined && { requirements }),
+    ...(rewardXp !== undefined && { rewardXp: parsePositiveInt(rewardXp) }),
+    ...(rewardCoins !== undefined && { rewardCoins: parsePositiveInt(rewardCoins) }),
+    ...(rewardGems !== undefined && { rewardGems: parsePositiveInt(rewardGems) }),
+    ...(rewardAffection !== undefined && { rewardAffection: parsePositiveInt(rewardAffection) }),
+    ...(Array.isArray(rewardItems) && { rewardItems: rewardItems.map((item) => String(item)).filter(Boolean) }),
+    ...(unlockLevel !== undefined && { unlockLevel: parsePositiveInt(unlockLevel) || 1 }),
+    ...(requiresPremium !== undefined && { requiresPremium: requiresPremium === true }),
+    ...(Object.values(PremiumTier).includes(String(minimumTier) as PremiumTier) && { minimumTier }),
+    ...(sortOrder !== undefined && { sortOrder: Number(sortOrder) || 0 }),
+    ...(isActive !== undefined && { isActive: isActive !== false }),
+    ...(startsAt !== undefined && { startsAt: startsAt ? new Date(startsAt) : null }),
+    ...(endsAt !== undefined && { endsAt: endsAt ? new Date(endsAt) : null }),
+  };
+
+  const normalizedGiftRewards = giftRewards !== undefined ? normalizeGiftRewards(giftRewards) : null;
+  if (normalizedGiftRewards) {
+    const giftRewardError = await validateGiftRewardIds(normalizedGiftRewards);
+    if (giftRewardError) {
+      return res.status(400).json({ error: giftRewardError });
+    }
+  }
+
+  const quest = await prisma.$transaction(async (tx) => {
+    const updated = await tx.quest.update({
+      where: { id },
+      data,
+    });
+
+    if (normalizedGiftRewards) {
+      await tx.questGiftReward.deleteMany({ where: { questId: id } });
+      if (normalizedGiftRewards.length > 0) {
+        await tx.questGiftReward.createMany({
+          data: normalizedGiftRewards.map((reward) => ({
+            questId: id,
+            giftId: reward.giftId,
+            quantity: reward.quantity,
+            sortOrder: reward.sortOrder,
+          })),
+        });
+      }
+    }
+
+    return tx.quest.findUniqueOrThrow({
+      where: { id: updated.id },
+      include: { giftRewards: { include: { gift: true }, orderBy: { sortOrder: 'asc' } } },
+    });
   });
 
-  res.json({ message: 'Quest updated', quest });
+  await cache.del(CacheKeys.quests());
+
+  res.json({ message: 'Quest updated', quest: { ...quest, rewardSummary: questRewardSummary(quest) } });
 }
 
 export async function deleteQuest(req: AdminRequest, res: Response) {
@@ -621,6 +920,8 @@ export async function deleteQuest(req: AdminRequest, res: Response) {
     prisma.userQuest.deleteMany({ where: { questId: id } }),
     prisma.quest.delete({ where: { id } }),
   ]);
+
+  await cache.del(CacheKeys.quests());
 
   res.json({ message: 'Quest deleted' });
 }
@@ -637,6 +938,8 @@ export async function toggleQuestActive(req: AdminRequest, res: Response) {
     where: { id },
     data: { isActive: !quest.isActive },
   });
+
+  await cache.del(CacheKeys.quests());
 
   res.json({ message: `Quest ${updated.isActive ? 'activated' : 'deactivated'}`, quest: updated });
 }
@@ -798,6 +1101,89 @@ export async function giveToUser(req: AdminRequest, res: Response) {
 async function sendBulkRewards(payload: Record<string, unknown>) {
   const coins = parsePositiveInt(payload.coins);
   const gems = parsePositiveInt(payload.gems);
+  const gifts = normalizeGiftRewards(payload.gifts);
+  const adminMessage = String(payload.message || '').trim() || 'Ban da nhan duoc phan thuong tu quan tri vien.';
+  const adminTarget = normalizeAdminTarget(payload);
+  const adminWhere = buildUserTargetWhere(adminTarget);
+
+  if (coins <= 0 && gems <= 0 && gifts.length === 0) {
+    return { status: 400, body: { error: 'At least one positive reward amount is required' } };
+  }
+
+  const giftRewardError = await validateGiftRewardIds(gifts);
+  if (giftRewardError) {
+    return { status: 400, body: { error: giftRewardError } };
+  }
+
+  const adminUsers = await prisma.user.findMany({
+    where: adminWhere,
+    select: { id: true, coins: true, gems: true },
+  });
+
+  if (adminUsers.length === 0) {
+    return {
+      status: 200,
+      body: { message: 'No users matched target', affected: 0, directDelivered: 0, inventoryFallback: 0, deliveredRealtime: 0 },
+    };
+  }
+
+  const notificationDataNew = {
+    source: 'admin_reward',
+    coins,
+    gems,
+    gifts,
+    target: adminTarget,
+    sentAt: new Date().toISOString(),
+  };
+
+  let realtimeCount = 0;
+  let directDelivered = 0;
+  let inventoryFallback = 0;
+
+  for (const user of adminUsers) {
+    const grantResult = await grantRewards({
+      userId: user.id,
+      coins,
+      gems,
+      gifts,
+      source: 'ADMIN_REWARD',
+      sourceRefId: 'admin_bulk',
+      notificationTitle: 'Phan thuong',
+      message: adminMessage,
+    });
+    await applyCharacterRewardEffects(user.id, grantResult);
+
+    directDelivered += grantResult.directDelivered;
+    inventoryFallback += grantResult.inventoryFallback;
+
+    const room = `user:${user.id}`;
+    const socketCount = io.sockets.adapter.rooms.get(room)?.size || 0;
+    if (socketCount === 0) continue;
+    realtimeCount += socketCount;
+    io.to(room).emit('user:balance_update', {
+      coins: user.coins + coins,
+      gems: user.gems + gems,
+      source: 'admin_reward',
+    });
+    io.to(room).emit('notification:new', {
+      type: 'reward',
+      title: 'Phan thuong',
+      message: adminMessage,
+      data: notificationDataNew,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  return {
+    status: 200,
+    body: {
+      message: `Gave rewards to ${adminUsers.length} users`,
+      affected: adminUsers.length,
+      directDelivered,
+      inventoryFallback,
+      deliveredRealtime: realtimeCount,
+    },
+  };
   const message = String(payload.message || '').trim() || 'Bạn đã nhận được phần thưởng từ quản trị viên.';
   const target = normalizeAdminTarget(payload);
   const where = buildUserTargetWhere(target);
@@ -875,6 +1261,26 @@ async function sendBulkRewards(payload: Record<string, unknown>) {
 export async function giveBulkRewards(req: AdminRequest, res: Response) {
   const result = await sendBulkRewards(req.body as Record<string, unknown>);
   res.status(result.status).json(result.body);
+}
+
+export async function previewBulkRewards(req: AdminRequest, res: Response) {
+  const target = normalizeAdminTarget(req.body as Record<string, unknown>);
+  const where = buildUserTargetWhere(target);
+  const [recipientCount, activeCharacterCount] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.count({
+      where: {
+        ...where,
+        characters: { some: { isActive: true, isEnded: false, isExPersona: false } },
+      },
+    }),
+  ]);
+
+  res.json({
+    recipientCount,
+    directEligible: activeCharacterCount,
+    inventoryFallbackEstimate: Math.max(0, recipientCount - activeCharacterCount),
+  });
 }
 
 export async function giveCoinsToAll(req: AdminRequest, res: Response) {

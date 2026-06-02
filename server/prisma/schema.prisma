@@ -440,11 +440,30 @@ model Quest {
   updatedAt       DateTime  @updatedAt
 
   userQuests      UserQuest[]
+  giftRewards     QuestGiftReward[]
 
   @@unique([title, type]) // Prevent duplicate quests
   @@index([type, isActive])               // Optimize DAILY quest queries
   @@index([isActive])                     // Optimize active quest filtering
   @@map("quests")
+}
+
+model QuestGiftReward {
+  id        String   @id @default(uuid())
+  questId   String
+  giftId    String
+  quantity  Int      @default(1)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quest Quest @relation(fields: [questId], references: [id], onDelete: Cascade)
+  gift  Gift  @relation(fields: [giftId], references: [id], onDelete: Cascade)
+
+  @@unique([questId, giftId])
+  @@index([questId])
+  @@index([giftId])
+  @@map("quest_gift_rewards")
 }
 
 enum QuestType {
@@ -514,6 +533,8 @@ model Gift {
 
   userGifts       UserGift[]
   giftHistory     GiftHistory[]
+  vipPackItems    VipGiftPackItem[]
+  questGiftRewards QuestGiftReward[]
 
   @@unique([name, rarity])
   @@index([isActive, category])           // Optimize shop queries by category
@@ -550,8 +571,11 @@ model GiftHistory {
   userId      String   // User who sent the gift
   characterId String
   giftId      String
+  quantity    Int      @default(1)
   message     String?
   reaction    String?  // AI's reaction to the gift
+  source      GiftHistorySource @default(USER_SEND)
+  sourceRefId String?
   createdAt   DateTime @default(now())
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -561,6 +585,48 @@ model GiftHistory {
   @@index([userId, createdAt])
   @@index([characterId, createdAt])
   @@map("gift_history")
+}
+
+enum GiftHistorySource {
+  USER_SEND
+  VIP_PACK
+  QUEST_REWARD
+  ADMIN_REWARD
+}
+
+model VipGiftPackSegment {
+  id          String      @id @default(uuid())
+  segmentTier PremiumTier @unique
+  displayName String
+  description String?
+  isActive    Boolean     @default(true)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items VipGiftPackItem[]
+
+  @@index([isActive, sortOrder])
+  @@map("vip_gift_pack_segments")
+}
+
+model VipGiftPackItem {
+  id        String   @id @default(uuid())
+  segmentId String
+  giftId    String
+  quantity  Int      @default(1)
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  segment VipGiftPackSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  gift    Gift               @relation(fields: [giftId], references: [id], onDelete: Cascade)
+
+  @@unique([segmentId, giftId])
+  @@index([segmentId, isActive, sortOrder])
+  @@index([giftId])
+  @@map("vip_gift_pack_items")
 }
 
 model VipGiftClaim {

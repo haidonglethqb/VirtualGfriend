@@ -5,6 +5,8 @@ import { characterService } from '../character/character.service';
 import { aiService } from '../ai/ai.service';
 import { gameEventService } from '../game/game-event.service';
 import { getTierConfig } from '../admin/tier-config.service';
+import { applyCharacterRewardEffects, grantRewards } from '../reward/reward-grant.service';
+import { getVipPackSegments as getConfiguredVipPackSegments } from './vip-pack-config.service';
 
 interface BuyGiftData {
   giftId: string;
@@ -21,12 +23,6 @@ interface SendGiftData {
 const TIER_HIERARCHY = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'] as const;
 type PremiumTierName = typeof TIER_HIERARCHY[number];
 type VipSegment = Exclude<PremiumTierName, 'FREE'>;
-
-const VIP_GIFT_POOLS: Record<VipSegment, string[]> = {
-  BASIC: ['Hoa Hồng Pha Lê', 'Socola Hoàng Gia', 'Gấu Bông VIP'],
-  PRO: ['Vòng Tay Ánh Sao', 'Hộp Nhạc Kỷ Niệm', 'Bữa Tối Ánh Nến'],
-  ULTIMATE: ['Nhẫn Kim Cương Vĩnh Cửu', 'Kỳ Nghỉ Thiên Đường', 'Ngôi Sao Mang Tên Em'],
-};
 
 const VIP_SEGMENTS_BY_TIER: Record<VipSegment, VipSegment[]> = {
   BASIC: ['BASIC'],
@@ -52,18 +48,12 @@ function getClaimWindow(now = new Date()) {
   const claimMonth = `${year}-${String(month).padStart(2, '0')}`;
   const nextClaimAt = new Date(Date.UTC(year, month, 1, 0, 0, 0));
   const secondsUntilNextClaim = Math.max(0, Math.ceil((nextClaimAt.getTime() - now.getTime()) / 1000));
-  const monthIndex = year * 12 + (month - 1);
 
-  return { claimMonth, nextClaimAt, secondsUntilNextClaim, monthIndex };
+  return { claimMonth, nextClaimAt, secondsUntilNextClaim };
 }
 
 function segmentsForTier(tier: PremiumTierName): VipSegment[] {
   return tier === 'FREE' ? [] : VIP_SEGMENTS_BY_TIER[tier];
-}
-
-function giftNameForSegment(segment: VipSegment, monthIndex: number) {
-  const pool = VIP_GIFT_POOLS[segment];
-  return pool[monthIndex % pool.length];
 }
 
 function isActivePremiumUser(user: {
@@ -128,27 +118,8 @@ function giftAccessPayload(
   };
 }
 
-async function getVipPackSegments(tier: PremiumTierName, claimMonth: string, monthIndex: number) {
-  const previewTier = tier === 'FREE' ? 'BASIC' : tier;
-  const segments = segmentsForTier(previewTier);
-  const namesBySegment = new Map(segments.map((segment) => [segment, giftNameForSegment(segment, monthIndex)]));
-  const gifts = await prisma.gift.findMany({
-    where: {
-      name: { in: Array.from(namesBySegment.values()) },
-      isActive: true,
-    },
-  });
-  const giftsByName = new Map(gifts.map((gift) => [gift.name, gift]));
-
-  return segments.map((segment) => {
-    const giftName = namesBySegment.get(segment)!;
-    return {
-      segment,
-      claimMonth,
-      quantity: 1,
-      gift: giftsByName.get(giftName) ?? null,
-    };
-  });
+async function getVipPackSegments(tier: PremiumTierName, claimMonth: string) {
+  return getConfiguredVipPackSegments(tier, claimMonth);
 }
 
 export const giftService = {
@@ -456,7 +427,7 @@ export const giftService = {
   },
 
   async getVipPackStatus(userId: string) {
-    const { claimMonth, nextClaimAt, secondsUntilNextClaim, monthIndex } = getClaimWindow();
+    const { claimMonth, nextClaimAt, secondsUntilNextClaim } = getClaimWindow();
     const { user, tier } = await getEffectiveUserTier(userId);
     const eligibleSegments = segmentsForTier(tier);
     const claimedRows = await prisma.vipGiftClaim.findMany({
@@ -466,21 +437,31 @@ export const giftService = {
     const claimedSegments = claimedRows.map((row) => row.tier as VipSegment);
     const claimedSet = new Set(claimedSegments);
     const claimableSegments = eligibleSegments.filter((segment) => !claimedSet.has(segment));
-    const packSegments = await getVipPackSegments(tier, claimMonth, monthIndex);
+    const packSegments = await getVipPackSegments(tier, claimMonth);
     const claimableSet = new Set(claimableSegments);
-    const packPreview = packSegments.map(({ segment, quantity, gift }) => ({
+    const configWarnings = packSegments.flatMap((segment) => segment.warnings);
+    const invalidClaimableSegments = new Set(
+      configWarnings
+        .filter((warning) => claimableSet.has(warning.segment))
+        .map((warning) => warning.segment),
+    );
+    const packPreview = packSegments.map(({ segment, items, config, warnings }) => ({
       segment,
-      quantity,
-      gift,
+      config,
+      items,
+      quantity: items[0]?.quantity ?? 0,
+      gift: items[0]?.gift ?? null,
+      warnings,
       isClaimable: claimableSet.has(segment),
       claimedAt: claimedRows.find((row) => row.tier === segment)?.claimedAt ?? null,
     }));
     const isEligible = isActivePremiumUser(user);
+    const validClaimableSegments = claimableSegments.filter((segment) => !invalidClaimableSegments.has(segment));
 
     return {
       tier,
       isEligible,
-      canClaim: isEligible && claimableSegments.length > 0,
+      canClaim: isEligible && validClaimableSegments.length > 0,
       claimMonth,
       eligibleSegments,
       claimedSegments,
@@ -488,12 +469,13 @@ export const giftService = {
       nextClaimAt,
       secondsUntilNextClaim,
       lockReason: isEligible ? null : 'VIP_REQUIRED',
+      configWarnings,
       packPreview,
     };
   },
 
   async claimVipPack(userId: string) {
-    const { claimMonth, monthIndex } = getClaimWindow();
+    const { claimMonth } = getClaimWindow();
     const { user, tier } = await getEffectiveUserTier(userId);
     if (!isActivePremiumUser(user) || tier === 'FREE') {
       throw new AppError('VIP subscription required to claim this gift pack', 403, 'VIP_REQUIRED');
@@ -510,44 +492,50 @@ export const giftService = {
       throw new AppError('VIP gift pack already claimed for this month', 400, 'VIP_GIFT_ALREADY_CLAIMED');
     }
 
-    const namesBySegment = new Map(claimableSegments.map((segment) => [segment, giftNameForSegment(segment, monthIndex)]));
-    const gifts = await prisma.gift.findMany({
-      where: {
-        name: { in: Array.from(namesBySegment.values()) },
-        isActive: true,
-      },
-    });
-    const giftsByName = new Map(gifts.map((gift) => [gift.name, gift]));
+    const packSegments = await getVipPackSegments(tier, claimMonth);
+    const packBySegment = new Map(packSegments.map((pack) => [pack.segment, pack]));
+    const configWarnings = packSegments
+      .filter((pack) => claimableSegments.includes(pack.segment))
+      .flatMap((pack) => pack.warnings);
+    if (configWarnings.length > 0) {
+      throw new AppError('VIP gift pack is not configured correctly', 500, 'VIP_GIFT_CONFIG_INVALID');
+    }
     const grants = claimableSegments.map((segment) => {
-      const gift = giftsByName.get(namesBySegment.get(segment)!);
-      if (!gift) {
+      const pack = packBySegment.get(segment);
+      if (!pack || pack.items.length === 0) {
         throw new AppError('VIP gift pack is not configured correctly', 500, 'VIP_GIFT_CONFIG_INVALID');
       }
-      return { segment, gift, quantity: 1 };
+      return { segment, items: pack.items };
     });
 
+    let grantResults: Awaited<ReturnType<typeof grantRewards>>[] = [];
     try {
-      await prisma.$transaction(async (tx) => {
+      grantResults = await prisma.$transaction(async (tx) => {
+        const results: Awaited<ReturnType<typeof grantRewards>>[] = [];
         for (const grant of grants) {
+          const giftGrant = await grantRewards({
+            userId,
+            source: 'VIP_PACK',
+            sourceRefId: `${claimMonth}:${grant.segment}`,
+            gifts: grant.items.map((item) => ({
+              giftId: item.gift.id,
+              quantity: item.quantity,
+            })),
+            message: 'Bạn đã nhận quà VIP tháng này.',
+            notificationTitle: 'Quà VIP',
+          }, tx);
+          results.push(giftGrant);
+
           await tx.vipGiftClaim.create({
             data: {
               userId,
               claimMonth,
               tier: grant.segment,
-              grantedGifts: [{
-                giftId: grant.gift.id,
-                name: grant.gift.name,
-                quantity: grant.quantity,
-              }],
+              grantedGifts: giftGrant.gifts,
             },
           });
-
-          await tx.userGift.upsert({
-            where: { userId_giftId: { userId, giftId: grant.gift.id } },
-            update: { quantity: { increment: grant.quantity } },
-            create: { userId, giftId: grant.gift.id, quantity: grant.quantity },
-          });
         }
+        return results;
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -557,17 +545,20 @@ export const giftService = {
     }
 
     await cache.del(CacheKeys.giftInventory(userId));
+    for (const result of grantResults) {
+      await applyCharacterRewardEffects(userId, result);
+    }
 
     return {
       claimed: true,
       tier,
       claimMonth,
       claimedSegments: claimableSegments,
-      granted: grants.map((grant) => ({
+      granted: grants.flatMap((grant) => grant.items.map((item) => ({
         segment: grant.segment,
-        quantity: grant.quantity,
-        gift: grant.gift,
-      })),
+        quantity: item.quantity,
+        gift: item.gift,
+      }))),
     };
   },
 };

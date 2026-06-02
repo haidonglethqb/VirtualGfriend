@@ -29,6 +29,7 @@ import {
   giveCoinsToAll,
   giveGemsToAll,
   giveBulkRewards,
+  previewBulkRewards,
   giveToUser,
   getAnalytics,
   getSystemInfo,
@@ -42,6 +43,7 @@ import {
 } from './admin.controller';
 import { getTierConfigs, updateTierConfigHandler } from './admin-tier-config.controller';
 import { getAdminPricing, getStripeLivePricing, updateAdminPricing, syncStripePrice } from './admin-pricing.controller';
+import { getAdminGiftCatalog, getAdminVipGiftPack, updateAdminVipGiftPack } from './admin-vip-pack.controller';
 
 const router = Router();
 
@@ -92,6 +94,7 @@ router.post('/templates/:id/toggle', toggleTemplateActive);
 // Bulk actions
 router.post('/bulk/coins', giveCoinsToAll);
 router.post('/bulk/gems', giveGemsToAll);
+router.post('/bulk/rewards/preview', previewBulkRewards);
 router.post('/bulk/rewards', giveBulkRewards);
 
 // System
@@ -100,6 +103,9 @@ router.post('/broadcast', broadcastNotification);
 
 // Gift history
 router.get('/gifts', getGiftHistory);
+router.get('/gift-catalog', getAdminGiftCatalog);
+router.get('/vip-gift-pack', getAdminVipGiftPack);
+router.put('/vip-gift-pack', updateAdminVipGiftPack);
 
 // Memories
 router.get('/memories', getMemories);

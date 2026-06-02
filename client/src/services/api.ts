@@ -386,8 +386,20 @@ export interface GiftCatalogItem {
 
 export interface VipPackPreviewItem {
   segment: VipGiftSegment;
+  config?: {
+    id: string | null;
+    displayName: string;
+    description: string | null;
+    isActive: boolean;
+    sortOrder: number;
+  } | null;
+  items: Array<{
+    gift: GiftCatalogItem;
+    quantity: number;
+  }>;
   quantity: number;
   gift: GiftCatalogItem | null;
+  warnings?: Array<{ segment: VipGiftSegment; code: string; message: string }>;
   isClaimable: boolean;
   claimedAt: string | null;
 }
@@ -403,6 +415,7 @@ export interface VipGiftPackStatus {
   nextClaimAt: string;
   secondsUntilNextClaim: number;
   lockReason: 'VIP_REQUIRED' | null;
+  configWarnings?: Array<{ segment: VipGiftSegment; code: string; message: string }>;
   packPreview: VipPackPreviewItem[];
 }
 

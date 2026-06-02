@@ -10,9 +10,14 @@ Quest {
   id, title, description, type, category,
   requirements,              // { action: "send_message", count: 10 }
   rewardXp, rewardCoins, rewardGems, rewardAffection,
+  rewardItems,               // legacy display compatibility
   requiresPremium, minimumTier,
   arcId, isArcFinalQuest,
   sortOrder, isActive
+}
+
+QuestGiftReward {
+  id, questId, giftId, quantity, sortOrder
 }
 
 UserQuest {
@@ -22,6 +27,13 @@ UserQuest {
   startedAt, completedAt, claimedAt
 }
 ```
+
+## Reward Granting
+- Quest scalar rewards still use `rewardCoins`, `rewardGems`, `rewardXp`, and `rewardAffection`.
+- Concrete gift rewards are stored in `QuestGiftReward` and returned as `giftRewards` plus `rewardSummary`.
+- Manual quest claim, auto-claim, Arc final quest claim, VIP pack claim, and admin bulk rewards use `rewardGrantService`.
+- Claim state changes and coin/gem/gift grants run transactionally with `COMPLETED -> CLAIMED` to prevent duplicate grant.
+- System gift rewards are silent: they create `GiftHistory` with `source=QUEST_REWARD` when an active character exists, otherwise they upsert `UserGift` inventory. They do not create chat `Message`, do not call AI reaction, and do not trigger `SEND_GIFT`.
 
 ## Arc Journey
 - Arcs are sequential and use `prerequisiteArcId`; the next Arc unlocks only after previous `ArcProgress.completedAt`.
@@ -60,6 +72,12 @@ Action mapping:
 - `POST /api/arcs/:arcId/start` - Auto-start Arc quests.
 - `POST /api/arcs/:arcId/quests/:questId/claim` - Claim final manual Arc quest.
 - `POST /api/arcs/:arcId/claim` - Claim once-only Arc completion rewards.
+
+## Admin
+- `GET /api/admin/quests` supports filters: `search`, `type`, `category`, `isActive`, `action`, `minimumTier`, `rewardType`, `giftId`, `startsAt`, `endsAt`.
+- `POST /api/admin/quests` and `PATCH /api/admin/quests/:id` accept `giftRewards: [{ giftId, quantity }]`.
+- Quest create/update/toggle/delete invalidates `CacheKeys.quests()`.
+- Admin UI shows KPI overview, filters, requirement/action/count, tier gate, scalar reward preview, gift reward preview, and clean active/inactive labels.
 
 ## Related
 - [Gifts & Shop](./gifts-shop.md)

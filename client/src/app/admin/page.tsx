@@ -28,6 +28,7 @@ import {
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import { TierConfigTab } from './tier-config-tab';
 import { PricingTab } from './pricing-tab';
+import { VipGiftPackAdmin } from './vip-gift-pack-admin';
 import { useLanguageStore } from '@/store/language-store';
 
 ChartJS.register(
@@ -66,6 +67,13 @@ interface AdminTarget {
   type: RewardTargetType;
   tiers?: string[];
   userIds?: string[];
+  createdAfter?: string;
+  createdBefore?: string;
+  lastActiveAfter?: string;
+  lastActiveBefore?: string;
+  minStreak?: number;
+  minLevel?: number;
+  hasActiveCharacter?: boolean;
 }
 
 interface RewardForm {
@@ -73,6 +81,7 @@ interface RewardForm {
   gems: number;
   message: string;
   target: AdminTarget;
+  gifts: Array<{ giftId: string; quantity: number }>;
 }
 
 interface ResetPasswordForm {
@@ -117,11 +126,58 @@ interface Quest {
   description: string;
   type: string;
   category: string;
+  requirements?: { action?: string; count?: number };
   rewardCoins: number;
   rewardGems: number;
   rewardXp: number;
+  rewardAffection: number;
+  rewardItems?: string[];
+  minimumTier?: string;
+  requiresPremium?: boolean;
+  giftRewards?: Array<{ giftId: string; quantity: number; gift?: GiftCatalogItem }>;
+  rewardSummary?: {
+    coins: number;
+    gems: number;
+    xp: number;
+    affection: number;
+    items: string[];
+    gifts: Array<{ giftId: string; quantity: number; gift?: GiftCatalogItem }>;
+  };
   isActive: boolean;
   sortOrder: number;
+}
+
+interface QuestSummary {
+  total: number;
+  active: number;
+  inactive: number;
+  premium: number;
+  withGiftReward: number;
+  missingConfig: number;
+}
+
+interface QuestFilters {
+  search: string;
+  type: string;
+  category: string;
+  isActive: string;
+  action: string;
+  minimumTier: string;
+  rewardType: string;
+  giftId: string;
+}
+
+interface GiftCatalogItem {
+  id: string;
+  name: string;
+  description?: string;
+  emoji: string;
+  category: string;
+  rarity: string;
+  minimumTier: string;
+  requiresPremium: boolean;
+  affectionBonus: number;
+  isActive?: boolean;
 }
 
 interface Template {
@@ -599,20 +655,26 @@ function RewardModal({
   form,
   setForm,
   onSubmit,
+  onPreview,
   onClose,
   loading,
   language,
   status,
   selectedUserCount,
+  giftCatalog,
+  preview,
 }: {
   form: RewardForm;
   setForm: (form: RewardForm) => void;
   onSubmit: () => void;
+  onPreview: () => void;
   onClose: () => void;
   loading: boolean;
   language: string;
   status: { type: 'success' | 'error'; message: string } | null;
   selectedUserCount: number;
+  giftCatalog: GiftCatalogItem[];
+  preview: { recipientCount: number; directEligible: number; inventoryFallbackEstimate: number } | null;
 }) {
   const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   const targetOptions = [
@@ -622,7 +684,7 @@ function RewardModal({
     { value: 'tier' as const, label: tr('Theo gói', 'By Tier') },
     { value: 'selected_users' as const, label: tr(`Đã chọn (${selectedUserCount})`, `Selected (${selectedUserCount})`) },
   ];
-  const isValid = Number(form.coins || 0) > 0 || Number(form.gems || 0) > 0;
+  const isValid = Number(form.coins || 0) > 0 || Number(form.gems || 0) > 0 || form.gifts.length > 0;
 
   return (
     <Modal title={tr('Tặng thưởng', 'Give Rewards')} size="lg" onClose={onClose}>
@@ -662,6 +724,61 @@ function RewardModal({
           />
         </label>
 
+        <div className="rounded-xl border border-gray-700/60 bg-gray-800/40 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-semibold text-white">{tr('Quà tặng cụ thể', 'Concrete gifts')}</p>
+            <button
+              type="button"
+              onClick={() => {
+                const firstGift = giftCatalog[0];
+                if (!firstGift) return;
+                setForm({ ...form, gifts: [...form.gifts, { giftId: firstGift.id, quantity: 1 }] });
+              }}
+              className="rounded-lg bg-pink-500/20 px-3 py-1.5 text-xs font-medium text-pink-200 hover:bg-pink-500/30"
+            >
+              {tr('Thêm quà', 'Add gift')}
+            </button>
+          </div>
+          <div className="space-y-2">
+            {form.gifts.map((giftReward, index) => (
+              <div key={`${giftReward.giftId}-${index}`} className="flex gap-2">
+                <select
+                  value={giftReward.giftId}
+                  onChange={(event) => {
+                    const next = [...form.gifts];
+                    next[index] = { ...next[index], giftId: event.target.value };
+                    setForm({ ...form, gifts: next });
+                  }}
+                  className="min-w-0 flex-1 px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white"
+                >
+                  {giftCatalog.map((gift) => (
+                    <option key={gift.id} value={gift.id}>{gift.emoji} {gift.name} · {gift.minimumTier}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={1}
+                  value={giftReward.quantity}
+                  onChange={(event) => {
+                    const next = [...form.gifts];
+                    next[index] = { ...next[index], quantity: Number(event.target.value) || 1 };
+                    setForm({ ...form, gifts: next });
+                  }}
+                  className="w-20 px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, gifts: form.gifts.filter((_, itemIndex) => itemIndex !== index) })}
+                  className="px-3 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            {form.gifts.length === 0 && <p className="text-sm text-gray-500">{tr('Chưa chọn quà cụ thể', 'No concrete gift selected')}</p>}
+          </div>
+        </div>
+
         <div className="space-y-2">
           <p className="text-sm text-gray-400">{tr('Phạm vi người nhận', 'Recipient scope')}</p>
           <div className="grid grid-cols-2 gap-2">
@@ -679,6 +796,25 @@ function RewardModal({
                 {option.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-700/60 bg-gray-800/40 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-white">{tr('Xem trước người nhận', 'Recipient preview')}</p>
+              <p className="text-xs text-gray-400">
+                {preview
+                  ? tr(
+                      `${preview.recipientCount} người · trực tiếp ${preview.directEligible} · lưu kho ${preview.inventoryFallbackEstimate}`,
+                      `${preview.recipientCount} users · direct ${preview.directEligible} · inventory ${preview.inventoryFallbackEstimate}`
+                    )
+                  : tr('Bấm xem trước trước khi gửi số lượng lớn.', 'Preview recipient count before sending.')}
+              </p>
+            </div>
+            <button type="button" onClick={onPreview} className="rounded-lg bg-gray-700 px-3 py-2 text-sm text-gray-200 hover:bg-gray-600">
+              {tr('Xem trước', 'Preview')}
+            </button>
           </div>
         </div>
 
@@ -752,6 +888,18 @@ export default function AdminPage() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [quests, setQuests] = useState<Quest[]>([]);
+  const [questSummary, setQuestSummary] = useState<QuestSummary | null>(null);
+  const [questFilters, setQuestFilters] = useState<QuestFilters>({
+    search: '',
+    type: '',
+    category: '',
+    isActive: '',
+    action: '',
+    minimumTier: '',
+    rewardType: '',
+    giftId: '',
+  });
+  const [giftCatalog, setGiftCatalog] = useState<GiftCatalogItem[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   
   const [userPagination, setUserPagination] = useState<Pagination>({ ...DEFAULT_PAGINATION, limit: 20 });
@@ -784,7 +932,9 @@ export default function AdminPage() {
     gems: 0,
     message: '',
     target: { type: 'all', tiers: [], userIds: [] },
+    gifts: [],
   });
+  const [rewardPreview, setRewardPreview] = useState<{ recipientCount: number; directEligible: number; inventoryFallbackEstimate: number } | null>(null);
   const [rewardStatus, setRewardStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [resetPasswordForm, setResetPasswordForm] = useState<ResetPasswordForm | null>(null);
   const [resetPasswordStatus, setResetPasswordStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -800,6 +950,26 @@ export default function AdminPage() {
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setStatusMessage({ message, type });
   };
+
+  const getQuestActionLabel = useCallback((action?: string) => {
+    const labels: Record<string, string> = {
+      send_message: tr('Gửi tin nhắn', 'Send messages'),
+      send_gift: tr('Tặng quà', 'Send gifts'),
+      daily_login: tr('Đăng nhập ngày', 'Daily login'),
+      morning_greeting: tr('Chào buổi sáng', 'Morning greeting'),
+      goodnight_message: tr('Chúc ngủ ngon', 'Goodnight message'),
+      romantic_message: tr('Tin nhắn lãng mạn', 'Romantic message'),
+      reach_level: tr('Đạt level', 'Reach level'),
+      reach_affection: tr('Đạt thân mật', 'Reach affection'),
+    };
+    return action ? labels[action] || action : tr('Chưa cấu hình', 'Missing config');
+  }, [tr]);
+
+  const getQuestRequirementText = useCallback((quest: Quest) => {
+    const action = quest.requirements?.action;
+    const count = quest.requirements?.count || 1;
+    return `${getQuestActionLabel(action)} · ${count}`;
+  }, [getQuestActionLabel]);
 
   const handleLogout = useCallback(() => {
     setToken('');
@@ -924,10 +1094,31 @@ export default function AdminPage() {
     }
   }, [apiCall, messagePagination.page, messagePagination.limit]);
 
-  const fetchQuests = useCallback(async () => {
-    const res = await apiCall('/quests');
-    if (res.ok) setQuests(await res.json());
+  const fetchGiftCatalog = useCallback(async () => {
+    const res = await apiCall('/gift-catalog?isActive=true&take=200');
+    if (res.ok) {
+      const data = await res.json();
+      setGiftCatalog(data.gifts || []);
+    }
   }, [apiCall]);
+
+  const fetchQuests = useCallback(async () => {
+    const params = new URLSearchParams();
+    Object.entries(questFilters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    const res = await apiCall(`/quests${params.toString() ? `?${params}` : ''}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setQuests(data);
+        setQuestSummary(null);
+      } else {
+        setQuests(data.quests || []);
+        setQuestSummary(data.summary || null);
+      }
+    }
+  }, [apiCall, questFilters]);
 
   const fetchAnalytics = useCallback(async (days?: number) => {
     const d = days ?? analyticsDays;
@@ -966,6 +1157,7 @@ export default function AdminPage() {
             break;
           case 'quests':
             await fetchQuests();
+            await fetchGiftCatalog();
             break;
           case 'templates':
             await fetchTemplates();
@@ -987,7 +1179,7 @@ export default function AdminPage() {
     };
 
     void fetchData();
-  }, [activeTab, fetchAnalytics, fetchCharacters, fetchMessages, fetchQuests, fetchStats, fetchSystemInfo, fetchTemplates, fetchUsers, isLoggedIn, token]);
+  }, [activeTab, fetchAnalytics, fetchCharacters, fetchGiftCatalog, fetchMessages, fetchQuests, fetchStats, fetchSystemInfo, fetchTemplates, fetchUsers, isLoggedIn, token]);
 
   // Action handlers
   const handleUpdateUser = async () => {
@@ -1058,19 +1250,22 @@ export default function AdminPage() {
 
   const openRewardModal = (target: AdminTarget = { type: 'all', tiers: [], userIds: [] }) => {
     setRewardStatus(null);
+    setRewardPreview(null);
     setRewardForm({
       coins: 0,
       gems: 0,
       message: '',
       target,
+      gifts: [],
     });
+    void fetchGiftCatalog();
     setShowRewardModal(true);
   };
 
   const handleRewardSubmit = async () => {
     const coins = Number(rewardForm.coins || 0);
     const gems = Number(rewardForm.gems || 0);
-    if (coins <= 0 && gems <= 0) {
+    if (coins <= 0 && gems <= 0 && rewardForm.gifts.length === 0) {
       setRewardStatus({ type: 'error', message: tr('Nhập ít nhất một phần thưởng lớn hơn 0', 'Enter at least one reward greater than 0') });
       return;
     }
@@ -1089,6 +1284,7 @@ export default function AdminPage() {
           gems,
           message: rewardForm.message.trim(),
           target,
+          gifts: rewardForm.gifts,
         }),
       });
       if (res.ok) {
@@ -1096,8 +1292,8 @@ export default function AdminPage() {
         setRewardStatus({
           type: 'success',
           message: language === 'vi'
-            ? `Đã tặng thưởng cho ${data.affected || 0} người dùng, realtime ${data.deliveredRealtime || 0}.`
-            : `Rewarded ${data.affected || 0} users, realtime ${data.deliveredRealtime || 0}.`,
+            ? `Đã tặng thưởng cho ${data.affected || 0} người dùng, trao trực tiếp ${data.directDelivered || 0}, lưu kho ${data.inventoryFallback || 0}.`
+            : `Rewarded ${data.affected || 0} users, direct ${data.directDelivered || 0}, inventory ${data.inventoryFallback || 0}.`,
         });
         void fetchUsers();
       } else {
@@ -1108,6 +1304,22 @@ export default function AdminPage() {
       setRewardStatus({ type: 'error', message: tr('Tặng thưởng thất bại', 'Failed to give rewards') });
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleRewardPreview = async () => {
+    const target = {
+      ...rewardForm.target,
+      userIds: rewardForm.target.type === 'selected_users' ? selectedUserIds : rewardForm.target.userIds,
+    };
+    try {
+      const res = await apiCall('/bulk/rewards/preview', {
+        method: 'POST',
+        body: JSON.stringify({ target }),
+      });
+      if (res.ok) setRewardPreview(await res.json());
+    } catch {
+      setRewardStatus({ type: 'error', message: tr('Không xem trước được người nhận', 'Failed to preview recipients') });
     }
   };
 
@@ -1154,6 +1366,9 @@ export default function AdminPage() {
         showToast(tr('Đã tạo nhiệm vụ', 'Quest created'));
         setShowModal(null);
         fetchQuests();
+      } else {
+        const data = await res.json();
+        showToast(data.error || tr('Tạo nhiệm vụ thất bại', 'Failed to create quest'), 'error');
       }
     } catch {
       showToast(tr('Tạo nhiệm vụ thất bại', 'Failed to create quest'), 'error');
@@ -1419,7 +1634,7 @@ export default function AdminPage() {
           <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
             <Shield className="w-8 h-8 text-white" />
           </div>
-          <p className="text-gray-400">{tr('?ang kiểm tra xác thực...', 'Checking authentication...')}</p>
+          <p className="text-gray-400">{tr('Đang kiểm tra xác thực...', 'Checking authentication...')}</p>
         </div>
       </div>
     );
@@ -1786,7 +2001,7 @@ export default function AdminPage() {
                         <td className="px-6 py-4 text-center text-pink-400">{char.affection}%</td>
                         <td className="px-6 py-4 text-center">
                           <span className={`px-2 py-1 rounded-full text-sm ${char.isActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                            {char.isActive ? tr('?ang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
+                            {char.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center">
@@ -1856,7 +2071,21 @@ export default function AdminPage() {
                 <h2 className="text-2xl font-bold">{tr('Quản lý nhiệm vụ', 'Quests Management')}</h2>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => { setFormData({}); setShowModal('createQuest'); }}
+                    onClick={() => {
+                      setFormData({
+                        type: 'DAILY',
+                        category: 'chat',
+                        requirements: { action: 'send_message', count: 1 },
+                        rewardCoins: 0,
+                        rewardGems: 0,
+                        rewardXp: 0,
+                        rewardAffection: 0,
+                        minimumTier: 'FREE',
+                        giftRewards: [],
+                        isActive: true,
+                      });
+                      setShowModal('createQuest');
+                    }}
                     className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center gap-2"
                   >
                     <Plus className="w-4 h-4" /> {tr('Tạo nhiệm vụ', 'Create Quest')}
@@ -1867,35 +2096,115 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4">
-                {['DAILY', 'WEEKLY', 'ACHIEVEMENT'].map((type) => (
-                  <div key={type} className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6">
-                    <h3 className="text-lg font-semibold mb-4 text-purple-400">{type} {tr('Nhiệm vụ', 'Quests')}</h3>
-                    <div className="grid gap-3">
-                      {quests.filter(q => q.type === type).map((quest) => (
-                        <div key={quest.id} className="flex items-center justify-between p-4 bg-gray-700/30 rounded-xl">
-                          <div>
-                            <p className="font-medium">{quest.title}</p>
-                            <p className="text-sm text-gray-400">{quest.description}</p>
-                            <div className="flex gap-2 mt-2">
-                              {quest.rewardCoins > 0 && <span className="text-yellow-400 text-sm">{quest.rewardCoins} {tr('xu', 'coins')}</span>}
-                              {quest.rewardGems > 0 && <span className="text-purple-400 text-sm">{quest.rewardGems} {tr('ngọc', 'gems')}</span>}
-                              {quest.rewardXp > 0 && <span className="text-blue-400 text-sm">{quest.rewardXp} XP</span>}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded text-xs ${quest.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                              {quest.isActive ? tr('?ang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
-                            </span>
-                            <button
-                              onClick={() => handleToggleQuest(quest.id)}
-                              className="p-2 bg-gray-600/50 rounded-lg hover:bg-gray-600"
-                            >
-                              <Zap className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+              <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-6">
+                {[
+                  { label: tr('Tổng', 'Total'), value: questSummary?.total ?? quests.length, color: 'text-white' },
+                  { label: tr('Đang hoạt động', 'Active'), value: questSummary?.active ?? quests.filter((q) => q.isActive).length, color: 'text-green-300' },
+                  { label: tr('Tạm tắt', 'Inactive'), value: questSummary?.inactive ?? quests.filter((q) => !q.isActive).length, color: 'text-red-300' },
+                  { label: 'VIP', value: questSummary?.premium ?? quests.filter((q) => q.requiresPremium || q.minimumTier !== 'FREE').length, color: 'text-amber-300' },
+                  { label: tr('Có quà', 'Gift reward'), value: questSummary?.withGiftReward ?? quests.filter((q) => (q.giftRewards || []).length > 0).length, color: 'text-pink-300' },
+                  { label: tr('Thiếu cấu hình', 'Missing config'), value: questSummary?.missingConfig ?? quests.filter((q) => !q.requirements?.action || !q.requirements?.count).length, color: 'text-orange-300' },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-xl border border-gray-700/60 bg-gray-800/50 p-4">
+                    <div className={`text-2xl font-bold ${item.color}`}>{item.value}</div>
+                    <div className="text-xs text-gray-400">{item.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mb-5 rounded-2xl border border-gray-700/50 bg-gray-800/40 p-4">
+                <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
+                  <input
+                    value={questFilters.search}
+                    onChange={(e) => setQuestFilters({ ...questFilters, search: e.target.value })}
+                    placeholder={tr('Tìm nhiệm vụ...', 'Search quests...')}
+                    className="rounded-lg border border-gray-600 bg-gray-900/60 px-3 py-2 text-sm text-white md:col-span-2"
+                  />
+                  <select value={questFilters.type} onChange={(e) => setQuestFilters({ ...questFilters, type: e.target.value })} className="rounded-lg border border-gray-600 bg-gray-900/60 px-3 py-2 text-sm text-white">
+                    <option value="">{tr('Mọi loại', 'All types')}</option>
+                    <option value="DAILY">DAILY</option>
+                    <option value="WEEKLY">WEEKLY</option>
+                    <option value="ACHIEVEMENT">ACHIEVEMENT</option>
+                    <option value="RELATIONSHIP">RELATIONSHIP</option>
+                    <option value="STORY">STORY</option>
+                  </select>
+                  <select value={questFilters.isActive} onChange={(e) => setQuestFilters({ ...questFilters, isActive: e.target.value })} className="rounded-lg border border-gray-600 bg-gray-900/60 px-3 py-2 text-sm text-white">
+                    <option value="">{tr('Mọi trạng thái', 'All status')}</option>
+                    <option value="true">{tr('Đang hoạt động', 'Active')}</option>
+                    <option value="false">{tr('Tạm tắt', 'Inactive')}</option>
+                  </select>
+                  <select value={questFilters.action} onChange={(e) => setQuestFilters({ ...questFilters, action: e.target.value })} className="rounded-lg border border-gray-600 bg-gray-900/60 px-3 py-2 text-sm text-white">
+                    <option value="">{tr('Mọi hành động', 'All actions')}</option>
+                    {['send_message', 'send_gift', 'daily_login', 'morning_greeting', 'goodnight_message', 'romantic_message', 'reach_level', 'reach_affection'].map((action) => (
+                      <option key={action} value={action}>{getQuestActionLabel(action)}</option>
+                    ))}
+                  </select>
+                  <select value={questFilters.minimumTier} onChange={(e) => setQuestFilters({ ...questFilters, minimumTier: e.target.value })} className="rounded-lg border border-gray-600 bg-gray-900/60 px-3 py-2 text-sm text-white">
+                    <option value="">{tr('Mọi tier', 'All tiers')}</option>
+                    {['FREE', 'BASIC', 'PRO', 'ULTIMATE'].map((tier) => <option key={tier} value={tier}>{tier}</option>)}
+                  </select>
+                  <select value={questFilters.rewardType} onChange={(e) => setQuestFilters({ ...questFilters, rewardType: e.target.value })} className="rounded-lg border border-gray-600 bg-gray-900/60 px-3 py-2 text-sm text-white">
+                    <option value="">{tr('Mọi thưởng', 'All rewards')}</option>
+                    <option value="coins">{tr('Xu', 'Coins')}</option>
+                    <option value="gems">{tr('Ngọc', 'Gems')}</option>
+                    <option value="xp">XP</option>
+                    <option value="affection">Affection</option>
+                    <option value="gift">{tr('Quà cụ thể', 'Gift reward')}</option>
+                  </select>
+                  <select value={questFilters.giftId} onChange={(e) => setQuestFilters({ ...questFilters, giftId: e.target.value })} className="rounded-lg border border-gray-600 bg-gray-900/60 px-3 py-2 text-sm text-white">
+                    <option value="">{tr('Mọi gift', 'All gifts')}</option>
+                    {giftCatalog.map((gift) => <option key={gift.id} value={gift.id}>{gift.emoji} {gift.name}</option>)}
+                  </select>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button onClick={fetchQuests} className="rounded-lg bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600">{tr('Lọc', 'Apply')}</button>
+                  <button
+                    onClick={() => setQuestFilters({ search: '', type: '', category: '', isActive: '', action: '', minimumTier: '', rewardType: '', giftId: '' })}
+                    className="rounded-lg bg-gray-700 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
+                  >
+                    {tr('Xóa lọc', 'Reset')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                {quests.map((quest) => (
+                  <div key={quest.id} className="grid gap-4 rounded-2xl border border-gray-700/50 bg-gray-800/45 p-4 xl:grid-cols-[minmax(0,1.6fr)_1fr_1fr_auto] xl:items-center">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-white">{quest.title}</p>
+                        <span className="rounded bg-gray-700/70 px-2 py-0.5 text-xs text-gray-300">{quest.type}</span>
+                        <span className="rounded bg-gray-700/70 px-2 py-0.5 text-xs text-gray-300">{quest.category}</span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm text-gray-400">{quest.description}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <span className="rounded-full bg-blue-500/15 px-2 py-1 text-blue-300">{getQuestRequirementText(quest)}</span>
+                        {(quest.requiresPremium || quest.minimumTier !== 'FREE') && (
+                          <span className="rounded-full bg-amber-500/15 px-2 py-1 text-amber-300">VIP {quest.minimumTier || 'BASIC'}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      {quest.rewardCoins > 0 && <span className="text-yellow-300">{quest.rewardCoins} {tr('xu', 'coins')}</span>}
+                      {quest.rewardGems > 0 && <span className="text-purple-300">{quest.rewardGems} {tr('ngọc', 'gems')}</span>}
+                      {quest.rewardXp > 0 && <span className="text-blue-300">{quest.rewardXp} XP</span>}
+                      {quest.rewardAffection > 0 && <span className="text-pink-300">{quest.rewardAffection} affection</span>}
+                      {quest.rewardCoins <= 0 && quest.rewardGems <= 0 && quest.rewardXp <= 0 && quest.rewardAffection <= 0 && <span className="text-gray-500">{tr('Không scalar reward', 'No scalar reward')}</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(quest.giftRewards || []).length > 0 ? (quest.giftRewards || []).map((reward) => (
+                        <span key={reward.giftId} className="rounded-full border border-pink-400/25 bg-pink-400/10 px-2 py-1 text-xs text-pink-200">
+                          {reward.gift?.emoji || '🎁'} {reward.gift?.name || reward.giftId} x{reward.quantity}
+                        </span>
+                      )) : <span className="text-sm text-gray-500">{tr('Chưa có quà cụ thể', 'No gift reward')}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 xl:justify-end">
+                      <span className={`px-2 py-1 rounded text-xs ${quest.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {quest.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
+                      </span>
+                      <button onClick={() => handleToggleQuest(quest.id)} className="p-2 bg-gray-600/50 rounded-lg hover:bg-gray-600">
+                        <Zap className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1937,7 +2246,7 @@ export default function AdminPage() {
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold">{template.name}</h3>
                         <span className={`px-2 py-1 rounded text-xs ${template.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {template.isActive ? tr('?ang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
+                          {template.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
                         </span>
                       </div>
                       <p className="text-sm text-gray-400 mb-3">{template.description}</p>
@@ -2359,7 +2668,10 @@ export default function AdminPage() {
           {/* TIER CONFIGS */}
           {activeTab === 'tier-configs' && (
             <motion.div key="tier-configs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <TierConfigTab apiCall={apiCall} showToast={showToast} />
+              <div className="space-y-6">
+                <TierConfigTab apiCall={apiCall} showToast={showToast} />
+                <VipGiftPackAdmin apiCall={apiCall} showToast={showToast} language={language} />
+              </div>
             </motion.div>
           )}
 
@@ -2628,7 +2940,7 @@ export default function AdminPage() {
                 disabled={actionLoading}
                 className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold rounded-xl hover:from-violet-400 hover:to-purple-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 shadow-md shadow-violet-500/20"
               >
-                {actionLoading ? tr('?ang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
+                {actionLoading ? tr('Đang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
               </button>
             </div>
           </Modal>
@@ -2684,6 +2996,33 @@ export default function AdminPage() {
                   </select>
                 </div>
               </div>
+              <div className="rounded-xl border border-gray-700/60 bg-gray-800/40 p-4">
+                <div className="mb-3 text-sm font-semibold text-white">{tr('Điều kiện hoàn thành', 'Completion condition')}</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">{tr('Hành động', 'Action')}</label>
+                    <select
+                      value={(formData.requirements as { action?: string })?.action || 'send_message'}
+                      onChange={(e) => setFormData({ ...formData, requirements: { ...(formData.requirements as object || {}), action: e.target.value } })}
+                      className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                    >
+                      {['send_message', 'send_gift', 'daily_login', 'morning_greeting', 'goodnight_message', 'romantic_message', 'reach_level', 'reach_affection'].map((action) => (
+                        <option key={action} value={action}>{getQuestActionLabel(action)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">{tr('Số lượng/mốc', 'Count/threshold')}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={(formData.requirements as { count?: number })?.count || 1}
+                      onChange={(e) => setFormData({ ...formData, requirements: { ...(formData.requirements as object || {}), count: Number(e.target.value) || 1 } })}
+                      className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                    />
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">{tr('Xu', 'Coins')}</label>
@@ -2713,13 +3052,92 @@ export default function AdminPage() {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Affection</label>
+                  <input
+                    type="number"
+                    value={formData.rewardAffection as number || 0}
+                    onChange={(e) => setFormData({ ...formData, rewardAffection: Number(e.target.value) })}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Minimum tier</label>
+                  <select
+                    value={formData.minimumTier as string || 'FREE'}
+                    onChange={(e) => setFormData({ ...formData, minimumTier: e.target.value, requiresPremium: e.target.value !== 'FREE' })}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  >
+                    {['FREE', 'BASIC', 'PRO', 'ULTIMATE'].map((tier) => <option key={tier} value={tier}>{tier}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="rounded-xl border border-gray-700/60 bg-gray-800/40 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-sm font-semibold text-white">{tr('Quà tặng cụ thể', 'Gift rewards')}</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const firstGift = giftCatalog[0];
+                      if (!firstGift) return;
+                      const current = Array.isArray(formData.giftRewards) ? formData.giftRewards as Array<{ giftId: string; quantity: number }> : [];
+                      setFormData({ ...formData, giftRewards: [...current, { giftId: firstGift.id, quantity: 1 }] });
+                    }}
+                    className="rounded-lg bg-pink-500/20 px-3 py-1.5 text-xs font-medium text-pink-200 hover:bg-pink-500/30"
+                  >
+                    {tr('Thêm quà', 'Add gift')}
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {(Array.isArray(formData.giftRewards) ? formData.giftRewards as Array<{ giftId: string; quantity: number }> : []).map((reward, index) => (
+                    <div key={`${reward.giftId}-${index}`} className="flex gap-2">
+                      <select
+                        value={reward.giftId}
+                        onChange={(e) => {
+                          const current = Array.isArray(formData.giftRewards) ? [...formData.giftRewards as Array<{ giftId: string; quantity: number }>] : [];
+                          current[index] = { ...current[index], giftId: e.target.value };
+                          setFormData({ ...formData, giftRewards: current });
+                        }}
+                        className="min-w-0 flex-1 px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white"
+                      >
+                        {giftCatalog.map((gift) => <option key={gift.id} value={gift.id}>{gift.emoji} {gift.name} · {gift.minimumTier}</option>)}
+                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        value={reward.quantity}
+                        onChange={(e) => {
+                          const current = Array.isArray(formData.giftRewards) ? [...formData.giftRewards as Array<{ giftId: string; quantity: number }>] : [];
+                          current[index] = { ...current[index], quantity: Number(e.target.value) || 1 };
+                          setFormData({ ...formData, giftRewards: current });
+                        }}
+                        className="w-20 px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = Array.isArray(formData.giftRewards) ? formData.giftRewards as Array<{ giftId: string; quantity: number }> : [];
+                          setFormData({ ...formData, giftRewards: current.filter((_, itemIndex) => itemIndex !== index) });
+                        }}
+                        className="px-3 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {(!Array.isArray(formData.giftRewards) || formData.giftRewards.length === 0) && (
+                    <div className="text-sm text-gray-500">{tr('Chưa chọn quà cụ thể', 'No concrete gifts selected')}</div>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowModal(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
                 {tr('Hủy', 'Cancel')}
               </button>
               <button onClick={handleCreateQuest} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? tr('?ang tạo...', 'Creating...') : tr('Tạo nhiệm vụ', 'Create Quest')}
+                {actionLoading ? tr('Đang tạo...', 'Creating...') : tr('Tạo nhiệm vụ', 'Create Quest')}
               </button>
             </div>
           </Modal>
@@ -2833,7 +3251,7 @@ export default function AdminPage() {
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                     className="w-4 h-4"
                   />
-                  {tr('?ang hoạt động', 'Active')}
+                  {tr('Đang hoạt động', 'Active')}
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-300">
                   <input
@@ -2851,7 +3269,7 @@ export default function AdminPage() {
                 {tr('Hủy', 'Cancel')}
               </button>
               <button onClick={handleCreateTemplate} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? tr('?ang tạo...', 'Creating...') : tr('Tạo mẫu', 'Create Template')}
+                {actionLoading ? tr('Đang tạo...', 'Creating...') : tr('Tạo mẫu', 'Create Template')}
               </button>
             </div>
           </Modal>
@@ -2965,7 +3383,7 @@ export default function AdminPage() {
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                     className="w-4 h-4"
                   />
-                  {tr('?ang hoạt động', 'Active')}
+                  {tr('Đang hoạt động', 'Active')}
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-300">
                   <input
@@ -2983,7 +3401,7 @@ export default function AdminPage() {
                 {tr('Hủy', 'Cancel')}
               </button>
               <button onClick={handleUpdateTemplate} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? tr('?ang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
+                {actionLoading ? tr('Đang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
               </button>
             </div>
           </Modal>
@@ -3035,11 +3453,14 @@ export default function AdminPage() {
             form={rewardForm}
             setForm={setRewardForm}
             onSubmit={handleRewardSubmit}
+            onPreview={handleRewardPreview}
             onClose={() => setShowRewardModal(false)}
             loading={actionLoading}
             language={language}
             status={rewardStatus}
             selectedUserCount={selectedUserIds.length}
+            giftCatalog={giftCatalog}
+            preview={rewardPreview}
           />
         )}
       </AnimatePresence>

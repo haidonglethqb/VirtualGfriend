@@ -2,6 +2,7 @@ import { Prisma, QuestStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../middlewares/error.middleware';
 import { characterService } from '../character/character.service';
+import { applyCharacterRewardEffects, grantRewards } from '../reward/reward-grant.service';
 
 const TIER_HIERARCHY = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
 
@@ -473,6 +474,7 @@ export const arcService = {
 
     const quest = await prisma.quest.findFirst({
       where: { id: questId, arcId, isActive: true },
+      include: { giftRewards: { include: { gift: true }, orderBy: { sortOrder: 'asc' } } },
     });
 
     if (!quest) throw new AppError('Quest not found', 404, 'QUEST_NOT_FOUND');
@@ -480,6 +482,57 @@ export const arcService = {
       throw new AppError('This arc quest is auto-claimed', 400, 'QUEST_AUTO_CLAIMED');
     }
 
+    const grantResult = await prisma.$transaction(async (tx) => {
+      const updated = await tx.userQuest.updateMany({
+        where: { userId, questId, status: 'COMPLETED' },
+        data: { status: 'CLAIMED', claimedAt: new Date() },
+      });
+
+      if (updated.count === 0) {
+        const userQuest = await tx.userQuest.findUnique({
+          where: { userId_questId: { userId, questId } },
+        });
+        if (!userQuest) throw new AppError('Quest not started', 400, 'QUEST_NOT_STARTED');
+        if (userQuest.status === 'CLAIMED') throw new AppError('Reward already claimed', 400, 'REWARD_ALREADY_CLAIMED');
+        throw new AppError('Quest not completed', 400, 'QUEST_NOT_COMPLETED');
+      }
+
+      return grantRewards({
+        userId,
+        coins: quest.rewardCoins,
+        gems: quest.rewardGems,
+        xp: quest.rewardXp,
+        affection: quest.rewardAffection,
+        gifts: quest.giftRewards.map((reward) => ({ giftId: reward.giftId, quantity: reward.quantity })),
+        source: 'QUEST_REWARD',
+        sourceRefId: quest.id,
+        notificationTitle: 'Phan thuong nhiem vu Arc',
+        message: `Ban da nhan thuong tu nhiem vu "${quest.title}".`,
+      }, tx);
+    });
+
+    await applyCharacterRewardEffects(userId, grantResult);
+
+    const progress = await this.updateArcProgress(userId, arcId);
+
+    return {
+      claimed: true,
+      rewards: {
+        coins: quest.rewardCoins,
+        gems: quest.rewardGems,
+        xp: quest.rewardXp,
+        affection: quest.rewardAffection,
+        gifts: quest.giftRewards.map((reward) => ({
+          giftId: reward.giftId,
+          quantity: reward.quantity,
+          gift: reward.gift,
+        })),
+      },
+      arcProgress: progress,
+    };
+
+/*
+    {
     await prisma.$transaction(async (tx) => {
       const updated = await tx.userQuest.updateMany({
         where: { userId, questId, status: 'COMPLETED' },
@@ -522,6 +575,8 @@ export const arcService = {
       },
       arcProgress: progress,
     };
+    }
+*/
   },
 
   async claimArcCompletion(userId: string, arcId: string) {
