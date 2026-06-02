@@ -14,6 +14,7 @@ import {
   normalizeFactKey,
   type FactSaveResult,
 } from '../character/fact-quota.service';
+import { cleanupLowQualityAiFacts } from './memory-policy.service';
 
 const log = createModuleLogger('FactsLearning');
 
@@ -161,6 +162,7 @@ export const factsLearningService = {
    *   - event → decay after 30 days (default)
    */
   async decayOldFacts(daysOld: number = 30): Promise<number> {
+    const cleaned = await cleanupLowQualityAiFacts();
     let totalDecayed = 0;
 
     // Decay event facts quickly (after daysOld days, default 30)
@@ -190,7 +192,7 @@ export const factsLearningService = {
     totalDecayed += memoryResult.count;
 
     // trait, preference, personal_info, hobby, emotional → never decay (permanent/evolving)
-    log.info(`Decayed ${totalDecayed} old facts (event: ${eventResult.count}, memory: ${memoryResult.count})`);
-    return totalDecayed;
+    log.info(`Decayed ${totalDecayed} old facts and cleaned ${cleaned.count} low-quality facts`);
+    return totalDecayed + cleaned.count;
   },
 };

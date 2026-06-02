@@ -97,3 +97,10 @@ Quality scoring evaluates user messages on sincerity (0-10), context fit, emotio
 - [Character Personality](./character-personality.md)
 - [Emotion Detection](./emotion-detection.md)
 - [Memory System](./memory-system.md)
+
+## Natural Recall Rules
+
+- For questions like "nay anh noi may gio?" or "mai anh qua luc nao?", recent messages outrank long-term facts.
+- Memory should be phrased naturally, not as database facts or key/value recall.
+- Relative events like "mai" and "hom nay" are temporary; if expired, the AI must not present them as future plans.
+- Fact extraction should skip short acknowledgements and isolated date/time fragments; concrete appointments become one event fact.

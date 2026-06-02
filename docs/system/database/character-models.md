@@ -99,11 +99,14 @@ model CharacterFact {
   importance  Int      @default(5)    // 1-10
   factType    String   @default("evolving")  // permanent, evolving, temporal
   sourceType  String   @default("manual")    // manual, ai_inline, ai_batch
+  expiresAt   DateTime?
+  metadata    Json?
   learnedAt   DateTime @default(now())
 
   @@unique([characterId, key])
   @@index([characterId, importance])
   @@index([characterId, category])
+  @@index([characterId, expiresAt])
 }
 ```
 

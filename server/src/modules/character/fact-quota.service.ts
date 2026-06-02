@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { cache, CacheKeys } from '../../lib/redis';
 import { getTierConfig, type PremiumTier } from '../admin/tier-config.service';
+import { normalizeIncomingMemoryFact } from '../ai/memory-policy.service';
 
 const VALID_CATEGORIES = new Set([
   'personal',
@@ -46,6 +47,9 @@ export interface IncomingFact {
   value: string;
   category?: string;
   importance?: number;
+  factType?: string;
+  expiresAt?: Date | string | null;
+  metadata?: Prisma.InputJsonValue;
 }
 
 export interface FactSaveResult {
@@ -134,7 +138,9 @@ export const factQuotaService = {
         key: normalizeFactKey(fact.key),
         value: fact.value.trim(),
         category: normalizeFactCategory(fact.category),
-      }));
+      }))
+      .map((fact) => normalizeIncomingMemoryFact(fact))
+      .filter((fact): fact is NonNullable<typeof fact> => fact !== null);
 
     if (normalizedFacts.length === 0) {
       const quota = await this.getQuotaForCharacter(characterId);
@@ -188,6 +194,9 @@ export const factQuotaService = {
               value: fact.value,
               category: fact.category,
               importance: existingIsManual ? Math.max(existing.importance, importance, 8) : importance,
+              factType: fact.factType,
+              expiresAt: fact.expiresAt,
+              metadata: fact.metadata,
               sourceType: existingIsManual ? existing.sourceType : sourceType,
               updatedAt: new Date(),
             },
@@ -209,6 +218,9 @@ export const factQuotaService = {
               value: fact.value,
               category: fact.category,
               importance,
+              factType: fact.factType,
+              expiresAt: fact.expiresAt,
+              metadata: fact.metadata,
               sourceType,
               learnedAt: new Date(),
             },

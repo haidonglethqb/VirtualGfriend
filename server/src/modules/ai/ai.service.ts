@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { CharacterFact, Gender, Message, RelationshipStage, UserGender } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
+import { extractSchedulingEventFact, formatFactForPrompt, getPromptFacts } from './memory-policy.service';
 
 const log = createModuleLogger('AI');
 
@@ -593,9 +594,15 @@ function buildSystemPrompt(context: AIContext): string {
   const userEmotionalState = detectUserEmotionalState(context.userMessage);
   const empathyGuidance = getUserEmotionalGuidance(userEmotionalState, pronouns);
 
-  const factsInfo = context.facts
-    .map((f) => `- ${f.key}: ${f.value}`)
+  const promptFactsInfo = getPromptFacts(context.facts)
+    .map(formatFactForPrompt)
     .join('\n');
+  const naturalMemoryRules = `QUY TAC NHO TU NHIEN:
+- Neu ${context.userName} hoi "nay vua noi gi", "mai may gio", "anh hen may gio", hay uu tien 20 tin nhan gan nhat truoc facts dai han.
+- Khi nhac lai chuyen cu, noi nhu nguoi that: "anh vua noi mai 6h ghe qua choi a", khong doc key/value va khong noi "theo fact".
+- Event co "mai/hom nay/toi nay" chi la ke hoach tam thoi. Neu thoi gian da qua thi khong noi nhu no van sap dien ra.
+- Neu khong chac, hoi lai mem va tu nhien thay vi bia.`;
+  const factsInfo = `${naturalMemoryRules}\n${promptFactsInfo}`.trim();
 
   // Recent conversation summaries for long-term memory context
   const summariesSection = context.recentSummaries && context.recentSummaries.length > 0
@@ -855,13 +862,17 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
         .slice(0, 3)
         .map(f => ({ ...f, category: f.category === 'trait' ? 'personal' : f.category }))
       : [];
+    const schedulingFact = extractSchedulingEventFact(context.userMessage);
+    const mergedFacts = schedulingFact && !facts.some((fact) => fact.key === schedulingFact.key)
+      ? [schedulingFact, ...facts].slice(0, 3)
+      : facts;
 
     return {
       message: normalizedMessage,
       affection_change: affectionChange,
       quality_score: parsed.evaluation.quality_score || 5,
       reason: parsed.evaluation.reason || 'No reason provided',
-      facts,
+      facts: mergedFacts,
     };
   } catch (error) {
     // Fallback: If AI doesn't return JSON, use old logic

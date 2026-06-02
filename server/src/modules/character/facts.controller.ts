@@ -4,6 +4,7 @@ import { prisma, Prisma } from '../../lib/prisma';
 import { AppError } from '../../middlewares/error.middleware';
 import { factQuotaService, normalizeFactCategory, normalizeFactKey } from './fact-quota.service';
 import { realtimeEvents } from '../../lib/realtime-events';
+import { cleanupLowQualityAiFacts } from '../ai/memory-policy.service';
 
 const querySchema = z.object({
   characterId: z.string().uuid().optional(),
@@ -65,6 +66,7 @@ export const factsController = {
   async getFacts(req: Request, res: Response, next: NextFunction) {
     try {
       const character = await factsController.resolveCharacter(req);
+      await cleanupLowQualityAiFacts(character.id);
 
       const facts = await prisma.characterFact.findMany({
         where: { characterId: character.id },

@@ -125,3 +125,11 @@ Breakup flow can now auto-create an ended `Character` flagged as `isExPersona=tr
 - [System Prompt](./system-prompt.md)
 - [Character Models](../database/character-models.md)
 - [Chat Models](../database/chat-models.md)
+
+## Memory Quality Rules
+
+- Temporary event facts can carry `expiresAt` and `metadata`.
+- Concrete scheduling messages such as "mai 6h anh ghe choi" are stored as one temporary event fact, not split into `ngay_gap` and `gio_gap`.
+- Expired AI-learned events and low-quality AI-learned facts are hidden from prompt context and can be cleaned up automatically.
+- Manual/user-edited facts are preserved.
+- Recent chat messages are the priority source for recall questions like "nay anh noi may gio?".
