@@ -73,9 +73,14 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 ### Quests (`/quests`), Gifts (`/gifts`), Shop (`/shop`→alias)
 | Module | Path | Description |
 |---|---|---|
-| Quests | `GET /`, `GET /all`, `GET /me`, `GET /my`, `GET /daily` | All/daily/current-user quests |
-| Quests | `POST /start/:questId`, `POST /complete/:questId` | Start or complete quest progress |
-| Quests | `POST /claim/:questId` | Claim reward |
+| Quests | `GET /`, `GET /all`, `GET /me`, `GET /my`, `GET /daily` | Non-arc all/daily/current-user quests |
+| Quests | `POST /start/:questId`, `POST /complete/:questId` | Start or complete non-arc quest progress |
+| Quests | `POST /claim/:questId` | Claim non-arc quest reward |
+| Arcs | `GET /arcs` | Sequential arc list with unlock state, progress, and quest summaries |
+| Arcs | `GET /arcs/:arcId` | Arc detail with quest progress and completion rewards |
+| Arcs | `POST /arcs/:arcId/start` | Auto-start all active quests in an unlocked arc |
+| Arcs | `POST /arcs/:arcId/quests/:questId/claim` | Claim the final manual arc quest |
+| Arcs | `POST /arcs/:arcId/claim` | Claim once-only arc completion rewards |
 | Gifts | `GET /gifts` | Gift catalog |
 | Gifts | `GET /gifts/inventory` | Purchased items |
 | Gifts | `POST /gifts/buy` | Buy with coins/gems (atomic debit with balance guard) |
@@ -103,7 +108,7 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 ### Game, Analytics, DM, Leaderboard
 | Module | Paths | Description |
 |---|---|---|
-| Game | `POST /daily-login`, `GET /progress` | Daily login reward, progress |
+| Game | `POST /daily-login`, `POST /action`, `GET /daily-progress` | Game actions, daily login reward, progress. `/action` accepts canonical actions and quest aliases such as `send_message` |
 | Analytics | `GET /stats` | User analytics |
 | DM | `GET /conversations`, `GET /conversations/:id/messages`, `GET /unread-count` | User messaging |
 | Leaderboard | `GET /:category` | `level`, `affection`, `streak`, `achievements` (5-min cache) |

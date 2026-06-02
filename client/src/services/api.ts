@@ -309,3 +309,104 @@ class ApiClient {
 
 export const api = new ApiClient(`${API_URL}/api`);
 export default api;
+
+export interface ArcQuestProgress {
+  id: string;
+  progress: number;
+  maxProgress: number;
+  status: 'IN_PROGRESS' | 'COMPLETED' | 'CLAIMED' | 'EXPIRED';
+  completed: boolean;
+  claimed: boolean;
+  completedAt: string | null;
+  claimedAt: string | null;
+}
+
+export interface ArcQuest {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  category: string;
+  requirements: {
+    action?: string;
+    count?: number;
+  };
+  sortOrder: number;
+  prerequisiteQuestId: string | null;
+  isArcFinalQuest: boolean;
+  rewardXp: number;
+  rewardCoins: number;
+  rewardGems: number;
+  rewardAffection: number;
+  target: number;
+  userProgress: ArcQuestProgress | null;
+}
+
+export interface ArcRewardSummary {
+  coins: number;
+  gems: number;
+  xp: number;
+  affection: number;
+  titleName: string | null;
+  sceneName: string | null;
+}
+
+export interface ArcSummary {
+  id: string;
+  name: string;
+  description: string;
+  iconEmoji: string;
+  minLevel: number;
+  maxLevel: number;
+  requiredTier: string;
+  backgroundImage: string | null;
+  orderIndex: number;
+  prerequisiteArcId: string | null;
+  completionPercent: number;
+  completedAt: string | null;
+  unlockedAt: string | null;
+  isUnlocked: boolean;
+  lockReason: 'tier' | 'prerequisite' | null;
+  totalQuests: number;
+  completedQuests: number;
+  rewards: ArcRewardSummary;
+  quests: ArcQuest[];
+}
+
+export interface ArcDetail extends ArcSummary {
+  isStarted: boolean;
+  finalQuestId: string | null;
+  canClaimArc: boolean;
+}
+
+export interface ArcClaimResult {
+  claimed: boolean;
+  arcProgress?: unknown;
+  progress?: unknown;
+  rewards: {
+    coins: number;
+    gems: number;
+    xp: number;
+    affection: number;
+    title?: unknown;
+    scene?: unknown;
+  };
+}
+
+export const arcApi = {
+  async getArcs() {
+    return api.get<ArcSummary[]>('/arcs');
+  },
+  async getArcDetail(arcId: string) {
+    return api.get<ArcDetail>(`/arcs/${arcId}`);
+  },
+  async startArc(arcId: string) {
+    return api.post<ArcDetail>(`/arcs/${arcId}/start`);
+  },
+  async claimArcCompletion(arcId: string) {
+    return api.post<ArcClaimResult>(`/arcs/${arcId}/claim`);
+  },
+  async claimArcQuestReward(arcId: string, questId: string) {
+    return api.post<ArcClaimResult>(`/arcs/${arcId}/quests/${questId}/claim`);
+  },
+};

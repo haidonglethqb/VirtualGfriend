@@ -428,6 +428,7 @@ model Quest {
   // Arc integration
   arcId           String?
   arc             Arc?      @relation(fields: [arcId], references: [id], onDelete: SetNull)
+  isArcFinalQuest Boolean   @default(false)
 
   // Chain quests
   prerequisiteQuestId String? @unique
@@ -762,6 +763,15 @@ model Arc {
   requiredTier    PremiumTier @default(FREE)  // VIP requirement to access
   backgroundImage String?   // Optional background image URL
   isActive        Boolean   @default(true)
+  prerequisiteArcId String? @unique
+  prerequisiteArc   Arc?    @relation("ArcChain", fields: [prerequisiteArcId], references: [id], onDelete: SetNull)
+  nextArc           Arc?    @relation("ArcChain")
+  rewardCoins      Int      @default(0)
+  rewardGems       Int      @default(0)
+  rewardAffection  Int      @default(0)
+  rewardXp         Int      @default(0)
+  rewardTitleName  String?
+  rewardSceneName  String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

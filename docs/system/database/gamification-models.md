@@ -25,6 +25,8 @@ model Quest {
   isActive        Boolean       @default(true)
   startsAt        DateTime?
   endsAt          DateTime?
+  arcId           String?
+  isArcFinalQuest Boolean       @default(false)
 }
 
 model UserQuest {
@@ -41,6 +43,42 @@ model UserQuest {
   @@unique([userId, questId])
 }
 ```
+
+## Arc System
+
+```prisma
+model Arc {
+  id              String      @id @default(uuid())
+  name            String      @unique
+  description     String
+  iconEmoji       String
+  minLevel        Int
+  maxLevel        Int
+  orderIndex      Int
+  requiredTier    PremiumTier @default(FREE)
+  prerequisiteArcId String?   @unique
+  rewardCoins     Int        @default(0)
+  rewardGems      Int        @default(0)
+  rewardAffection Int        @default(0)
+  rewardXp        Int        @default(0)
+  rewardTitleName String?
+  rewardSceneName String?
+}
+
+model ArcProgress {
+  id                String   @id @default(uuid())
+  userId            String
+  arcId             String
+  completionPercent Int      @default(0)
+  currentQuestId    String?
+  unlockedAt        DateTime @default(now())
+  completedAt       DateTime?
+
+  @@unique([userId, arcId])
+}
+```
+
+Arc completion is sequential: `prerequisiteArcId` must have a completed `ArcProgress.completedAt` before the next arc unlocks.
 
 ### Quest Enums
 

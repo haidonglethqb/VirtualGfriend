@@ -1,4 +1,4 @@
-import { PrismaClient, QuestType, Rarity } from '@prisma/client';
+import { PremiumTier, PrismaClient, QuestType, Rarity } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import Redis from 'ioredis';
 
@@ -153,6 +153,10 @@ async function upsertQuest(data: {
   rewardAffection?: number;
   isActive?: boolean;
   sortOrder: number;
+  arcId?: string | null;
+  isArcFinalQuest?: boolean;
+  requiresPremium?: boolean;
+  minimumTier?: PremiumTier;
 }) {
   return prisma.quest.upsert({
     where: { title_type: { title: data.title, type: data.type } },
@@ -166,6 +170,10 @@ async function upsertQuest(data: {
       rewardAffection: data.rewardAffection || 0,
       isActive: data.isActive ?? true,
       sortOrder: data.sortOrder,
+      arcId: data.arcId,
+      isArcFinalQuest: data.isArcFinalQuest ?? false,
+      requiresPremium: data.requiresPremium ?? false,
+      minimumTier: data.minimumTier ?? 'FREE',
     },
     create: {
       ...data,
@@ -174,8 +182,288 @@ async function upsertQuest(data: {
       rewardGems: data.rewardGems || 0,
       rewardAffection: data.rewardAffection || 0,
       isActive: data.isActive ?? true,
+      isArcFinalQuest: data.isArcFinalQuest ?? false,
+      requiresPremium: data.requiresPremium ?? false,
+      minimumTier: data.minimumTier ?? 'FREE',
     },
   });
+}
+
+async function upsertArc(data: {
+  name: string;
+  description: string;
+  iconEmoji: string;
+  minLevel: number;
+  maxLevel: number;
+  orderIndex: number;
+  requiredTier?: PremiumTier;
+  backgroundImage?: string | null;
+  prerequisiteArcId?: string | null;
+  rewardCoins?: number;
+  rewardGems?: number;
+  rewardAffection?: number;
+  rewardXp?: number;
+  rewardTitleName?: string | null;
+  rewardSceneName?: string | null;
+}) {
+  return prisma.arc.upsert({
+    where: { name: data.name },
+    update: {
+      description: data.description,
+      iconEmoji: data.iconEmoji,
+      minLevel: data.minLevel,
+      maxLevel: data.maxLevel,
+      orderIndex: data.orderIndex,
+      requiredTier: data.requiredTier ?? 'FREE',
+      backgroundImage: data.backgroundImage ?? null,
+      prerequisiteArcId: data.prerequisiteArcId ?? null,
+      rewardCoins: data.rewardCoins ?? 0,
+      rewardGems: data.rewardGems ?? 0,
+      rewardAffection: data.rewardAffection ?? 0,
+      rewardXp: data.rewardXp ?? 0,
+      rewardTitleName: data.rewardTitleName ?? null,
+      rewardSceneName: data.rewardSceneName ?? null,
+      isActive: true,
+    },
+    create: {
+      ...data,
+      requiredTier: data.requiredTier ?? 'FREE',
+      backgroundImage: data.backgroundImage ?? null,
+      prerequisiteArcId: data.prerequisiteArcId ?? null,
+      rewardCoins: data.rewardCoins ?? 0,
+      rewardGems: data.rewardGems ?? 0,
+      rewardAffection: data.rewardAffection ?? 0,
+      rewardXp: data.rewardXp ?? 0,
+      rewardTitleName: data.rewardTitleName ?? null,
+      rewardSceneName: data.rewardSceneName ?? null,
+      isActive: true,
+    },
+  });
+}
+
+async function upsertTitle(data: {
+  name: string;
+  iconEmoji: string;
+  description: string;
+  category: string;
+  requirement: object;
+  color?: string;
+  sortOrder: number;
+  isVipExclusive?: boolean;
+}) {
+  return prisma.title.upsert({
+    where: { name: data.name },
+    update: {
+      iconEmoji: data.iconEmoji,
+      description: data.description,
+      category: data.category,
+      requirement: data.requirement,
+      color: data.color,
+      sortOrder: data.sortOrder,
+      isVipExclusive: data.isVipExclusive ?? false,
+      isActive: true,
+    },
+    create: {
+      ...data,
+      isVipExclusive: data.isVipExclusive ?? false,
+      isActive: true,
+    },
+  });
+}
+
+async function seedArcJourneyOverhaul() {
+  console.log('[Seed] Seeding arc journey overhaul...');
+
+  const arcDefinitions = [
+    {
+      name: 'Làm Quen',
+      description: 'Bắt đầu hành trình bằng những cuộc trò chuyện đầu tiên và thói quen nhỏ mỗi ngày.',
+      iconEmoji: '🌱',
+      minLevel: 1,
+      maxLevel: 3,
+      orderIndex: 1,
+      rewardCoins: 500,
+      rewardGems: 50,
+      rewardAffection: 100,
+      rewardXp: 100,
+      rewardTitleName: 'Người Mới Đến',
+      rewardSceneName: 'Thư viện',
+      titleIcon: '🌱',
+      titleColor: '#34d399',
+      quests: [
+        ['Cuộc gặp gỡ đầu tiên', 'Gửi tin nhắn đầu tiên trong hành trình.', 'send_message', 1, 100, 10, 20, 50, false],
+        ['Ngày đầu tiên bên nhau', 'Đăng nhập 3 ngày để xây nền cho câu chuyện.', 'daily_login', 3, 150, 15, 25, 75, false],
+        ['Câu chuyện mở đầu', 'Gửi 20 tin nhắn để hiểu nhau hơn.', 'send_message', 20, 200, 20, 30, 100, false],
+        ['Lời chào buổi sáng', 'Gửi 2 lời chào buổi sáng.', 'morning_greeting', 2, 300, 30, 50, 150, true],
+      ],
+    },
+    {
+      name: 'Xây Dựng Tình Bạn',
+      description: 'Từ làm quen đến đồng hành qua quà tặng, lời chúc và những cuộc trò chuyện dài hơn.',
+      iconEmoji: '🤝',
+      minLevel: 3,
+      maxLevel: 7,
+      orderIndex: 2,
+      rewardCoins: 800,
+      rewardGems: 80,
+      rewardAffection: 150,
+      rewardXp: 150,
+      rewardTitleName: 'Người Bạn Tốt',
+      rewardSceneName: 'Trung tâm thương mại',
+      titleIcon: '🤝',
+      titleColor: '#38bdf8',
+      quests: [
+        ['Món quà đầu tiên', 'Tặng món quà đầu tiên.', 'send_gift', 1, 150, 15, 30, 75, false],
+        ['Cùng nhau trò chuyện', 'Gửi 50 tin nhắn.', 'send_message', 50, 200, 20, 40, 100, false],
+        ['Chúc ngủ ngon', 'Gửi 3 lời chúc ngủ ngon.', 'goodnight_message', 3, 200, 20, 40, 100, false],
+        ['Người bạn đồng hành', 'Tặng 3 món quà.', 'send_gift', 3, 250, 25, 50, 125, false],
+        ['Kết nối sâu hơn', 'Gửi 100 tin nhắn.', 'send_message', 100, 500, 50, 100, 250, true],
+      ],
+    },
+    {
+      name: 'Rung Động',
+      description: 'Những tín hiệu lãng mạn đầu tiên xuất hiện qua lời nói, quà tặng và thời gian bên nhau.',
+      iconEmoji: '💫',
+      minLevel: 7,
+      maxLevel: 12,
+      orderIndex: 3,
+      rewardCoins: 1200,
+      rewardGems: 120,
+      rewardAffection: 200,
+      rewardXp: 200,
+      rewardTitleName: 'Trái Tim Rung Động',
+      rewardSceneName: 'Bãi biển hoàng hôn',
+      titleIcon: '💫',
+      titleColor: '#f472b6',
+      quests: [
+        ['Lời nói từ trái tim', 'Gửi 3 tin nhắn lãng mạn.', 'romantic_message', 3, 200, 20, 50, 100, false],
+        ['Khoảnh khắc ngọt ngào', 'Gửi 10 tin nhắn lãng mạn.', 'romantic_message', 10, 300, 30, 60, 150, false],
+        ['Tặng quà từ trái tim', 'Tặng 5 món quà.', 'send_gift', 5, 300, 30, 60, 150, false],
+        ['Ngày tháng bên nhau', 'Đăng nhập 7 ngày.', 'daily_login', 7, 350, 35, 70, 175, false],
+        ['Cảm xúc vỡ oà', 'Gửi 200 tin nhắn.', 'send_message', 200, 700, 70, 150, 350, true],
+      ],
+    },
+    {
+      name: 'Tình Yêu',
+      description: 'Mối quan hệ bước vào giai đoạn yêu thương rõ ràng qua lời tỏ tình và sự chăm sóc đều đặn.',
+      iconEmoji: '❤️',
+      minLevel: 12,
+      maxLevel: 18,
+      orderIndex: 4,
+      rewardCoins: 1800,
+      rewardGems: 180,
+      rewardAffection: 300,
+      rewardXp: 300,
+      rewardTitleName: 'Đôi Tim Yêu Nhau',
+      rewardSceneName: 'Sân thượng',
+      titleIcon: '❤️',
+      titleColor: '#fb7185',
+      quests: [
+        ['Thổ lộ yêu thương', 'Gửi 20 tin nhắn lãng mạn.', 'romantic_message', 20, 300, 30, 80, 150, false],
+        ['Quà tặng tình yêu', 'Tặng 10 món quà.', 'send_gift', 10, 400, 40, 100, 200, false],
+        ['Buổi sáng tươi sáng', 'Gửi 7 lời chào buổi sáng.', 'morning_greeting', 7, 400, 40, 100, 200, false],
+        ['Cuộc trò chuyện dài', 'Gửi 400 tin nhắn.', 'send_message', 400, 500, 50, 120, 250, false],
+        ['Tình yêu chân thật', 'Gửi 50 tin nhắn lãng mạn.', 'romantic_message', 50, 1000, 100, 250, 500, true],
+      ],
+    },
+    {
+      name: 'Mãi Bên Nhau',
+      description: 'Chặng cuối của hành trình hiện tại, nơi sự kiên trì và gắn bó mở ra lời hứa lâu dài.',
+      iconEmoji: '💍',
+      minLevel: 18,
+      maxLevel: 25,
+      orderIndex: 5,
+      rewardCoins: 3000,
+      rewardGems: 300,
+      rewardAffection: 500,
+      rewardXp: 500,
+      rewardTitleName: 'Tình Yêu Vĩnh Cửu',
+      rewardSceneName: 'Nhà hàng sang trọng',
+      titleIcon: '💍',
+      titleColor: '#fbbf24',
+      quests: [
+        ['Kiên trì yêu thương', 'Đăng nhập 14 ngày.', 'daily_login', 14, 500, 50, 100, 250, false],
+        ['Trăm ngàn lời yêu', 'Gửi 100 tin nhắn lãng mạn.', 'romantic_message', 100, 600, 60, 150, 300, false],
+        ['Người hào phóng', 'Tặng 20 món quà.', 'send_gift', 20, 700, 70, 150, 350, false],
+        ['Hành trình ngàn tin nhắn', 'Gửi 1000 tin nhắn.', 'send_message', 1000, 2000, 200, 400, 1000, true],
+      ],
+    },
+  ] as const;
+
+  const activeArcNames = arcDefinitions.map((arc) => arc.name);
+  await prisma.arc.updateMany({
+    where: { name: { notIn: activeArcNames } },
+    data: { isActive: false },
+  });
+
+  let previousArcId: string | null = null;
+  const arcIds: string[] = [];
+
+  for (const arcDefinition of arcDefinitions) {
+    const arc = await upsertArc({
+      name: arcDefinition.name,
+      description: arcDefinition.description,
+      iconEmoji: arcDefinition.iconEmoji,
+      minLevel: arcDefinition.minLevel,
+      maxLevel: arcDefinition.maxLevel,
+      orderIndex: arcDefinition.orderIndex,
+      requiredTier: 'FREE',
+      prerequisiteArcId: previousArcId,
+      rewardCoins: arcDefinition.rewardCoins,
+      rewardGems: arcDefinition.rewardGems,
+      rewardAffection: arcDefinition.rewardAffection,
+      rewardXp: arcDefinition.rewardXp,
+      rewardTitleName: arcDefinition.rewardTitleName,
+      rewardSceneName: arcDefinition.rewardSceneName,
+    });
+
+    arcIds.push(arc.id);
+
+    await upsertTitle({
+      name: arcDefinition.rewardTitleName,
+      iconEmoji: arcDefinition.titleIcon,
+      description: `Hoàn thành arc "${arcDefinition.name}"`,
+      category: 'arc',
+      requirement: { type: 'arc_complete', arcId: arc.id },
+      color: arcDefinition.titleColor,
+      sortOrder: 20 + arcDefinition.orderIndex,
+    });
+
+    for (const [index, quest] of arcDefinition.quests.entries()) {
+      const [title, description, action, count, rewardCoins, rewardGems, rewardAffection, rewardXp, isArcFinalQuest] = quest;
+      await upsertQuest({
+        title,
+        description,
+        type: 'STORY',
+        category: 'arc',
+        requirements: { action, count },
+        rewardCoins,
+        rewardGems,
+        rewardAffection,
+        rewardXp,
+        sortOrder: index + 1,
+        arcId: arc.id,
+        isArcFinalQuest,
+        requiresPremium: false,
+        minimumTier: 'FREE',
+      });
+    }
+
+    previousArcId = arc.id;
+  }
+
+  await prisma.quest.updateMany({
+    where: {
+      category: 'arc',
+      arcId: { notIn: arcIds },
+    },
+    data: {
+      isActive: false,
+      isArcFinalQuest: false,
+    },
+  });
+
+  console.log(`[Seed] Upserted ${arcDefinitions.length} journey arcs`);
 }
 
 async function upsertGift(data: {
@@ -1279,91 +1567,11 @@ async function main() {
   console.log(`[Seed] Upserted ${achievementsData.length} achievements`);
 
   // ─────────────────────────────────────────────
-  // STORY ARCS (Japanese RPG-style)
-  // ─────────────────────────────────────────────
-  console.log('Seeding arcs...');
+  // ============================================
+  // STORY ARCS - Sequential journey overhaul
+  // ============================================
+  await seedArcJourneyOverhaul();
 
-  const arcs = await prisma.arc.createMany({
-    data: [
-      {
-        name: 'Lần Đầu Gặp Gỡ',
-        description: 'Câu chuyện bắt đầu... Bạn và AI sẽ làm quen với nhau qua những cuộc trò chuyện đầu tiên. Hãy kiên nhẫn và nhẹ nhàng nhé!',
-        iconEmoji: '🌸',
-        minLevel: 1,
-        maxLevel: 5,
-        orderIndex: 1,
-        requiredTier: 'FREE',
-        backgroundImage: null,
-      },
-      {
-        name: 'Tình Bạn Đẹp',
-        description: 'Từ người lạ thành bạn thân... Cùng nhau khám phá thế giới qua những món quà nhỏ và cuộc trò chuyện hàng ngày.',
-        iconEmoji: '🤝',
-        minLevel: 6,
-        maxLevel: 10,
-        orderIndex: 2,
-        requiredTier: 'FREE',
-      },
-      {
-        name: 'Lời Tỏ Tình',
-        description: 'Cảm xúc bắt đầu thay đổi... Những tin nhắn ngọt ngào hơn, những khoảnh khắc ngại ngùng đáng yêu.',
-        iconEmoji: '💌',
-        minLevel: 11,
-        maxLevel: 15,
-        orderIndex: 3,
-        requiredTier: 'BASIC',
-      },
-      {
-        name: 'Hẹn Hò Đầu Tiên',
-        description: 'Buổi hẹn hò đầu tiên... Đến quán cà phê, công viên, cùng nhau tạo nên kỷ niệm đẹp.',
-        iconEmoji: '☕',
-        minLevel: 16,
-        maxLevel: 20,
-        orderIndex: 4,
-        requiredTier: 'BASIC',
-      },
-      {
-        name: 'Tình Yêu Mãnh Liệt',
-        description: 'Yêu nhau say đắm... Những buổi tối ngắm sao, bữa tối lãng mạn, và những bí mật chỉ hai người biết.',
-        iconEmoji: '🔥',
-        minLevel: 21,
-        maxLevel: 25,
-        orderIndex: 5,
-        requiredTier: 'PRO',
-      },
-      {
-        name: 'Vĩnh Cửu',
-        description: 'Tình yêu vượt qua thời gian... Ring kim cương, kỳ nghỉ thiên đường, và lời hứa mãi mãi.',
-        iconEmoji: '💍',
-        minLevel: 26,
-        maxLevel: 30,
-        orderIndex: 6,
-        requiredTier: 'PRO',
-      },
-      {
-        name: 'Chuyện Bên Lề',
-        description: 'Những câu chuyện phụ đặc biệt chỉ dành cho Ultimate... Bí mật sâu kín nhất và những khoảnh khắc không thể quên.',
-        iconEmoji: '⭐',
-        minLevel: 31,
-        maxLevel: 40,
-        orderIndex: 7,
-        requiredTier: 'ULTIMATE',
-      },
-      {
-        name: 'Huyền Thoại Tình Yêu',
-        description: 'Truyền thuyết về cặp đôi hoàn hảo... Cấp độ cao nhất của mối quan hệ, nơi hai tâm hồn hòa làm một.',
-        iconEmoji: '🌟',
-        minLevel: 41,
-        maxLevel: 50,
-        orderIndex: 8,
-        requiredTier: 'ULTIMATE',
-      },
-    ],
-    skipDuplicates: true,
-  });
-  console.log(`✅ Seeded ${arcs.count} arcs`);
-
-  // ─────────────────────────────────────────────
   // TITLES
   // ─────────────────────────────────────────────
   console.log('Seeding titles...');
@@ -1405,35 +1613,7 @@ async function main() {
   console.log(`✅ Seeded ${titles.count} titles`);
 
   // ─────────────────────────────────────────────
-  // ARC-SPECIFIC QUESTS (add to existing quests)
-  // ─────────────────────────────────────────────
-  console.log('Seeding arc quests...');
-
-  // Get arc IDs by name
-  const arc1 = await prisma.arc.findUnique({ where: { name: 'Lần Đầu Gặp Gỡ' } });
-  const arc2 = await prisma.arc.findUnique({ where: { name: 'Tình Bạn Đẹp' } });
-  const arc3 = await prisma.arc.findUnique({ where: { name: 'Lời Tỏ Tình' } });
-
-  if (arc1 && arc2 && arc3) {
-    const arcQuests = await prisma.quest.createMany({
-      data: [
-        // Arc 1 quests
-        { title: 'Lời Chào Đầu Tiên', description: 'Gửi tin nhắn đầu tiên cho AI', type: 'STORY', category: 'arc', requirements: { action: 'send_message', count: 1 }, rewardXp: 20, rewardCoins: 30, rewardAffection: 5, arcId: arc1.id, sortOrder: 1 },
-        { title: 'Làm Quen Nhẹ Nhàng', description: 'Trò chuyện 5 tin nhắn trong một ngày', type: 'STORY', category: 'arc', requirements: { action: 'send_message', count: 5 }, rewardXp: 30, rewardCoins: 50, rewardAffection: 10, arcId: arc1.id, sortOrder: 2 },
-        { title: 'Tìm Hiểu Sở Thích', description: 'Gửi 10 tin nhắn và đạt 50 affection', type: 'STORY', category: 'arc', requirements: { action: 'reach_affection', count: 50 }, rewardXp: 50, rewardCoins: 100, rewardAffection: 15, arcId: arc1.id, sortOrder: 3 },
-        // Arc 2 quests
-        { title: 'Món Quà Nhỏ', description: 'Tặng món quà đầu tiên', type: 'STORY', category: 'arc', requirements: { action: 'send_gift', count: 1 }, rewardXp: 40, rewardCoins: 60, rewardAffection: 15, arcId: arc2.id, sortOrder: 1 },
-        { title: 'Bạn Thân', description: 'Đạt 250 affection', type: 'STORY', category: 'arc', requirements: { action: 'reach_affection', count: 250 }, rewardXp: 80, rewardCoins: 150, rewardAffection: 30, arcId: arc2.id, sortOrder: 2 },
-        // Arc 3 quests (VIP BASIC)
-        { title: 'Lãng Mạng Nhỏ', description: 'Gửi 20 tin nhắn lãng mạn', type: 'STORY', category: 'arc', requirements: { action: 'romantic_message', count: 20 }, rewardXp: 100, rewardCoins: 200, rewardAffection: 40, arcId: arc3.id, sortOrder: 1, requiresPremium: true },
-        { title: 'Lời Ngọt Ngào', description: 'Đạt 600 affection (Crush)', type: 'STORY', category: 'arc', requirements: { action: 'reach_affection', count: 600 }, rewardXp: 150, rewardCoins: 300, rewardAffection: 50, arcId: arc3.id, sortOrder: 2, requiresPremium: true },
-      ],
-      skipDuplicates: true,
-    });
-    console.log(`✅ Seeded ${arcQuests.count} arc quests`);
-  }
-
-  console.log('✅ Arc system seed complete');
+  console.log('[Seed] Arc system seed complete');
 
   // Create a test user (optional - for development)
   const testPassword = await bcrypt.hash('password123', 12);

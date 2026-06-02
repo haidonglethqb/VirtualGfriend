@@ -4,6 +4,20 @@ import { AppError } from '../../middlewares/error.middleware';
 import { characterService } from '../character/character.service';
 import { getTierConfig } from '../admin/tier-config.service';
 
+function isArcQuest(quest: { arcId?: string | null; category?: string | null }) {
+  return !!quest.arcId || quest.category === 'arc';
+}
+
+function assertNotArcQuest(quest: { arcId?: string | null; category?: string | null }) {
+  if (isArcQuest(quest)) {
+    throw new AppError(
+      'Arc quests must be started and claimed through the arc journey',
+      403,
+      'ARC_QUEST_REQUIRES_ARC_FLOW'
+    );
+  }
+}
+
 export const questService = {
   async getAllQuests() {
     const allQuests = await cache.getOrSet(
@@ -18,6 +32,7 @@ export const questService = {
     // Filter event quests by date
     const now = new Date();
     const filteredQuests = allQuests.filter(q => {
+      if (isArcQuest(q)) return false;
       if (q.type !== 'EVENT') return true;
       if ((q as any).startsAt && now < (q as any).startsAt) return false;
       if ((q as any).endsAt && now > (q as any).endsAt) return false;
@@ -59,7 +74,13 @@ export const questService = {
 
   async getUserQuests(userId: string) {
     return prisma.userQuest.findMany({
-      where: { userId },
+      where: {
+        userId,
+        quest: {
+          arcId: null,
+          NOT: { category: 'arc' },
+        },
+      },
       include: { quest: true },
       orderBy: { startedAt: 'desc' },
     });
@@ -74,6 +95,8 @@ export const questService = {
       where: {
         type: 'DAILY',
         isActive: true,
+        arcId: null,
+        NOT: { category: 'arc' },
       },
     });
 
@@ -115,6 +138,7 @@ export const questService = {
     if (!quest) {
       throw new AppError('Quest not found', 404, 'QUEST_NOT_FOUND');
     }
+    assertNotArcQuest(quest);
 
     // Check premium access for premium quests
     const user = await prisma.user.findUnique({
@@ -160,11 +184,13 @@ export const questService = {
   async completeQuest(userId: string, questId: string) {
     const userQuest = await prisma.userQuest.findUnique({
       where: { userId_questId: { userId, questId } },
+      include: { quest: true },
     });
 
     if (!userQuest) {
       throw new AppError('Quest not started', 400, 'QUEST_NOT_STARTED');
     }
+    assertNotArcQuest(userQuest.quest);
 
     if (userQuest.status !== 'IN_PROGRESS') {
       throw new AppError('Quest already completed', 400, 'QUEST_ALREADY_COMPLETED');
@@ -191,6 +217,16 @@ export const questService = {
   },
 
   async claimReward(userId: string, questId: string) {
+    const questForAccess = await prisma.quest.findUnique({
+      where: { id: questId },
+      select: { arcId: true, category: true },
+    });
+
+    if (!questForAccess) {
+      throw new AppError('Quest not found', 404, 'QUEST_NOT_FOUND');
+    }
+    assertNotArcQuest(questForAccess);
+
     // Atomic update: only transition COMPLETED -> CLAIMED
     const updated = await prisma.userQuest.updateMany({
       where: { userId, questId, status: 'COMPLETED' },
@@ -207,6 +243,7 @@ export const questService = {
       if (!userQuest) {
         throw new AppError('Quest not found', 404, 'QUEST_NOT_FOUND');
       }
+      assertNotArcQuest(userQuest.quest);
       if (userQuest.status === 'CLAIMED') {
         throw new AppError('Reward already claimed', 400, 'REWARD_ALREADY_CLAIMED');
       }
@@ -221,6 +258,7 @@ export const questService = {
     if (!userQuest) {
       throw new AppError('Quest not found', 404, 'QUEST_NOT_FOUND');
     }
+    assertNotArcQuest(userQuest.quest);
 
     const quest = userQuest.quest;
 
@@ -307,7 +345,12 @@ export const questService = {
 
     // Get all active weekly quests
     const weeklyQuests = await prisma.quest.findMany({
-      where: { type: 'WEEKLY', isActive: true },
+      where: {
+        type: 'WEEKLY',
+        isActive: true,
+        arcId: null,
+        NOT: { category: 'arc' },
+      },
     });
 
     if (weeklyQuests.length === 0) {

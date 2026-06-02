@@ -1,16 +1,16 @@
 # Quests System
 
 ## Overview
-Quest system provides structured objectives for users to earn XP, coins, gems, and affection. Quests auto-start daily, track progress via game events, and support auto-claiming.
+Quest system provides structured objectives for users to earn XP, coins, gems, and affection. Daily quests auto-start from game events; arc quests auto-start when the user starts an arc.
 
 ## Quest Types
 
 | Type | Description | Reset Cycle |
 |------|-------------|-------------|
-| `DAILY` | Everyday objectives (chat, greet, gift) | Daily (midnight UTC) |
+| `DAILY` | Everyday objectives (chat, greet, gift) | Daily |
 | `WEEKLY` | Longer-term objectives | Weekly |
-| `STORY` | Narrative-driven quests | One-time |
-| `ACHIEVEMENT` | Milestone-based unlocks | Permanent |
+| `STORY` | Narrative and arc quests | One-time |
+| `ACHIEVEMENT` | Milestone-based objectives | Permanent |
 | `EVENT` | Time-limited seasonal quests | Event duration |
 | `RELATIONSHIP` | Bond-specific objectives | Per character |
 
@@ -21,7 +21,8 @@ Quest {
   id, type, title, description,
   requirements: JSON,   // { action: "send_message", count: 10 }
   rewardXp, rewardCoins, rewardGems, rewardAffection,
-  requiresPremium, minimumTier,  // Premium gating
+  requiresPremium, minimumTier,
+  arcId, isArcFinalQuest,
   sortOrder, isActive
 }
 
@@ -33,45 +34,50 @@ UserQuest {
 }
 ```
 
-## Quest Progress Flow
+## Progress Flow
 
 ```mermaid
 sequenceDiagram
     participant User
     participant GameEvent
-    participant QuestService
-    participant DB
-    participant CharacterService
+    participant Quest
+    participant Arc
+    participant Character
 
     User->>GameEvent: processAction(SEND_MESSAGE)
-    GameEvent->>GameEvent: autoStartDailyQuests (debounced)
-    GameEvent->>QuestService: updateQuestProgress(action)
-    QuestService->>DB: Find IN_PROGRESS quests
-    QuestService->>DB: Batch update progress
-    alt Progress >= maxProgress
-        QuestService->>QuestService: Auto-claim quest
-        QuestService->>DB: Status → CLAIMED
-        QuestService->>DB: Increment coins, gems
-        QuestService->>CharacterService: addExperience + updateAffection
-        GameEvent->>GameEvent: checkMilestones
+    GameEvent->>Quest: update matching IN_PROGRESS quests
+    GameEvent->>Arc: sync reach_affection/reach_level quests
+    alt Non-final quest completed
+        GameEvent->>Quest: autoClaimQuest()
+        Quest->>Character: addExperience/updateAffection
+    else Final arc quest completed
+        GameEvent->>Quest: leave status COMPLETED
     end
-    GameEvent-->>User: Return questsCompleted[]
+    GameEvent->>Arc: update started arc progress
 ```
 
-## Reward Claiming Flow
+## Claiming
 
-1. **Auto-claim**: `gameEventService.autoClaimQuest()` runs immediately on completion
-2. **Manual claim**: `POST /api/quests/claim/:questId` — validates `status === COMPLETED`
-3. **Transaction**: Atomic — status update + currency grant happen together
-4. **Side effects**: XP/affection applied to active character (non-critical, outside transaction)
+- Normal completed quests: auto-claimed by `gameEventService.autoClaimQuest()`.
+- Manual quest claim: `POST /api/quests/claim/:questId`.
+- Final arc quest: `POST /api/arcs/:arcId/quests/:questId/claim`.
+- Arc completion: `POST /api/arcs/:arcId/claim`, grants arc coins, gems, XP, affection, title, and scene once.
+- Quest API list/start/complete/claim endpoints exclude arc quests; arc quests must use Arc API so prerequisite order cannot be bypassed.
 
-## Premium Gating
-- `requiresPremium: true` — blocks FREE tier users
-- `minimumTier: "BASIC"|"PRO"|"ULTIMATE"` — tier-specific access
-- Checked via `tier-config.service.canAccessPremiumQuests`
+## Arc Journey
+
+Seeded story arcs are sequential and FREE:
+`Làm Quen` -> `Xây Dựng Tình Bạn` -> `Rung Động` -> `Tình Yêu` -> `Mãi Bên Nhau`.
+
+Arc rules:
+- `POST /api/arcs/:arcId/start` upserts all active quests for that arc.
+- `prerequisiteArcId` blocks the next arc until the previous arc has `completedAt`.
+- Completion percent is based on claimed arc quests.
+- Only `isArcFinalQuest=true` requires manual user claim.
 
 ## Related
+
 - [Gifts & Shop](./gifts-shop.md)
 - [Levels & Affection](./levels-affection.md)
-- [Daily Rewards](./daily-rewards.md)
-- Source: `server/src/modules/quest/`, `server/src/modules/game/game-event.service.ts`
+- [Scenes](./scenes.md)
+- Source: `server/src/modules/arc/`, `server/src/modules/game/game-event.service.ts`

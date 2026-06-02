@@ -23,6 +23,7 @@ export type GameAction =
   | 'DAILY_LOGIN'
   | 'FIRST_MESSAGE_TODAY'
   | 'REACH_AFFECTION_LEVEL'
+  | 'REACH_LEVEL'
   | 'COMPLETE_QUEST'
   | 'UNLOCK_SCENE'
   | 'RELATIONSHIP_UPGRADE';
@@ -143,13 +144,22 @@ export const gameEventService = {
     // 5.5 Update arc progress for all arcs user has started
     try {
       const { arcService } = await import('../arc/arc.service');
-      const arcs = await prisma.arc.findMany({
-        where: { isActive: true },
-        select: { id: true },
+      const thresholdUpdates = await arcService.syncThresholdQuestProgress(userId);
+      result.questsUpdated += thresholdUpdates.updated;
+      for (const completed of thresholdUpdates.completed) {
+        if (!result.questsCompleted.some((quest) => quest.questId === completed.questId)) {
+          result.questsCompleted.push(completed);
+        }
+        await this.autoClaimQuest(userId, completed.questId, _depth);
+      }
+
+      const startedArcProgress = await prisma.arcProgress.findMany({
+        where: { userId },
+        select: { arcId: true },
       });
 
-      for (const arc of arcs) {
-        await arcService.updateArcProgress(userId, arc.id);
+      for (const progress of startedArcProgress) {
+        await arcService.updateArcProgress(userId, progress.arcId);
       }
     } catch (err) {
       log.error('Arc progress update failed:', err);
@@ -176,7 +186,12 @@ export const gameEventService = {
 
     // Get all daily quests (single query)
     const dailyQuests = await prisma.quest.findMany({
-      where: { type: 'DAILY', isActive: true },
+      where: {
+        type: 'DAILY',
+        isActive: true,
+        arcId: null,
+        NOT: { category: 'arc' },
+      },
     });
 
     if (dailyQuests.length === 0) return;
@@ -257,12 +272,17 @@ export const gameEventService = {
       'DAILY_LOGIN': ['daily_login', 'login'],
       'FIRST_MESSAGE_TODAY': ['first_message', 'morning_greeting', 'goodnight_message'],
       'REACH_AFFECTION_LEVEL': ['reach_affection'],
+      'REACH_LEVEL': ['reach_level'],
       'COMPLETE_QUEST': ['complete_quest'],
       'UNLOCK_SCENE': ['unlock_scene'],
       'RELATIONSHIP_UPGRADE': ['relationship_upgrade'],
     };
 
     const matchingActions = actionMapping[action] || [action.toLowerCase()];
+    const sourceAction = metadata?.sourceAction;
+    if (typeof sourceAction === 'string' && !matchingActions.includes(sourceAction)) {
+      matchingActions.push(sourceAction);
+    }
 
     // Check for time-based quest matching
     const currentHour = new Date().getHours();
@@ -287,11 +307,24 @@ export const gameEventService = {
       },
       include: { quest: true },
     });
+    const arcIds = Array.from(
+      new Set(userQuests.map((userQuest) => userQuest.quest.arcId).filter((arcId): arcId is string => !!arcId))
+    );
+    const startedArcIds = arcIds.length > 0
+      ? new Set(
+          (await prisma.arcProgress.findMany({
+            where: { userId, arcId: { in: arcIds } },
+            select: { arcId: true },
+          })).map((progress) => progress.arcId)
+        )
+      : new Set<string>();
 
     // Collect batch updates
     const batchUpdates: { id: string; progress: number; isCompleted: boolean; quest: typeof userQuests[0]['quest'] }[] = [];
 
     for (const uq of userQuests) {
+      if (uq.quest.arcId && !startedArcIds.has(uq.quest.arcId)) continue;
+
       const requirements = uq.quest.requirements as { action?: string; count?: number };
 
       if (requirements.action && matchingActions.includes(requirements.action)) {
@@ -340,6 +373,15 @@ export const gameEventService = {
    * Auto-claim a completed quest and distribute rewards
    */
   async autoClaimQuest(userId: string, questId: string, _depth: number = 0): Promise<void> {
+    const questForClaim = await prisma.quest.findUnique({
+      where: { id: questId },
+      select: { isArcFinalQuest: true },
+    });
+
+    if (questForClaim?.isArcFinalQuest) {
+      return;
+    }
+
     // Atomic update: only transition COMPLETED -> CLAIMED, prevents double-claim
     const updated = await prisma.userQuest.updateMany({
       where: { userId, questId, status: 'COMPLETED' },
@@ -741,7 +783,12 @@ export const gameEventService = {
         },
       }),
       prisma.quest.count({
-        where: { type: 'DAILY', isActive: true },
+        where: {
+          type: 'DAILY',
+          isActive: true,
+          arcId: null,
+          NOT: { category: 'arc' },
+        },
       }),
       prisma.message.count({
         where: {
