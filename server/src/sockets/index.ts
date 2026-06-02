@@ -281,6 +281,13 @@ export function setupSocketHandlers(io: Server) {
           })
         }
 
+        if (result.accountProgress) {
+          io.to(userRoom).emit('user:progress_update', {
+            ...result.accountProgress,
+            sourceSocketId: socket.id,
+          })
+        }
+
         // Broadcast user message to ALL user's tabs (echo clientId so client can replace optimistic)
         io.to(userRoom).emit('message:receive', {
           ...result.userMessage,

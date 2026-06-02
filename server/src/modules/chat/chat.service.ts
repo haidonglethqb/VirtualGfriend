@@ -478,6 +478,7 @@ export const chatService = {
       newStage,
       unlocks,
       rewards,
+      accountProgress: xpResult.accountProgress,
       questsCompleted: gameResult.questsCompleted,
       milestonesUnlocked: gameResult.milestonesUnlocked,
       factUpdates,

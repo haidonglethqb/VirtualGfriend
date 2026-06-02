@@ -23,6 +23,8 @@ interface User {
   coins: number;
   gems: number;
   streak?: number;
+  level?: number;
+  experience?: number;
 }
 
 interface AuthResponseData {
@@ -49,6 +51,7 @@ interface AuthState {
   setAccessToken: (token: string) => void;
   checkAuth: () => Promise<void>;
   updateBalance: (coins?: number, gems?: number) => void;
+  updateProgress: (level?: number, experience?: number) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -185,6 +188,19 @@ export const useAuthStore = create<AuthState>()(
           },
         });
       },
+
+      updateProgress: (level?: number, experience?: number) => {
+        const user = get().user;
+        if (!user) return;
+
+        set({
+          user: {
+            ...user,
+            level: level !== undefined ? level : user.level,
+            experience: experience !== undefined ? experience : user.experience,
+          },
+        });
+      },
     }),
     {
       name: 'vgfriend-auth',
@@ -210,6 +226,11 @@ if (typeof window !== 'undefined') {
   window.addEventListener('user:balance_update', (event) => {
     const detail = (event as CustomEvent<{ coins?: number; gems?: number }>).detail;
     useAuthStore.getState().updateBalance(detail?.coins, detail?.gems);
+  });
+
+  window.addEventListener('user:progress_update', (event) => {
+    const detail = (event as CustomEvent<{ level?: number; experience?: number }>).detail;
+    useAuthStore.getState().updateProgress(detail?.level, detail?.experience);
   });
 
   window.addEventListener('storage', (event) => {

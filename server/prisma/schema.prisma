@@ -31,6 +31,8 @@ model User {
   coins             Int       @default(0)
   gems              Int       @default(0)
   streak            Int       @default(0)       // Daily login streak
+  level             Int       @default(1)       // Account level
+  experience        Int       @default(0)       // Account XP toward next level
   lastActiveAt      DateTime?                   // Last activity for streak calculation
   lastLoginAt       DateTime?
 
@@ -81,6 +83,7 @@ model User {
   userTitles        UserTitle[]
 
   @@index([streak])               // Leaderboard: top by streak
+  @@index([level, experience])     // Account progression display/ranking
   @@index([username])             // Search: find user by username
   @@map("users")
 }

@@ -1,7 +1,7 @@
 # Levels & Affection System
 
 ## Overview
-Dual progression system: character levels (XP-based) and affection (0-1000 scale) drive relationship stages, AI behavior, pet names, and language formality.
+Progression has account level, character level, and affection. Account level identifies the user profile, while character level and affection drive relationship stages, AI behavior, pet names, and language formality.
 
 ## Affection Scale (0-1000)
 
@@ -22,6 +22,8 @@ Dual progression system: character levels (XP-based) and affection (0-1000 scale
 // XP required per level: 100 + (level - 1) * 50
 // Level 1→2: 100 XP  |  Level 5→6: 300 XP  |  Level 10→11: 550 XP
 ```
+
+Chat XP is applied to both the active character and the user account. Subscription tier XP multipliers apply before both progress bars are updated.
 
 ### Level Milestones
 

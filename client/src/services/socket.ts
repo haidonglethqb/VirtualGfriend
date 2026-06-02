@@ -2,6 +2,7 @@ import { io, Socket } from 'socket.io-client'
 import { useChatStore, Message } from '@/store/chat-store'
 import { useCharacterStore } from '@/store/character-store'
 import { useNotificationStore } from '@/store/notification-store'
+import { useAuthStore } from '@/store/auth-store'
 import { crossTabSync } from './cross-tab-sync'
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
@@ -209,6 +210,18 @@ class SocketService {
       this.dispatchChatFactsUpdate(data)
     })
 
+    this.socket.on('user:progress_update', (data: { level?: number; experience?: number; sourceSocketId?: string }) => {
+      useAuthStore.getState().updateProgress(data.level, data.experience)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('user:progress_update', {
+          detail: {
+            level: data.level,
+            experience: data.experience,
+          },
+        }))
+      }
+    })
+
     this.socket.on('character:affection_change', (data: { 
       characterId: string
       change: number
@@ -244,7 +257,7 @@ class SocketService {
       if (data.levelUp && data.newLevel) {
         useNotificationStore.getState().showLevelUp(data.newLevel, data.unlocks || [], data.rewards)
       }
-      
+
       // Show relationship upgrade modal
       if (data.relationshipUpgrade && data.previousStage && data.newStage) {
         useNotificationStore.getState().showRelationshipUpgrade(data.previousStage, data.newStage)

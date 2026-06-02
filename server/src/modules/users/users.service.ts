@@ -45,6 +45,8 @@ export const userService = {
         coins: true,
         gems: true,
         streak: true,
+        level: true,
+        experience: true,
         createdAt: true,
       },
     });

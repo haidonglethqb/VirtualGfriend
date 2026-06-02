@@ -21,6 +21,8 @@ model User {
   coins             Int           @default(0)
   gems              Int           @default(0)
   streak            Int           @default(0)       // Daily login streak
+  level             Int           @default(1)       // Account level
+  experience        Int           @default(0)       // Account XP toward next level
   lastActiveAt      DateTime?
   lastLoginAt       DateTime?
   userGender        UserGender    @default(NOT_SPECIFIED)
@@ -39,6 +41,7 @@ model User {
 
 ```prisma
 @@index([streak])           // Leaderboard: top streaks
+@@index([level, experience]) // Account progression
 @@index([username])         // Search by username
 ```
 

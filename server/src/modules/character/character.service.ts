@@ -149,6 +149,12 @@ interface XpBonusResult {
   total: number;
 }
 
+interface LevelProgressionResult {
+  level: number;
+  experience: number;
+  leveledUp: boolean;
+}
+
 function calculateMessageXpBonus(
   messageLength: number,
   streak: number,
@@ -176,6 +182,29 @@ function getTotalXpForLevel(level: number): number {
   const n = level - 1;
   if (n <= 0) return 0;
   return 100 * n + 25 * n * (n - 1);
+}
+
+function applyLevelProgression(level: number, experience: number, xp: number): LevelProgressionResult {
+  const previousLevel = level;
+  let newXp = experience + xp;
+  let newLevel = level;
+  let xpNeeded = getXpRequiredForLevel(newLevel);
+
+  while (newXp >= xpNeeded && newLevel < MAX_LEVEL) {
+    newXp -= xpNeeded;
+    newLevel++;
+    xpNeeded = getXpRequiredForLevel(newLevel);
+  }
+
+  if (newLevel >= MAX_LEVEL) {
+    newXp = Math.min(newXp, getXpRequiredForLevel(MAX_LEVEL));
+  }
+
+  return {
+    level: newLevel,
+    experience: newXp,
+    leveledUp: newLevel > previousLevel,
+  };
 }
 
 function calculateRelationshipStage(affection: number): RelationshipStage {
@@ -559,6 +588,7 @@ export const characterService = {
   // Enhanced addExperience with XP scaling and level-up rewards
   async addExperience(characterId: string, xp: number, userId?: string): Promise<{
     character: any;
+    accountProgress?: { level: number; experience: number };
     leveledUp: boolean;
     previousLevel: number;
     newLevel: number;
@@ -586,37 +616,53 @@ export const characterService = {
     }
 
     const previousLevel = character.level;
-    let newXp = character.experience + xp;
-    let newLevel = character.level;
+    const progress = applyLevelProgression(character.level, character.experience, xp);
+    let newXp = progress.experience;
+    let newLevel = progress.level;
     let milestoneReward: LevelMilestoneReward | null = null;
 
-    // Check for level ups with scaling XP
-    let xpNeeded = getXpRequiredForLevel(newLevel);
-    while (newXp >= xpNeeded && newLevel < MAX_LEVEL) {
-      newXp -= xpNeeded;
-      newLevel++;
-      xpNeeded = getXpRequiredForLevel(newLevel);
-
+    if (newLevel > previousLevel) {
       // Check if this level is a milestone
-      const milestone = LEVEL_MILESTONES.find(m => m.level === newLevel);
+      const milestone = LEVEL_MILESTONES.filter(m => m.level > previousLevel && m.level <= newLevel).at(-1);
       if (milestone) {
         milestoneReward = milestone;
       }
     }
 
-    // Prevent XP overflow past full bar at max level
-    if (newLevel >= MAX_LEVEL) {
-      newXp = Math.min(newXp, getXpRequiredForLevel(MAX_LEVEL));
-    }
+    const accountUpdate =
+      userId && userId === character.userId
+        ? prisma.user
+            .findUnique({
+              where: { id: userId },
+              select: { level: true, experience: true },
+            })
+            .then((user) => {
+              if (!user) return null;
+              const accountProgress = applyLevelProgression(user.level, user.experience, xp);
+              return prisma.user.update({
+                where: { id: userId },
+                data: {
+                  level: accountProgress.level,
+                  experience: accountProgress.experience,
+                },
+                select: {
+                  level: true,
+                  experience: true,
+                },
+              });
+            })
+        : Promise.resolve(null);
 
-    // Update character
-    const updatedCharacter = await prisma.character.update({
-      where: { id: characterId },
-      data: {
-        experience: newXp,
-        level: newLevel,
-      },
-    });
+    const [updatedCharacter, updatedAccount] = await Promise.all([
+      prisma.character.update({
+        where: { id: characterId },
+        data: {
+          experience: newXp,
+          level: newLevel,
+        },
+      }),
+      accountUpdate,
+    ]);
 
     // If leveled up and hit a milestone, give rewards
     if (milestoneReward && character.userId) {
@@ -663,6 +709,7 @@ export const characterService = {
 
     return {
       character: updatedCharacter,
+      accountProgress: updatedAccount || undefined,
       leveledUp: newLevel > previousLevel,
       previousLevel,
       newLevel,
