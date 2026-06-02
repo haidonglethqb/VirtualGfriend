@@ -35,7 +35,7 @@ interface AIContext {
 interface InlineFact {
   key: string;
   value: string;
-  category: 'preference' | 'memory' | 'trait' | 'event';
+  category: 'personal' | 'preference' | 'relationship' | 'work' | 'life' | 'memory' | 'event' | 'other';
   importance?: number;
 }
 
@@ -654,6 +654,10 @@ TÂM TRẠNG HIỆN TẠI:
 ${moodDescription}
 ${empathyGuidance}
 
+FACTS ÄÃƒ BIáº¾T Vá»€ ${context.userName}:
+${factsInfo || '- ChÆ°a cÃ³ fact nÃ o. Chá»‰ nháº¯c láº¡i fact khi há»£p ngá»¯ cáº£nh, khÃ´ng nhá»“i táº¥t cáº£ vÃ o cÃ¢u tráº£ lá»i.'}
+${summariesSection}
+
 PHONG CÁCH THEO NGHỀ NGHIỆP:
 ${getOccupationStyle(context.occupation)}
 
@@ -740,7 +744,7 @@ Bạn PHẢI trả lời theo đúng format JSON sau, KHÔNG được thêm text
     "reason": "Lý do đánh giá ngắn gọn"
   },
   "facts": [
-    {"key": "tên_thông_tin", "value": "giá trị", "category": "preference|memory|trait|event"}
+    {"key": "ten_thong_tin", "value": "giá trị", "category": "personal|preference|relationship|work|life|memory|event|other"}
   ]
 }
 
@@ -844,8 +848,12 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
     const affectionChange = Math.max(-5, Math.min(5, parsed.evaluation.affection_change || 0));
 
     // Extract inline facts (validate structure)
+    const allowedCategories = new Set(['personal', 'preference', 'relationship', 'work', 'life', 'memory', 'event', 'other', 'trait']);
     const facts = Array.isArray(parsed.facts)
-      ? parsed.facts.filter(f => f.key && f.value && f.category).slice(0, 3)
+      ? parsed.facts
+        .filter(f => f.key && f.value && f.category && allowedCategories.has(f.category))
+        .slice(0, 3)
+        .map(f => ({ ...f, category: f.category === 'trait' ? 'personal' : f.category }))
       : [];
 
     return {
@@ -1044,7 +1052,6 @@ export const aiService = {
         messages: [
           { role: 'system', content: systemPrompt },
           ...conversationHistory,
-          { role: 'user', content: context.userMessage },
         ],
         temperature,
         max_tokens: 500,

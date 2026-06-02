@@ -12,6 +12,7 @@ import { createModuleLogger } from '../../lib/logger';
 import { MESSAGE_LIMITS } from '../../lib/constants';
 import { getTierConfig } from '../admin/tier-config.service';
 import type { PremiumTier } from '../../lib/prisma';
+import { factQuotaService, type FactSaveResult } from '../character/fact-quota.service';
 
 const log = createModuleLogger('Chat');
 
@@ -54,6 +55,7 @@ interface SendMessageData {
   content: string;
   messageType?: MessageType;
   metadata?: Record<string, unknown>;
+  onFactUpdates?: (updates: FactSaveResult & { source: 'ai_inline' | 'ai_batch' }) => void;
 }
 
 function isArchivedExPersona(character: {
@@ -326,30 +328,24 @@ export const chatService = {
     });
     log.debug('AI response generated:', aiResponse.content.substring(0, 50));
 
-    // Save inline facts extracted by AI (runs in background)
+    let factUpdates: (FactSaveResult & { source: 'ai_inline' | 'ai_batch' }) | undefined;
+
+    // Save inline facts extracted by AI before returning so clients can update counts immediately.
     if (aiResponse.inlineFacts && aiResponse.inlineFacts.length > 0) {
-      const inlineFacts = aiResponse.inlineFacts;
-      Promise.resolve().then(async () => {
-        for (const fact of inlineFacts) {
-          try {
-            const normalizedKey = fact.key
-              .toLowerCase()
-              .replace(/\s+/g, '_')
-              .replace(/[^a-z0-9_]/g, '');
-            const importance = factsLearningService.calculateImportance(fact.category, fact.value);
-            await prisma.characterFact.upsert({
-              where: { characterId_key: { characterId: data.characterId, key: normalizedKey } },
-              update: { value: fact.value, category: fact.category, importance, sourceType: 'ai_inline', updatedAt: new Date() },
-              create: { characterId: data.characterId, key: normalizedKey, value: fact.value, category: fact.category, importance, sourceType: 'ai_inline', learnedAt: new Date() },
-            });
-          } catch (err) {
-            log.error('Error saving inline fact:', err);
-          }
+      try {
+        const saveResult = await factQuotaService.saveFactsQuotaAware(
+          data.characterId,
+          aiResponse.inlineFacts.slice(0, 3),
+          'ai_inline',
+          factsLearningService.calculateImportance,
+        );
+        factUpdates = { ...saveResult, source: 'ai_inline' };
+        if (saveResult.added > 0 || saveResult.updated > 0) {
+          log.info('Saved inline facts:', saveResult);
         }
-        // Invalidate cache after saving facts
-        await cache.del(CacheKeys.characterWithFacts(data.characterId));
-        log.info('Saved ' + inlineFacts.length + ' inline facts');
-      }).catch(err => log.error('Inline facts save error:', err));
+      } catch (err) {
+        log.error('Inline facts save error:', err);
+      }
     }
 
     // Save AI message
@@ -447,7 +443,12 @@ export const chatService = {
     if (factsLearningService.shouldExtractFacts(totalMessages)) {
       // Run batch background operations (don't block response)
       factsLearningService.extractAndSaveFacts(data.characterId, recentMessages)
-        .then(facts => { if (facts.length > 0) log.info('Auto-extracted ' + facts.length + ' facts'); })
+        .then(facts => {
+          if (facts.length > 0) log.info('Auto-extracted ' + facts.length + ' facts');
+          if (facts.factUpdates) {
+            data.onFactUpdates?.({ ...facts.factUpdates, source: 'ai_batch' });
+          }
+        })
         .catch(err => log.error('Facts extraction error:', err));
       conversationSummaryService.createSummary(userId, data.characterId, recentMessages)
         .catch(err => log.error('Summary creation error:', err));
@@ -479,6 +480,7 @@ export const chatService = {
       rewards,
       questsCompleted: gameResult.questsCompleted,
       milestonesUnlocked: gameResult.milestonesUnlocked,
+      factUpdates,
     };
   },
 

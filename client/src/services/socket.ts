@@ -20,6 +20,24 @@ type ChatCharacterUpdateDetail = {
   newLevel?: number
 }
 
+type FactQuota = {
+  tier: 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE'
+  limit: number
+  used: number
+  remaining: number
+  isFull: boolean
+}
+
+export type ChatFactsUpdateDetail = {
+  characterId: string
+  added: number
+  updated: number
+  skipped: number
+  total: number
+  quota: FactQuota
+  source: 'ai_inline' | 'ai_batch' | 'manual'
+}
+
 class SocketService {
   private socket: Socket | null = null
   private reconnectAttempts = 0
@@ -43,6 +61,16 @@ class SocketService {
     }
 
     window.dispatchEvent(new CustomEvent<ChatCharacterUpdateDetail>('vgfriend:chat-character-update', {
+      detail,
+    }))
+  }
+
+  private dispatchChatFactsUpdate(detail: ChatFactsUpdateDetail) {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    window.dispatchEvent(new CustomEvent<ChatFactsUpdateDetail>('vgfriend:chat-facts-update', {
       detail,
     }))
   }
@@ -171,6 +199,14 @@ class SocketService {
       }
 
       // NO BroadcastChannel here - socket room already syncs all tabs
+    })
+
+    this.socket.on('character:facts_update', (data: ChatFactsUpdateDetail & { sourceSocketId?: string }) => {
+      if (!this.isCurrentConversation(data.characterId)) {
+        return
+      }
+
+      this.dispatchChatFactsUpdate(data)
     })
 
     this.socket.on('character:affection_change', (data: { 

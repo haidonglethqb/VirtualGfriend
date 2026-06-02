@@ -8,6 +8,12 @@ import { cache, CacheKeys } from '../../lib/redis';
 import { aiService } from '../ai/ai.service';
 import { Message } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
+import {
+  factQuotaService,
+  normalizeFactCategory,
+  normalizeFactKey,
+  type FactSaveResult,
+} from '../character/fact-quota.service';
 
 const log = createModuleLogger('FactsLearning');
 
@@ -15,7 +21,7 @@ const log = createModuleLogger('FactsLearning');
 const FACT_EXTRACTION_INTERVAL = 10;
 
 // Categories of facts to extract
-type FactCategory = 'preference' | 'memory' | 'trait' | 'event';
+type FactCategory = 'personal' | 'preference' | 'relationship' | 'work' | 'life' | 'memory' | 'event' | 'other';
 
 interface ExtractedFact {
   key: string;
@@ -23,6 +29,8 @@ interface ExtractedFact {
   category: FactCategory;
   importance?: number;
 }
+
+type ExtractFactsResult = ExtractedFact[] & { factUpdates?: FactSaveResult };
 
 export const factsLearningService = {
   /**
@@ -38,7 +46,7 @@ export const factsLearningService = {
   async extractAndSaveFacts(
     characterId: string,
     recentMessages: Message[]
-  ): Promise<ExtractedFact[]> {
+  ): Promise<ExtractFactsResult> {
     try {
       // Only extract if we have enough context
       if (recentMessages.length < 5) {
@@ -48,7 +56,7 @@ export const factsLearningService = {
       log.debug('Extracting facts from ' + recentMessages.length + ' messages');
 
       // Use AI to extract facts
-      const extractedFacts = await aiService.extractFacts(recentMessages);
+      const extractedFacts = (await aiService.extractFacts(recentMessages)).slice(0, 7);
 
       if (!extractedFacts || extractedFacts.length === 0) {
         log.debug('No facts extracted');
@@ -57,60 +65,27 @@ export const factsLearningService = {
 
       log.debug('Extracted ' + extractedFacts.length + ' facts');
 
-      // Save facts to database
-      const savedFacts: ExtractedFact[] = [];
+      const saveResult = await factQuotaService.saveFactsQuotaAware(
+        characterId,
+        extractedFacts,
+        'ai_batch',
+        this.calculateImportance,
+      );
 
-      for (const fact of extractedFacts) {
-        try {
-          // Normalize key to snake_case
-          const normalizedKey = fact.key
-            .toLowerCase()
-            .replace(/\s+/g, '_')
-            .replace(/[^a-z0-9_]/g, '');
-
-          // Determine importance based on category
-          const importance = this.calculateImportance(fact.category, fact.value);
-
-          // Upsert the fact
-          await prisma.characterFact.upsert({
-            where: {
-              characterId_key: {
-                characterId,
-                key: normalizedKey,
-              },
-            },
-            update: {
-              value: fact.value,
-              category: fact.category,
-              importance,
-              updatedAt: new Date(),
-            },
-            create: {
-              characterId,
-              key: normalizedKey,
-              value: fact.value,
-              category: fact.category,
-              importance,
-              sourceType: 'ai_batch',
-              learnedAt: new Date(),
-            },
-          });
-
-          savedFacts.push({
-            key: normalizedKey,
-            value: fact.value,
-            category: fact.category as FactCategory,
-            importance,
-          });
-        } catch (error) {
-          log.error('Error saving fact:', { fact, error });
-        }
-      }
+      const savedFacts = extractedFacts
+        .slice(0, saveResult.added + saveResult.updated)
+        .map((fact) => ({
+          key: normalizeFactKey(fact.key),
+          value: fact.value,
+          category: normalizeFactCategory(fact.category) as FactCategory,
+          importance: this.calculateImportance(fact.category, fact.value),
+        })) as ExtractFactsResult;
+      savedFacts.factUpdates = saveResult;
 
       log.info('Saved ' + savedFacts.length + ' facts');
 
       // Invalidate character cache after extracting and saving facts
-      if (savedFacts.length > 0) {
+      if (saveResult.added > 0 || saveResult.updated > 0) {
         await cache.del(CacheKeys.characterWithFacts(characterId));
       }
 
@@ -128,9 +103,13 @@ export const factsLearningService = {
     // Base importance by category
     const categoryScores: Record<string, number> = {
       preference: 7,  // User preferences are important
-      trait: 8,       // Personality traits are very important
+      personal: 8,    // Personal info is very important
+      relationship: 8,
+      work: 7,
+      life: 6,
       memory: 6,      // Memories are moderately important
       event: 5,       // Events are less persistent
+      other: 5,
     };
 
     let importance = categoryScores[category] || 5;

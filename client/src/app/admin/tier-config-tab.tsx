@@ -15,12 +15,13 @@ type TierConfigs = Record<PremiumTier, PremiumFeatures>;
 
 const TIERS: PremiumTier[] = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
 
-type NumberField = 'maxCharacters' | 'maxMessagesPerDay' | 'monthlyCoinBonus' | 'monthlyGemBonus' | 'xpMultiplier' | 'affectionMultiplier' | 'freeTrialDays' | 'maxScenes';
+type NumberField = 'maxCharacters' | 'maxMessagesPerDay' | 'maxFacts' | 'monthlyCoinBonus' | 'monthlyGemBonus' | 'xpMultiplier' | 'affectionMultiplier' | 'freeTrialDays' | 'maxScenes';
 type BooleanField = Exclude<keyof PremiumFeatures, NumberField>;
 
 const NUMBER_FIELDS: NumberField[] = [
   'maxCharacters',
   'maxMessagesPerDay',
+  'maxFacts',
   'monthlyCoinBonus',
   'monthlyGemBonus',
   'xpMultiplier',
@@ -46,6 +47,7 @@ const BOOLEAN_FIELDS: BooleanField[] = [
 const FIELD_LABELS: Record<keyof PremiumFeatures, string> = {
   maxCharacters: 'Số nhân vật',
   maxMessagesPerDay: 'Tin nhắn mỗi ngày',
+  maxFacts: 'Facts mỗi nhân vật',
   monthlyCoinBonus: 'Thưởng xu/tháng',
   monthlyGemBonus: 'Thưởng ngọc/tháng',
   xpMultiplier: 'Nhân XP',
@@ -69,6 +71,7 @@ const FIELD_LABELS: Record<keyof PremiumFeatures, string> = {
 const FIELD_LABELS_EN: Record<keyof PremiumFeatures, string> = {
   maxCharacters: 'Max characters',
   maxMessagesPerDay: 'Messages per day',
+  maxFacts: 'Facts per character',
   monthlyCoinBonus: 'Monthly coin bonus',
   monthlyGemBonus: 'Monthly gem bonus',
   xpMultiplier: 'XP multiplier',
@@ -94,6 +97,7 @@ function getDefaultTierConfig(): TierConfigs {
     FREE: {
       maxCharacters: 1,
       maxMessagesPerDay: 20,
+      maxFacts: 20,
       adFree: false,
       voiceMessages: false,
       sendImages: false,
@@ -116,6 +120,7 @@ function getDefaultTierConfig(): TierConfigs {
     BASIC: {
       maxCharacters: 5,
       maxMessagesPerDay: -1,
+      maxFacts: 40,
       adFree: true,
       voiceMessages: true,
       sendImages: true,
@@ -138,6 +143,7 @@ function getDefaultTierConfig(): TierConfigs {
     PRO: {
       maxCharacters: 5,
       maxMessagesPerDay: -1,
+      maxFacts: 80,
       adFree: true,
       voiceMessages: true,
       sendImages: true,
@@ -160,6 +166,7 @@ function getDefaultTierConfig(): TierConfigs {
     ULTIMATE: {
       maxCharacters: -1,
       maxMessagesPerDay: -1,
+      maxFacts: 160,
       adFree: true,
       voiceMessages: true,
       sendImages: true,

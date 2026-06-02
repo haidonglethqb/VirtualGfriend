@@ -9,6 +9,7 @@ import { moodService } from '../modules/character/mood.service'
 import { createModuleLogger } from '../lib/logger'
 import { MESSAGE_LIMITS, CACHE_TTL, RATE_LIMITS } from '../lib/constants'
 import { AppError } from '../middlewares/error.middleware'
+import { realtimeEvents } from '../lib/realtime-events'
 
 const log = createModuleLogger('Socket')
 
@@ -60,6 +61,11 @@ interface JwtPayload {
 }
 
 export function setupSocketHandlers(io: Server) {
+  realtimeEvents.on('character:facts_update', (payload) => {
+    const { userId: targetUserId, ...eventPayload } = payload
+    io.to(`user:${targetUserId}`).emit('character:facts_update', eventPayload)
+  })
+
   // Authentication middleware
   io.use(async (socket: AuthenticatedSocket, next) => {
     try {
@@ -260,7 +266,20 @@ export function setupSocketHandlers(io: Server) {
           characterId: data.characterId,
           content: content,
           messageType: (data.messageType as 'TEXT') || 'TEXT',
+          onFactUpdates: (updates) => {
+            io.to(userRoom).emit('character:facts_update', {
+              ...updates,
+              sourceSocketId: socket.id,
+            })
+          },
         })
+
+        if (result.factUpdates) {
+          io.to(userRoom).emit('character:facts_update', {
+            ...result.factUpdates,
+            sourceSocketId: socket.id,
+          })
+        }
 
         // Broadcast user message to ALL user's tabs (echo clientId so client can replace optimistic)
         io.to(userRoom).emit('message:receive', {

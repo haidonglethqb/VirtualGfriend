@@ -19,6 +19,7 @@ const VALID_TIERS: PremiumTier[] = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
 const tierConfigPatchSchema = z.object({
   maxCharacters: z.number().int().min(-1).optional(),
   maxMessagesPerDay: z.number().int().min(-1).optional(),
+  maxFacts: z.number().int().min(-1).optional(),
   adFree: z.boolean().optional(),
   voiceMessages: z.boolean().optional(),
   sendImages: z.boolean().optional(),
@@ -37,6 +38,7 @@ const tierConfigPatchSchema = z.object({
   freeTrialDays: z.number().int().min(0).max(365).optional(),
   exclusiveContent: z.boolean().optional(),
   maxScenes: z.number().int().optional(),
+  canCreateExPersonaOnBreakup: z.boolean().optional(),
 }).strict();
 
 /** GET /admin/tier-configs — return all 4 tier configs */

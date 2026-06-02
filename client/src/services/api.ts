@@ -17,6 +17,21 @@ interface ApiResponse<T = unknown> {
     message: string;
     code?: string;
   };
+  quota?: unknown;
+}
+
+export class ApiError extends Error {
+  code?: string;
+  status: number;
+  quota?: unknown;
+
+  constructor(message: string, status: number, code?: string, quota?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.quota = quota;
+  }
 }
 
 class ApiClient {
@@ -140,7 +155,12 @@ class ApiClient {
 
     // Check if response is not ok, throw with backend message
     if (!response.ok) {
-      throw new Error(data.error?.message || data.message || 'Request failed');
+      throw new ApiError(
+        data.error?.message || data.message || 'Request failed',
+        response.status,
+        data.error?.code,
+        data.quota,
+      );
     }
 
     // Also check success field in response body (for 200 responses with success: false)

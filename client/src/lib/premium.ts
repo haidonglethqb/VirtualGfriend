@@ -6,6 +6,7 @@ export type PremiumTier = 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE';
 export interface PremiumFeatures {
   maxMessagesPerDay: number;
   maxCharacters: number;
+  maxFacts: number;
   adFree: boolean;
   voiceMessages: boolean;
   sendImages: boolean;
@@ -39,6 +40,7 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
   FREE: {
     maxMessagesPerDay: 20,
     maxCharacters: 1,
+    maxFacts: 20,
     adFree: false,
     voiceMessages: false,
     sendImages: false,
@@ -61,6 +63,7 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
   BASIC: {
     maxMessagesPerDay: -1,
     maxCharacters: 5,
+    maxFacts: 40,
     adFree: true,
     voiceMessages: true,
     sendImages: true,
@@ -83,6 +86,7 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
   PRO: {
     maxMessagesPerDay: -1,
     maxCharacters: 5,
+    maxFacts: 80,
     adFree: true,
     voiceMessages: true,
     sendImages: true,
@@ -105,6 +109,7 @@ export const PREMIUM_FEATURES: AllTierConfigs = {
   ULTIMATE: {
     maxMessagesPerDay: -1,
     maxCharacters: -1,
+    maxFacts: 160,
     adFree: true,
     voiceMessages: true,
     sendImages: true,

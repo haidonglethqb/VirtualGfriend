@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import api from '@/services/api';
+import api, { ApiError } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
 interface Fact {
@@ -37,8 +37,18 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ReactNode; co
   relationship: { label: 'Quan hệ', icon: <Heart className="w-4 h-4" />, color: 'from-pink-500/20 to-rose-500/20' },
   work: { label: 'Công việc', icon: <Briefcase className="w-4 h-4" />, color: 'from-purple-500/20 to-indigo-500/20' },
   life: { label: 'Cuộc sống', icon: <Home className="w-4 h-4" />, color: 'from-green-500/20 to-emerald-500/20' },
+  memory: { label: 'Kỷ niệm', icon: <Brain className="w-4 h-4" />, color: 'from-indigo-500/20 to-blue-500/20' },
+  event: { label: 'Sự kiện', icon: <Tag className="w-4 h-4" />, color: 'from-orange-500/20 to-yellow-500/20' },
   other: { label: 'Khác', icon: <Tag className="w-4 h-4" />, color: 'from-gray-500/20 to-gray-600/20' },
 };
+
+interface FactQuota {
+  tier: 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE';
+  limit: number;
+  used: number;
+  remaining: number;
+  isFull: boolean;
+}
 
 interface FactItemProps {
   fact: Fact;
@@ -175,6 +185,7 @@ interface FactsResponseData {
   facts: Fact[];
   grouped: GroupedFacts;
   total: number;
+  quota?: FactQuota;
   character?: {
     id: string;
     name: string;
@@ -192,6 +203,7 @@ export function FactsManager({ characterId, characterName }: FactsManagerProps) 
   const [isAdding, setIsAdding] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [resolvedCharacterName, setResolvedCharacterName] = useState<string>(characterName || '');
+  const [quota, setQuota] = useState<FactQuota | null>(null);
 
   const getFactsEndpoint = useCallback(() => {
     if (!characterId) {
@@ -214,6 +226,7 @@ export function FactsManager({ characterId, characterName }: FactsManagerProps) 
       if (response.success) {
         setFacts(response.data.facts || []);
         setGrouped(response.data.grouped || {});
+        setQuota(response.data.quota || null);
         setResolvedCharacterName(response.data.character?.name || characterName || '');
       }
     } catch {
@@ -231,7 +244,26 @@ export function FactsManager({ characterId, characterName }: FactsManagerProps) 
     setIsLoading(true);
     setFacts([]);
     setGrouped({});
+    setQuota(null);
     void fetchFacts();
+  }, [characterId, fetchFacts]);
+
+  useEffect(() => {
+    const handleFactsUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ characterId?: string; quota?: FactQuota }>).detail;
+      if (characterId && detail?.characterId && detail.characterId !== characterId) {
+        return;
+      }
+      if (detail?.quota) {
+        setQuota(detail.quota);
+      }
+      void fetchFacts();
+    };
+
+    window.addEventListener('vgfriend:chat-facts-update', handleFactsUpdate as EventListener);
+    return () => {
+      window.removeEventListener('vgfriend:chat-facts-update', handleFactsUpdate as EventListener);
+    };
   }, [characterId, fetchFacts]);
 
   const handleEdit = async (fact: Fact, newValue: string) => {
@@ -277,7 +309,18 @@ export function FactsManager({ characterId, characterName }: FactsManagerProps) 
           description: 'Thông tin đã được lưu' 
         });
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'FACT_LIMIT_REACHED') {
+        if (error.quota) {
+          setQuota(error.quota as FactQuota);
+        }
+        toast({
+          title: 'Bộ nhớ đã đầy',
+          description: 'Hãy xóa bớt fact hoặc nâng cấp gói để lưu thêm.',
+          variant: 'destructive',
+        });
+        return;
+      }
       toast({
         title: 'Lỗi',
         description: 'Không thể thêm thông tin',
@@ -310,7 +353,12 @@ export function FactsManager({ characterId, characterName }: FactsManagerProps) 
           </div>
           <div>
             <h2 className="text-lg font-semibold text-white">Trí nhớ AI</h2>
-            <p className="text-sm text-white/60">{facts.length} thông tin đã học</p>
+            <p className="text-sm text-white/60">
+              {quota ? `${quota.used}/${quota.limit < 0 ? '∞' : quota.limit} thông tin đã học` : `${facts.length} thông tin đã học`}
+            </p>
+            {quota?.isFull && (
+              <p className="text-xs text-amber-300 mt-0.5">Bộ nhớ đã đầy</p>
+            )}
             {resolvedCharacterName && (
               <p className="text-xs text-love/90 mt-0.5">Companion: {resolvedCharacterName}</p>
             )}
@@ -320,6 +368,7 @@ export function FactsManager({ characterId, characterName }: FactsManagerProps) 
         <Button
           onClick={() => setShowAddForm(true)}
           size="sm"
+          disabled={quota?.isFull}
           className="bg-gradient-to-r from-pink-500 to-purple-500"
         >
           <Plus className="w-4 h-4 mr-1" />
@@ -364,7 +413,7 @@ export function FactsManager({ characterId, characterName }: FactsManagerProps) 
 
       {/* Add Form Modal */}
       <AnimatePresence>
-        {showAddForm && (
+        {showAddForm && !quota?.isFull && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -413,7 +462,7 @@ export function FactsManager({ characterId, characterName }: FactsManagerProps) 
                 <Button
                   size="sm"
                   onClick={handleAdd}
-                  disabled={isAdding || !newFact.key.trim() || !newFact.value.trim()}
+                  disabled={isAdding || quota?.isFull || !newFact.key.trim() || !newFact.value.trim()}
                   className="bg-gradient-to-r from-pink-500 to-purple-500"
                 >
                   {isAdding ? 'Đang lưu...' : 'Lưu'}

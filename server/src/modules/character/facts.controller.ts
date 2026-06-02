@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { prisma } from '../../lib/prisma';
+import { prisma, Prisma } from '../../lib/prisma';
 import { AppError } from '../../middlewares/error.middleware';
+import { factQuotaService, normalizeFactCategory, normalizeFactKey } from './fact-quota.service';
+import { realtimeEvents } from '../../lib/realtime-events';
 
 const querySchema = z.object({
   characterId: z.string().uuid().optional(),
@@ -15,6 +17,24 @@ function inferFactSource(fact: { importance: number; sourceType?: string | null 
   if (fact.sourceType === 'ai_inline') return 'ai_inline';
   if (fact.sourceType === 'manual') return 'user_added';
   return fact.importance >= 8 ? 'user_added' : 'ai_learned';
+}
+
+function emitManualFactUpdate(
+  userId: string,
+  characterId: string,
+  quota: Awaited<ReturnType<typeof factQuotaService.getQuotaForCharacter>>,
+  counts: { added?: number; updated?: number; skipped?: number },
+) {
+  realtimeEvents.emit('character:facts_update', {
+    userId,
+    characterId,
+    added: counts.added || 0,
+    updated: counts.updated || 0,
+    skipped: counts.skipped || 0,
+    total: quota.used,
+    quota,
+    source: 'manual',
+  });
 }
 
 export const factsController = {
@@ -53,6 +73,7 @@ export const factsController = {
           { updatedAt: 'desc' },
         ],
       });
+      const quota = await factQuotaService.getQuotaForCharacter(character.id);
 
       // Group by category
       type FactType = typeof facts[number];
@@ -82,6 +103,7 @@ export const factsController = {
             ])
           ),
           total: facts.length,
+          quota,
           character: {
             id: character.id,
             name: character.name,
@@ -123,12 +145,16 @@ export const factsController = {
           updatedAt: new Date(),
         },
       });
+      await factQuotaService.invalidate(character.id);
+      const quota = await factQuotaService.getQuotaForCharacter(character.id);
+      emitManualFactUpdate(req.user!.id, character.id, quota, { updated: 1 });
 
       res.json({
         success: true,
         data: {
           ...updated,
           source: 'user_edited',
+          quota,
           character: {
             id: character.id,
             name: character.name,
@@ -163,11 +189,15 @@ export const factsController = {
       await prisma.characterFact.delete({
         where: { id: factId },
       });
+      await factQuotaService.invalidate(character.id);
+      const quota = await factQuotaService.getQuotaForCharacter(character.id);
+      emitManualFactUpdate(req.user!.id, character.id, quota, { updated: 0 });
 
       res.json({
         success: true,
         message: 'Fact deleted',
         data: {
+          quota,
           character: {
             id: character.id,
             name: character.name,
@@ -191,10 +221,15 @@ export const factsController = {
       const schema = z.object({
         key: z.string().min(1).max(100),
         value: z.string().min(1).max(500),
-        category: z.enum(['personal', 'preference', 'relationship', 'work', 'life', 'other']).optional(),
+        category: z.enum(['personal', 'preference', 'relationship', 'work', 'life', 'memory', 'event', 'other']).optional(),
       });
 
-      const data = schema.parse(req.body);
+      const parsed = schema.parse(req.body);
+      const data = {
+        ...parsed,
+        key: normalizeFactKey(parsed.key),
+        category: normalizeFactCategory(parsed.category),
+      };
       const character = await factsController.resolveCharacter(req);
 
       // Check for duplicate key
@@ -217,11 +252,15 @@ export const factsController = {
             updatedAt: new Date(),
           },
         });
+        await factQuotaService.invalidate(character.id);
+        const quota = await factQuotaService.getQuotaForCharacter(character.id);
+        emitManualFactUpdate(req.user!.id, character.id, quota, { updated: 1 });
         return res.json({
           success: true,
           data: {
             ...updated,
             source: 'user_added',
+            quota,
             character: {
               id: character.id,
               name: character.name,
@@ -232,22 +271,57 @@ export const factsController = {
         });
       }
 
-      const fact = await prisma.characterFact.create({
-        data: {
-          characterId: character.id,
-          key: data.key,
-          value: data.value,
-          category: data.category || 'other',
-          sourceType: 'manual',
-          importance: 8, // User-added facts are important
-        },
-      });
+      const quota = await factQuotaService.getQuotaForCharacter(character.id);
+      if (quota.isFull) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'FACT_LIMIT_REACHED',
+            message: 'Fact limit reached for this character',
+          },
+          quota,
+        });
+      }
+
+      const fact = await prisma.$transaction(async (tx) => {
+        const used = await tx.characterFact.count({ where: { characterId: character.id } });
+        if (quota.limit >= 0 && used >= quota.limit) {
+          return null;
+        }
+
+        return tx.characterFact.create({
+          data: {
+            characterId: character.id,
+            key: data.key,
+            value: data.value,
+            category: data.category || 'other',
+            sourceType: 'manual',
+            importance: 8, // User-added facts are important
+          },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+      if (!fact) {
+        const latestQuota = await factQuotaService.getQuotaForCharacter(character.id);
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'FACT_LIMIT_REACHED',
+            message: 'Fact limit reached for this character',
+          },
+          quota: latestQuota,
+        });
+      }
+      await factQuotaService.invalidate(character.id);
+      const updatedQuota = await factQuotaService.getQuotaForCharacter(character.id);
+      emitManualFactUpdate(req.user!.id, character.id, updatedQuota, { added: 1 });
 
       res.status(201).json({
         success: true,
         data: {
           ...fact,
           source: 'user_added',
+          quota: updatedQuota,
           character: {
             id: character.id,
             name: character.name,

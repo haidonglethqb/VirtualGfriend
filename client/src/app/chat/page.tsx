@@ -56,6 +56,14 @@ interface ChatCharacterUpdateDetail {
   newLevel?: number;
 }
 
+interface FactQuota {
+  tier: 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE';
+  limit: number;
+  used: number;
+  remaining: number;
+  isFull: boolean;
+}
+
 const CHAT_I18N = {
   vi: {
     lover: 'Người yêu',
@@ -98,6 +106,7 @@ const CHAT_I18N = {
     knowledgeScope: 'Kiến thức cho {name}',
     openFacts: 'Mở facts',
     factsCount: '{count} facts',
+    factsFull: 'Đã đầy',
   },
   en: {
     lover: 'Lover',
@@ -140,6 +149,7 @@ const CHAT_I18N = {
     knowledgeScope: 'Knowledge for {name}',
     openFacts: 'Open facts',
     factsCount: '{count} facts',
+    factsFull: 'Full',
   },
 } as const;
 
@@ -215,6 +225,7 @@ function ChatPageContent() {
   const [giftSuccess, setGiftSuccess] = useState(false)
   const [chatCharacter, setChatCharacter] = useState<ChatCharacterSummary | null>(null)
   const [factsCount, setFactsCount] = useState(0)
+  const [factsQuota, setFactsQuota] = useState<FactQuota | null>(null)
   const previousRequestedCharacterIdRef = useRef<string | null>(null)
   const handledMissingCharacterIdRef = useRef<string | null>(null)
 
@@ -423,21 +434,48 @@ function ChatPageContent() {
   useEffect(() => {
     if (!activeChatCharacterId || chatCharacter?.isExPersona) {
       setFactsCount(0)
+      setFactsQuota(null)
       return
     }
 
     const fetchFactsCount = async () => {
       try {
-        const response = await api.get<{ total: number }>(`/character/facts?characterId=${encodeURIComponent(activeChatCharacterId)}`)
+        const response = await api.get<{ total: number; quota?: FactQuota }>(`/character/facts?characterId=${encodeURIComponent(activeChatCharacterId)}`)
         if (response.success) {
           setFactsCount(response.data.total || 0)
+          setFactsQuota(response.data.quota || null)
         }
       } catch {
         setFactsCount(0)
+        setFactsQuota(null)
       }
     }
 
     void fetchFactsCount()
+  }, [activeChatCharacterId, chatCharacter?.isExPersona])
+
+  useEffect(() => {
+    if (!activeChatCharacterId || chatCharacter?.isExPersona) {
+      return
+    }
+
+    const handleFactsUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ characterId?: string; total?: number; quota?: FactQuota }>).detail
+      if (!detail || detail.characterId !== activeChatCharacterId) {
+        return
+      }
+      if (typeof detail.total === 'number') {
+        setFactsCount(detail.total)
+      }
+      if (detail.quota) {
+        setFactsQuota(detail.quota)
+      }
+    }
+
+    window.addEventListener('vgfriend:chat-facts-update', handleFactsUpdate as EventListener)
+    return () => {
+      window.removeEventListener('vgfriend:chat-facts-update', handleFactsUpdate as EventListener)
+    }
   }, [activeChatCharacterId, chatCharacter?.isExPersona])
 
   // Connect socket when accessToken is available — separate effect to avoid re-running fetchMessages
@@ -595,7 +633,10 @@ function ChatPageContent() {
     await fetchCharacter(characterId)
   }
   const knowledgeLabel = t.knowledgeScope.replace('{name}', displayCharacterName)
-  const factsCountLabel = t.factsCount.replace('{count}', String(factsCount))
+  const factsDisplayCount = factsQuota
+    ? `${factsQuota.used}/${factsQuota.limit < 0 ? '∞' : factsQuota.limit}`
+    : String(factsCount)
+  const factsCountLabel = t.factsCount.replace('{count}', factsDisplayCount)
 
   return (
     <AppLayout>
@@ -697,7 +738,7 @@ function ChatPageContent() {
                 </div>
                 <div className="mt-1 flex items-center justify-between">
                   <span className="text-sm text-white">{factsCountLabel}</span>
-                  <span className="text-xs text-love">{t.openFacts}</span>
+                  <span className="text-xs text-love">{factsQuota?.isFull ? t.factsFull : t.openFacts}</span>
                 </div>
               </button>
             )}
