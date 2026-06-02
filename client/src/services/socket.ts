@@ -372,6 +372,16 @@ class SocketService {
       useNotificationStore.getState().showGeneralNotification(data)
     })
 
+    this.socket.on('user:balance_update', (data: {
+      coins?: number
+      gems?: number
+      source?: string
+    }) => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('user:balance_update', { detail: data }))
+      }
+    })
+
     // Cross-tab sync events via socket (for multi-device sync)
     this.socket.on('sync:state_request', (data: { requestingSocketId: string }) => {
       // Another tab is requesting state via server

@@ -207,6 +207,11 @@ function isValidJWTStructure(token: string): boolean {
 
 // Cross-tab sync: Listen for storage changes from other tabs
 if (typeof window !== 'undefined') {
+  window.addEventListener('user:balance_update', (event) => {
+    const detail = (event as CustomEvent<{ coins?: number; gems?: number }>).detail;
+    useAuthStore.getState().updateBalance(detail?.coins, detail?.gems);
+  });
+
   window.addEventListener('storage', (event) => {
     if (event.key === 'vgfriend-auth' && event.newValue) {
       try {

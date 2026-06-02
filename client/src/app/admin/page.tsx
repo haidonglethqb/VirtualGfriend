@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -45,6 +45,7 @@ interface User {
   username: string;
   displayName: string | null;
   avatar: string | null;
+  bio?: string | null;
   isEmailVerified: boolean;
   isPremium: boolean;
   premiumTier: string | null;
@@ -52,8 +53,33 @@ interface User {
   coins: number;
   gems: number;
   streak: number;
+  userGender?: string;
+  datingPreference?: string;
   createdAt: string;
   lastLoginAt: string | null;
+}
+
+type RewardTargetType = 'all' | 'free' | 'premium' | 'tier' | 'selected_users';
+type BroadcastType = 'info' | 'success' | 'warning';
+
+interface AdminTarget {
+  type: RewardTargetType;
+  tiers?: string[];
+  userIds?: string[];
+}
+
+interface RewardForm {
+  coins: number;
+  gems: number;
+  message: string;
+  target: AdminTarget;
+}
+
+interface ResetPasswordForm {
+  userId: string;
+  username: string;
+  newPassword: string;
+  confirmPassword: string;
 }
 
 const TIER_OPTIONS = [
@@ -155,6 +181,8 @@ interface Pagination {
   totalPages: number;
 }
 
+const DEFAULT_PAGINATION: Pagination = { page: 1, limit: 20, total: 0, totalPages: 0 };
+
 // Chart.js dark theme defaults
 const chartDefaults = {
   color: '#9ca3af',
@@ -194,8 +222,7 @@ const ADMIN_I18N = {
       pricing: 'Bảng giá',
     },
     broadcast: 'Thông báo',
-    giveCoinsAll: 'Tặng xu (tất cả)',
-    giveGemsAll: 'Tặng ngọc (tất cả)',
+    reward: 'Tặng thưởng',
     logout: 'Đăng xuất',
     languageTitle: 'Ngôn ngữ',
   },
@@ -219,8 +246,7 @@ const ADMIN_I18N = {
       pricing: 'Pricing',
     },
     broadcast: 'Broadcast',
-    giveCoinsAll: 'Give Coins (All)',
-    giveGemsAll: 'Give Gems (All)',
+    reward: 'Give Rewards',
     logout: 'Logout',
     languageTitle: 'Language',
   },
@@ -313,13 +339,17 @@ function BroadcastModal({
   onClose,
   loading,
   language,
+  status,
+  selectedUserCount,
 }: {
-  form: { title: string; message: string; type: 'info' | 'success' | 'warning'; durationMs: number; targetFilter: 'all' | 'free' | 'premium' };
+  form: { title: string; message: string; type: BroadcastType; durationMs: number; target: AdminTarget };
   setForm: (f: typeof form) => void;
   onSubmit: () => void;
   onClose: () => void;
   loading: boolean;
   language: string;
+  status: { type: 'success' | 'error'; message: string } | null;
+  selectedUserCount: number;
 }) {
   const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
 
@@ -333,6 +363,8 @@ function BroadcastModal({
     { value: 'all' as const, label: tr('Tất cả', 'All Users'), Icon: Users2, desc: tr('Gửi cho tất cả người dùng', 'Send to all users') },
     { value: 'free' as const, label: 'Free', Icon: UserCheck, desc: tr('Chỉ tài khoản miễn phí', 'Free accounts only') },
     { value: 'premium' as const, label: 'Premium', Icon: Crown, desc: tr('Chỉ tài khoản premium', 'Premium accounts only') },
+    { value: 'tier' as const, label: tr('Theo gói', 'By Tier'), Icon: Crown, desc: tr('Chọn một hoặc nhiều gói VIP', 'Choose one or more VIP tiers') },
+    { value: 'selected_users' as const, label: tr('Đã chọn', 'Selected'), Icon: UserCheck, desc: tr(`${selectedUserCount} người dùng trong bảng`, `${selectedUserCount} table users`) },
   ];
 
   const durationOptions = [
@@ -465,30 +497,49 @@ function BroadcastModal({
               {targetOptions.map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => setForm({ ...form, targetFilter: opt.value })}
+                  onClick={() => setForm({ ...form, target: { ...form.target, type: opt.value } })}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer text-left ${
-                    form.targetFilter === opt.value
+                    form.target.type === opt.value
                       ? 'bg-purple-500/15 border-purple-500/40 ring-1 ring-purple-400/30'
                       : 'bg-gray-800/40 border-gray-700/50 hover:border-gray-600'
                   }`}
                 >
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    form.targetFilter === opt.value ? 'bg-purple-500/30' : 'bg-gray-700/60'
+                    form.target.type === opt.value ? 'bg-purple-500/30' : 'bg-gray-700/60'
                   }`}>
-                    <opt.Icon className={`w-4 h-4 ${form.targetFilter === opt.value ? 'text-purple-300' : 'text-gray-400'}`} />
+                    <opt.Icon className={`w-4 h-4 ${form.target.type === opt.value ? 'text-purple-300' : 'text-gray-400'}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-semibold ${form.targetFilter === opt.value ? 'text-white' : 'text-gray-300'}`}>{opt.label}</div>
+                    <div className={`text-sm font-semibold ${form.target.type === opt.value ? 'text-white' : 'text-gray-300'}`}>{opt.label}</div>
                     <div className="text-xs text-gray-500">{opt.desc}</div>
                   </div>
                   <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                    form.targetFilter === opt.value ? 'border-purple-400 bg-purple-500' : 'border-gray-600'
+                    form.target.type === opt.value ? 'border-purple-400 bg-purple-500' : 'border-gray-600'
                   }`}>
-                    {form.targetFilter === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    {form.target.type === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                   </div>
                 </button>
               ))}
             </div>
+            {form.target.type === 'tier' && (
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                {TIER_OPTIONS.filter((tier) => tier.value !== 'FREE').map((tier) => (
+                  <label key={tier.value} className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800/40 px-3 py-2 text-sm text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={form.target.tiers?.includes(tier.value) || false}
+                      onChange={(event) => {
+                        const tiers = new Set(form.target.tiers || []);
+                        if (event.target.checked) tiers.add(tier.value);
+                        else tiers.delete(tier.value);
+                        setForm({ ...form, target: { ...form.target, tiers: Array.from(tiers) } });
+                      }}
+                    />
+                    {tier.label}
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Preview */}
@@ -509,6 +560,14 @@ function BroadcastModal({
             </div>
           )}
         </div>
+
+        {status && (
+          <div className={`mx-6 mb-4 rounded-xl border px-4 py-3 text-sm ${
+            status.type === 'success' ? 'border-green-500/30 bg-green-500/10 text-green-300' : 'border-red-500/30 bg-red-500/10 text-red-300'
+          }`}>
+            {status.message}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-700/50 flex items-center gap-3">
@@ -533,6 +592,139 @@ function BroadcastModal({
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+function RewardModal({
+  form,
+  setForm,
+  onSubmit,
+  onClose,
+  loading,
+  language,
+  status,
+  selectedUserCount,
+}: {
+  form: RewardForm;
+  setForm: (form: RewardForm) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+  loading: boolean;
+  language: string;
+  status: { type: 'success' | 'error'; message: string } | null;
+  selectedUserCount: number;
+}) {
+  const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
+  const targetOptions = [
+    { value: 'all' as const, label: tr('Tất cả', 'All Users') },
+    { value: 'free' as const, label: 'Free' },
+    { value: 'premium' as const, label: 'Premium' },
+    { value: 'tier' as const, label: tr('Theo gói', 'By Tier') },
+    { value: 'selected_users' as const, label: tr(`Đã chọn (${selectedUserCount})`, `Selected (${selectedUserCount})`) },
+  ];
+  const isValid = Number(form.coins || 0) > 0 || Number(form.gems || 0) > 0;
+
+  return (
+    <Modal title={tr('Tặng thưởng', 'Give Rewards')} size="lg" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-2">
+            <span className="text-sm text-gray-400">{tr('Xu', 'Coins')}</span>
+            <input
+              type="number"
+              min={0}
+              value={form.coins}
+              onChange={(event) => setForm({ ...form, coins: Number(event.target.value) })}
+              className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm text-gray-400">{tr('Ngọc', 'Gems')}</span>
+            <input
+              type="number"
+              min={0}
+              value={form.gems}
+              onChange={(event) => setForm({ ...form, gems: Number(event.target.value) })}
+              className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+            />
+          </label>
+        </div>
+
+        <label className="block space-y-2">
+          <span className="text-sm text-gray-400">{tr('Nội dung thông báo', 'Notification message')}</span>
+          <textarea
+            value={form.message}
+            onChange={(event) => setForm({ ...form, message: event.target.value })}
+            rows={3}
+            maxLength={500}
+            placeholder={tr('Bạn đã nhận được phần thưởng từ quản trị viên.', 'You received a reward from the admin.')}
+            className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white resize-none"
+          />
+        </label>
+
+        <div className="space-y-2">
+          <p className="text-sm text-gray-400">{tr('Phạm vi người nhận', 'Recipient scope')}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {targetOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setForm({ ...form, target: { ...form.target, type: option.value } })}
+                className={`rounded-xl border px-3 py-2 text-sm text-left ${
+                  form.target.type === option.value
+                    ? 'border-purple-400 bg-purple-500/15 text-white'
+                    : 'border-gray-700 bg-gray-800/40 text-gray-400 hover:border-gray-600'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {form.target.type === 'tier' && (
+          <div className="grid grid-cols-2 gap-2">
+            {TIER_OPTIONS.filter((tier) => tier.value !== 'FREE').map((tier) => (
+              <label key={tier.value} className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800/40 px-3 py-2 text-sm text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={form.target.tiers?.includes(tier.value) || false}
+                  onChange={(event) => {
+                    const tiers = new Set(form.target.tiers || []);
+                    if (event.target.checked) tiers.add(tier.value);
+                    else tiers.delete(tier.value);
+                    setForm({ ...form, target: { ...form.target, tiers: Array.from(tiers) } });
+                  }}
+                />
+                {tier.label}
+              </label>
+            ))}
+          </div>
+        )}
+
+        {status && (
+          <div className={`rounded-xl border px-4 py-3 text-sm ${
+            status.type === 'success' ? 'border-green-500/30 bg-green-500/10 text-green-300' : 'border-red-500/30 bg-red-500/10 text-red-300'
+          }`}>
+            {status.message}
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-2">
+          <button onClick={onClose} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
+            {tr('Hủy', 'Cancel')}
+          </button>
+          <button
+            onClick={onSubmit}
+            disabled={!isValid || loading}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50"
+          >
+            {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
+            {loading ? tr('Đang xử lý...', 'Processing...') : tr('Tặng thưởng', 'Give Rewards')}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -562,18 +754,40 @@ export default function AdminPage() {
   const [quests, setQuests] = useState<Quest[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [userPagination, setUserPagination] = useState<Pagination>({ ...DEFAULT_PAGINATION, limit: 20 });
+  const [characterPagination, setCharacterPagination] = useState<Pagination>({ ...DEFAULT_PAGINATION, limit: 20 });
+  const [messagePagination, setMessagePagination] = useState<Pagination>({ ...DEFAULT_PAGINATION, limit: 50 });
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [statusMessage, setStatusMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Broadcast modal
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
-  const [broadcastForm, setBroadcastForm] = useState({
+  const [broadcastForm, setBroadcastForm] = useState<{
+    title: string;
+    message: string;
+    type: BroadcastType;
+    durationMs: number;
+    target: AdminTarget;
+  }>({
     title: '',
     message: '',
-    type: 'info' as 'info' | 'success' | 'warning',
+    type: 'info' as BroadcastType,
     durationMs: 5000,
-    targetFilter: 'all' as 'all' | 'free' | 'premium',
+    target: { type: 'all' as RewardTargetType, tiers: [] as string[], userIds: [] as string[] },
   });
+  const [broadcastStatus, setBroadcastStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [rewardForm, setRewardForm] = useState<RewardForm>({
+    coins: 0,
+    gems: 0,
+    message: '',
+    target: { type: 'all', tiers: [], userIds: [] },
+  });
+  const [rewardStatus, setRewardStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [resetPasswordForm, setResetPasswordForm] = useState<ResetPasswordForm | null>(null);
+  const [resetPasswordStatus, setResetPasswordStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Modal states
   const [showModal, setShowModal] = useState<string | null>(null);
@@ -583,12 +797,8 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Toast notification
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    setStatusMessage({ message, type });
   };
 
   const handleLogout = useCallback(() => {
@@ -611,11 +821,11 @@ export default function AdminPage() {
     
     if (res.status === 401) {
       handleLogout();
-      throw new Error(tr('Phiên đăng nhập đã hết hạn', 'Session expired'));
+      throw new Error('Session expired');
     }
     
     return res;
-  }, [handleLogout, token, tr]);
+  }, [handleLogout, token]);
 
   // Check for saved token on mount
   useEffect(() => {
@@ -669,6 +879,11 @@ export default function AdminPage() {
     }
   };
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchQuery(searchQuery.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
   // Fetch functions
   const fetchStats = useCallback(async () => {
     const res = await apiCall('/stats');
@@ -677,37 +892,37 @@ export default function AdminPage() {
 
   const fetchUsers = useCallback(async () => {
     const params = new URLSearchParams({
-      page: String(pagination.page),
-      limit: '20',
-      ...(searchQuery && { search: searchQuery }),
+      page: String(userPagination.page),
+      limit: String(userPagination.limit),
+      ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
     });
     const res = await apiCall(`/users?${params}`);
     if (res.ok) {
       const data = await res.json();
       setUsers(data.users);
-      setPagination(data.pagination);
+      setUserPagination(data.pagination);
     }
-  }, [apiCall, pagination.page, searchQuery]);
+  }, [apiCall, userPagination.page, userPagination.limit, debouncedSearchQuery]);
 
   const fetchCharacters = useCallback(async () => {
-    const params = new URLSearchParams({ page: String(pagination.page), limit: '20' });
+    const params = new URLSearchParams({ page: String(characterPagination.page), limit: String(characterPagination.limit) });
     const res = await apiCall(`/characters?${params}`);
     if (res.ok) {
       const data = await res.json();
       setCharacters(data.characters);
-      setPagination(data.pagination);
+      setCharacterPagination(data.pagination);
     }
-  }, [apiCall, pagination.page]);
+  }, [apiCall, characterPagination.page, characterPagination.limit]);
 
   const fetchMessages = useCallback(async () => {
-    const params = new URLSearchParams({ page: String(pagination.page), limit: '50' });
+    const params = new URLSearchParams({ page: String(messagePagination.page), limit: String(messagePagination.limit) });
     const res = await apiCall(`/messages?${params}`);
     if (res.ok) {
       const data = await res.json();
       setMessages(data.messages);
-      setPagination(data.pagination);
+      setMessagePagination(data.pagination);
     }
-  }, [apiCall, pagination.page]);
+  }, [apiCall, messagePagination.page, messagePagination.limit]);
 
   const fetchQuests = useCallback(async () => {
     const res = await apiCall('/quests');
@@ -763,6 +978,8 @@ export default function AdminPage() {
             break;
           case 'tier-configs':
             break;
+          case 'pricing':
+            break;
         }
       } catch (err) {
         console.error('Fetch error:', err);
@@ -770,21 +987,26 @@ export default function AdminPage() {
     };
 
     void fetchData();
-  }, [activeTab, fetchAnalytics, fetchCharacters, fetchMessages, fetchQuests, fetchStats, fetchSystemInfo, fetchTemplates, fetchUsers, isLoggedIn, pagination.page, searchQuery, token]);
+  }, [activeTab, fetchAnalytics, fetchCharacters, fetchMessages, fetchQuests, fetchStats, fetchSystemInfo, fetchTemplates, fetchUsers, isLoggedIn, token]);
 
   // Action handlers
   const handleUpdateUser = async () => {
     if (!selectedItem) return;
     setActionLoading(true);
+    setStatusMessage(null);
     try {
       const res = await apiCall(`/users/${selectedItem.id}`, {
         method: 'PATCH',
         body: JSON.stringify(formData),
       });
       if (res.ok) {
+        const data = await res.json();
+        setUsers((current) => current.map((user) => user.id === selectedItem.id ? { ...user, ...data.user } : user));
         showToast(tr('Cập nhật người dùng thành công', 'User updated successfully'));
         setShowModal(null);
-        fetchUsers();
+      } else {
+        const data = await res.json();
+        showToast(data.error || tr('Cập nhật người dùng thất bại', 'Failed to update user'), 'error');
       }
     } catch {
       showToast(tr('Cập nhật người dùng thất bại', 'Failed to update user'), 'error');
@@ -793,48 +1015,97 @@ export default function AdminPage() {
     }
   };
 
-  const handleResetPassword = async (userId: string) => {
-    const newPass = prompt(tr('Nhập mật khẩu mới (tối thiểu 8 ký tự):', 'Enter new password (min 8 chars):'));
-    if (!newPass || newPass.length < 8) {
-      showToast(tr('Mật khẩu phải có ít nhất 8 ký tự', 'Password must be at least 8 characters'), 'error');
+  const openResetPassword = (user: User) => {
+    setResetPasswordStatus(null);
+    setResetPasswordForm({
+      userId: user.id,
+      username: user.username || user.email,
+      newPassword: '',
+      confirmPassword: '',
+    });
+  };
+
+  const handleResetPasswordSubmit = async () => {
+    if (!resetPasswordForm) return;
+    if (resetPasswordForm.newPassword.length < 8) {
+      setResetPasswordStatus({ type: 'error', message: tr('Mật khẩu phải có ít nhất 8 ký tự', 'Password must be at least 8 characters') });
       return;
     }
-    
+    if (resetPasswordForm.newPassword !== resetPasswordForm.confirmPassword) {
+      setResetPasswordStatus({ type: 'error', message: tr('Mật khẩu xác nhận không khớp', 'Password confirmation does not match') });
+      return;
+    }
+
     setActionLoading(true);
+    setResetPasswordStatus(null);
     try {
-      const res = await apiCall(`/users/${userId}/reset-password`, {
+      const res = await apiCall(`/users/${resetPasswordForm.userId}/reset-password`, {
         method: 'POST',
-        body: JSON.stringify({ newPassword: newPass }),
+        body: JSON.stringify({ newPassword: resetPasswordForm.newPassword }),
       });
-      if (res.ok) showToast(tr('Đặt lại mật khẩu thành công', 'Password reset successfully'));
+      if (res.ok) {
+        setResetPasswordStatus({ type: 'success', message: tr('Đặt lại mật khẩu thành công', 'Password reset successfully') });
+      } else {
+        const data = await res.json();
+        setResetPasswordStatus({ type: 'error', message: data.error || tr('Đặt lại mật khẩu thất bại', 'Failed to reset password') });
+      }
     } catch {
-      showToast(tr('Đặt lại mật khẩu thất bại', 'Failed to reset password'), 'error');
+      setResetPasswordStatus({ type: 'error', message: tr('Đặt lại mật khẩu thất bại', 'Failed to reset password') });
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleGiveRewards = async (userId: string) => {
-    const coins = prompt(tr('Nhập số xu muốn tặng (0 để bỏ qua):', 'Enter coins to give (0 to skip):'));
-    const gems = prompt(tr('Nhập số ngọc muốn tặng (0 để bỏ qua):', 'Enter gems to give (0 to skip):'));
-    
-    if (!coins && !gems) return;
-    
+  const openRewardModal = (target: AdminTarget = { type: 'all', tiers: [], userIds: [] }) => {
+    setRewardStatus(null);
+    setRewardForm({
+      coins: 0,
+      gems: 0,
+      message: '',
+      target,
+    });
+    setShowRewardModal(true);
+  };
+
+  const handleRewardSubmit = async () => {
+    const coins = Number(rewardForm.coins || 0);
+    const gems = Number(rewardForm.gems || 0);
+    if (coins <= 0 && gems <= 0) {
+      setRewardStatus({ type: 'error', message: tr('Nhập ít nhất một phần thưởng lớn hơn 0', 'Enter at least one reward greater than 0') });
+      return;
+    }
+
+    const target = {
+      ...rewardForm.target,
+      userIds: rewardForm.target.type === 'selected_users' ? selectedUserIds : rewardForm.target.userIds,
+    };
     setActionLoading(true);
+    setRewardStatus(null);
     try {
-      const res = await apiCall(`/users/${userId}/give`, {
+      const res = await apiCall('/bulk/rewards', {
         method: 'POST',
-        body: JSON.stringify({ 
-          coins: parseInt(coins || '0'), 
-          gems: parseInt(gems || '0') 
+        body: JSON.stringify({
+          coins,
+          gems,
+          message: rewardForm.message.trim(),
+          target,
         }),
       });
       if (res.ok) {
-        showToast(tr('Tặng thưởng thành công', 'Rewards given successfully'));
-        fetchUsers();
+        const data = await res.json();
+        setRewardStatus({
+          type: 'success',
+          message: language === 'vi'
+            ? `Đã tặng thưởng cho ${data.affected || 0} người dùng, realtime ${data.deliveredRealtime || 0}.`
+            : `Rewarded ${data.affected || 0} users, realtime ${data.deliveredRealtime || 0}.`,
+        });
+        void fetchUsers();
+      } else {
+        const data = await res.json();
+        setRewardStatus({ type: 'error', message: data.error || tr('Tặng thưởng thất bại', 'Failed to give rewards') });
       }
     } catch {
-      showToast(tr('Tặng thưởng thất bại', 'Failed to give rewards'), 'error');
+      setRewardStatus({ type: 'error', message: tr('Tặng thưởng thất bại', 'Failed to give rewards') });
     } finally {
       setActionLoading(false);
     }
@@ -1035,40 +1306,18 @@ export default function AdminPage() {
     }
   };
 
-  const handleBulkGive = async (type: 'coins' | 'gems') => {
-    const amount = prompt(
-      language === 'vi'
-        ? `Nhập số lượng ${type === 'coins' ? 'xu' : 'ngọc'} tặng cho TẤT CẢ người dùng:`
-        : `Enter ${type} amount to give to ALL users:`,
-    );
-    if (!amount || parseInt(amount) <= 0) return;
-    
-    if (!confirm(language === 'vi' ? `Tặng ${amount} ${type === 'coins' ? 'xu' : 'ngọc'} cho TẤT CẢ người dùng?` : `Give ${amount} ${type} to ALL users?`)) return;
-    
-    setActionLoading(true);
-    try {
-      const res = await apiCall(`/bulk/${type}`, {
-        method: 'POST',
-        body: JSON.stringify({ amount: parseInt(amount) }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        showToast(data.message);
-      }
-    } catch {
-      showToast(tr('Tặng thưởng thất bại', 'Failed to give rewards'), 'error');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleBroadcast = () => {
-    setBroadcastForm({ title: '', message: '', type: 'info', durationMs: 5000, targetFilter: 'all' });
+    setBroadcastStatus(null);
+    setBroadcastForm({ title: '', message: '', type: 'info', durationMs: 5000, target: { type: 'all', tiers: [], userIds: [] } });
     setShowBroadcastModal(true);
   };
 
   const handleBroadcastSubmit = async () => {
     if (!broadcastForm.title.trim() || !broadcastForm.message.trim()) return;
+    const target = {
+      ...broadcastForm.target,
+      userIds: broadcastForm.target.type === 'selected_users' ? selectedUserIds : broadcastForm.target.userIds,
+    };
     setActionLoading(true);
     try {
       const res = await apiCall('/broadcast', {
@@ -1078,22 +1327,23 @@ export default function AdminPage() {
           message: broadcastForm.message.trim(),
           type: broadcastForm.type,
           durationMs: broadcastForm.durationMs,
-          targetFilter: broadcastForm.targetFilter,
+          target,
         }),
       });
       if (res.ok) {
         const data = await res.json();
-        setShowBroadcastModal(false);
-        showToast(
-          language === 'vi'
-            ? `Đã gửi ${data.persisted || 0} thông báo (hiển thị ${data.durationMs || 5000}ms)`
-            : `Sent ${data.persisted || 0} notifications (${data.durationMs || 5000}ms display)`
-        );
+        setBroadcastStatus({
+          type: 'success',
+          message: language === 'vi'
+            ? `Đã gửi ${data.persisted || 0} thông báo, realtime ${data.deliveredRealtime || 0}.`
+            : `Sent ${data.persisted || 0} notifications, realtime ${data.deliveredRealtime || 0}.`,
+        });
       } else {
-        showToast(tr('Gửi thông báo thất bại', 'Failed to send broadcast'), 'error');
+        const data = await res.json();
+        setBroadcastStatus({ type: 'error', message: data.error || tr('Gửi thông báo thất bại', 'Failed to send broadcast') });
       }
     } catch {
-      showToast(tr('Gửi thông báo thất bại', 'Failed to send broadcast'), 'error');
+      setBroadcastStatus({ type: 'error', message: tr('Gửi thông báo thất bại', 'Failed to send broadcast') });
     } finally {
       setActionLoading(false);
     }
@@ -1148,6 +1398,19 @@ export default function AdminPage() {
     }
   };
 
+  const tabs: { id: TabType; icon: typeof Users; label: string }[] = useMemo(() => [
+    { id: 'dashboard', icon: LayoutDashboard, label: t.tabs.dashboard },
+    { id: 'users', icon: Users, label: t.tabs.users },
+    { id: 'characters', icon: Heart, label: t.tabs.characters },
+    { id: 'messages', icon: MessageSquare, label: t.tabs.messages },
+    { id: 'quests', icon: Target, label: t.tabs.quests },
+    { id: 'templates', icon: ImageIcon, label: t.tabs.templates },
+    { id: 'analytics', icon: BarChart3, label: t.tabs.analytics },
+    { id: 'system', icon: Server, label: t.tabs.system },
+    { id: 'tier-configs', icon: Settings, label: t.tabs.tierConfigs },
+    { id: 'pricing', icon: Coins, label: t.tabs.pricing },
+  ], [t]);
+
   // Loading state - checking token
   if (isLoggedIn === null) {
     return (
@@ -1156,7 +1419,7 @@ export default function AdminPage() {
           <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
             <Shield className="w-8 h-8 text-white" />
           </div>
-          <p className="text-gray-400">{tr('Đang kiểm tra xác thực...', 'Checking authentication...')}</p>
+          <p className="text-gray-400">{tr('?ang kiểm tra xác thực...', 'Checking authentication...')}</p>
         </div>
       </div>
     );
@@ -1214,38 +1477,8 @@ export default function AdminPage() {
     );
   }
 
-  const tabs: { id: TabType; icon: typeof Users; label: string }[] = [
-    { id: 'dashboard', icon: LayoutDashboard, label: t.tabs.dashboard },
-    { id: 'users', icon: Users, label: t.tabs.users },
-    { id: 'characters', icon: Heart, label: t.tabs.characters },
-    { id: 'messages', icon: MessageSquare, label: t.tabs.messages },
-    { id: 'quests', icon: Target, label: t.tabs.quests },
-    { id: 'templates', icon: ImageIcon, label: t.tabs.templates },
-    { id: 'analytics', icon: BarChart3, label: t.tabs.analytics },
-    { id: 'system', icon: Server, label: t.tabs.system },
-    { id: 'tier-configs', icon: Settings, label: t.tabs.tierConfigs },
-    { id: 'pricing', icon: Coins, label: t.tabs.pricing },
-  ];
-
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* Toast */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: -50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -50 }}
-            className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 ${
-              toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
-            }`}
-          >
-            {toast.type === 'success' ? <Check className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-            {toast.message}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 bg-gray-800/50 backdrop-blur-xl border-r border-gray-700/50 p-4">
         <div className="h-full flex flex-col min-h-0">
@@ -1276,7 +1509,7 @@ export default function AdminPage() {
               {tabs.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => { setActiveTab(item.id); setPagination(p => ({ ...p, page: 1 })); }}
+                  onClick={() => { setActiveTab(item.id); }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                     activeTab === item.id ? 'bg-purple-500/20 text-purple-400' : 'text-gray-400 hover:bg-gray-700/50'
                   }`}
@@ -1296,18 +1529,11 @@ export default function AdminPage() {
                 {t.broadcast}
               </button>
               <button
-                onClick={() => handleBulkGive('coins')}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-700/50"
-              >
-                <Coins className="w-5 h-5" />
-                {t.giveCoinsAll}
-              </button>
-              <button
-                onClick={() => handleBulkGive('gems')}
+                onClick={() => openRewardModal({ type: selectedUserIds.length > 0 ? 'selected_users' : 'all', tiers: [], userIds: selectedUserIds })}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-700/50"
               >
                 <Sparkles className="w-5 h-5" />
-                {t.giveGemsAll}
+                {t.reward}
               </button>
             </div>
           </div>
@@ -1326,6 +1552,16 @@ export default function AdminPage() {
 
       {/* Main Content */}
       <main className="ml-64 p-8">
+        {statusMessage && (
+          <div className={`mb-4 flex items-center justify-between rounded-xl border px-4 py-3 text-sm ${
+            statusMessage.type === 'success' ? 'border-green-500/30 bg-green-500/10 text-green-300' : 'border-red-500/30 bg-red-500/10 text-red-300'
+          }`}>
+            <span>{statusMessage.message}</span>
+            <button onClick={() => setStatusMessage(null)} className="p-1 rounded hover:bg-white/10" aria-label="Dismiss">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         <AnimatePresence mode="wait">
           {/* DASHBOARD */}
           {activeTab === 'dashboard' && stats && (
@@ -1391,7 +1627,7 @@ export default function AdminPage() {
                   <input
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setPagination(p => ({ ...p, page: 1 })); }}
+                    onChange={(e) => { setSearchQuery(e.target.value); setUserPagination(p => ({ ...p, page: 1 })); }}
                     placeholder={tr('Tìm theo email, tên người dùng...', 'Search by email, username...')}
                     className="w-full pl-12 pr-4 py-3 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
                   />
@@ -1402,6 +1638,20 @@ export default function AdminPage() {
                 <table className="w-full">
                   <thead className="bg-gray-700/50">
                     <tr>
+                      <th className="w-10 px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={users.length > 0 && users.every((user) => selectedUserIds.includes(user.id))}
+                          onChange={(event) => {
+                            setSelectedUserIds((current) => {
+                              const pageIds = users.map((user) => user.id);
+                              if (event.target.checked) return Array.from(new Set([...current, ...pageIds]));
+                              return current.filter((id) => !pageIds.includes(id));
+                            });
+                          }}
+                          aria-label={tr('Chọn tất cả người dùng trên trang', 'Select all users on this page')}
+                        />
+                      </th>
                       <th className="text-left px-6 py-4 text-gray-400 font-medium">{tr('Người dùng', 'User')}</th>
                       <th className="text-left px-6 py-4 text-gray-400 font-medium">Email</th>
                       <th className="text-center px-6 py-4 text-gray-400 font-medium">Premium</th>
@@ -1413,6 +1663,18 @@ export default function AdminPage() {
                   <tbody>
                     {users.map((user) => (
                       <tr key={user.id} className="border-t border-gray-700/50 hover:bg-gray-700/30">
+                        <td className="px-4 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedUserIds.includes(user.id)}
+                            onChange={(event) => {
+                              setSelectedUserIds((current) => event.target.checked
+                                ? Array.from(new Set([...current, user.id]))
+                                : current.filter((id) => id !== user.id));
+                            }}
+                            aria-label={tr('Chọn người dùng', 'Select user')}
+                          />
+                        </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-medium">
@@ -1445,6 +1707,12 @@ export default function AdminPage() {
                                 setFormData({
                                   coins: user.coins,
                                   gems: user.gems,
+                                  email: user.email,
+                                  username: user.username,
+                                  displayName: user.displayName || '',
+                                  bio: user.bio || '',
+                                  userGender: user.userGender || 'NOT_SPECIFIED',
+                                  datingPreference: user.datingPreference || 'ALL',
                                   isPremium: user.isPremium,
                                   premiumTier: user.premiumTier || 'FREE',
                                   premiumExpiresAt: user.premiumExpiresAt ? user.premiumExpiresAt.slice(0, 10) : '',
@@ -1458,14 +1726,14 @@ export default function AdminPage() {
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleResetPassword(user.id)}
+                              onClick={() => openResetPassword(user)}
                               className="p-2 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30"
                               title={tr('Đặt lại mật khẩu', 'Reset Password')}
                             >
                               <Key className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleGiveRewards(user.id)}
+                              onClick={() => openRewardModal({ type: 'selected_users', userIds: [user.id], tiers: [] })}
                               className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30"
                               title={tr('Tặng thưởng', 'Give Rewards')}
                             >
@@ -1477,7 +1745,7 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
-                <PaginationControls pagination={pagination} setPagination={setPagination} language={language} />
+                <PaginationControls pagination={userPagination} setPagination={setUserPagination} language={language} />
               </div>
             </motion.div>
           )}
@@ -1518,7 +1786,7 @@ export default function AdminPage() {
                         <td className="px-6 py-4 text-center text-pink-400">{char.affection}%</td>
                         <td className="px-6 py-4 text-center">
                           <span className={`px-2 py-1 rounded-full text-sm ${char.isActive ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                            {char.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
+                            {char.isActive ? tr('?ang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center">
@@ -1534,7 +1802,7 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
-                <PaginationControls pagination={pagination} setPagination={setPagination} language={language} />
+                <PaginationControls pagination={characterPagination} setPagination={setCharacterPagination} language={language} />
               </div>
             </motion.div>
           )}
@@ -1543,7 +1811,7 @@ export default function AdminPage() {
           {activeTab === 'messages' && (
             <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">{tr('Tin nhắn', 'Messages')} ({pagination.total.toLocaleString()})</h2>
+                <h2 className="text-2xl font-bold">{tr('Tin nhắn', 'Messages')} ({messagePagination.total.toLocaleString()})</h2>
                 <button onClick={fetchMessages} className="p-2 bg-gray-700/50 rounded-lg hover:bg-gray-700">
                   <RefreshCw className="w-5 h-5" />
                 </button>
@@ -1576,7 +1844,7 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
-                <PaginationControls pagination={pagination} setPagination={setPagination} language={language} />
+                <PaginationControls pagination={messagePagination} setPagination={setMessagePagination} language={language} />
               </div>
             </motion.div>
           )}
@@ -1617,7 +1885,7 @@ export default function AdminPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className={`px-2 py-1 rounded text-xs ${quest.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                              {quest.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
+                              {quest.isActive ? tr('?ang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
                             </span>
                             <button
                               onClick={() => handleToggleQuest(quest.id)}
@@ -1669,7 +1937,7 @@ export default function AdminPage() {
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold">{template.name}</h3>
                         <span className={`px-2 py-1 rounded text-xs ${template.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {template.isActive ? tr('Đang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
+                          {template.isActive ? tr('?ang hoạt động', 'Active') : tr('Không hoạt động', 'Inactive')}
                         </span>
                       </div>
                       <p className="text-sm text-gray-400 mb-3">{template.description}</p>
@@ -2153,6 +2421,63 @@ export default function AdminPage() {
             </div>
 
             <div className="space-y-5 max-h-[45vh] overflow-y-auto pr-1">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                  {tr('Thông tin tài khoản', 'Account Info')}
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="email"
+                    value={(formData.email as string) || ''}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                    placeholder="Email"
+                  />
+                  <input
+                    type="text"
+                    value={(formData.username as string) || ''}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    className="px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                    placeholder={tr('Tên đăng nhập', 'Username')}
+                  />
+                  <input
+                    type="text"
+                    value={(formData.displayName as string) || ''}
+                    onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                    className="col-span-2 px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                    placeholder={tr('Tên hiển thị', 'Display name')}
+                  />
+                  <textarea
+                    value={(formData.bio as string) || ''}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    className="col-span-2 px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white resize-none"
+                    rows={3}
+                    placeholder="Bio"
+                  />
+                  <select
+                    value={(formData.userGender as string) || 'NOT_SPECIFIED'}
+                    onChange={(e) => setFormData({ ...formData, userGender: e.target.value })}
+                    className="px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  >
+                    <option value="NOT_SPECIFIED">{tr('Chưa chọn giới tính', 'Not specified')}</option>
+                    <option value="MALE">{tr('Nam', 'Male')}</option>
+                    <option value="FEMALE">{tr('Nữ', 'Female')}</option>
+                    <option value="NON_BINARY">Non-binary</option>
+                    <option value="OTHER">{tr('Khác', 'Other')}</option>
+                  </select>
+                  <select
+                    value={(formData.datingPreference as string) || 'ALL'}
+                    onChange={(e) => setFormData({ ...formData, datingPreference: e.target.value })}
+                    className="px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                  >
+                    <option value="ALL">{tr('Tất cả', 'All')}</option>
+                    <option value="MALE">{tr('Nam', 'Male')}</option>
+                    <option value="FEMALE">{tr('Nữ', 'Female')}</option>
+                    <option value="NON_BINARY">Non-binary</option>
+                  </select>
+                </div>
+              </div>
+
               {/* Premium Tier */}
               <div>
                 <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
@@ -2303,7 +2628,7 @@ export default function AdminPage() {
                 disabled={actionLoading}
                 className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold rounded-xl hover:from-violet-400 hover:to-purple-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 shadow-md shadow-violet-500/20"
               >
-                {actionLoading ? tr('Đang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
+                {actionLoading ? tr('?ang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
               </button>
             </div>
           </Modal>
@@ -2394,7 +2719,7 @@ export default function AdminPage() {
                 {tr('Hủy', 'Cancel')}
               </button>
               <button onClick={handleCreateQuest} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? tr('Đang tạo...', 'Creating...') : tr('Tạo nhiệm vụ', 'Create Quest')}
+                {actionLoading ? tr('?ang tạo...', 'Creating...') : tr('Tạo nhiệm vụ', 'Create Quest')}
               </button>
             </div>
           </Modal>
@@ -2508,7 +2833,7 @@ export default function AdminPage() {
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                     className="w-4 h-4"
                   />
-                  {tr('Đang hoạt động', 'Active')}
+                  {tr('?ang hoạt động', 'Active')}
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-300">
                   <input
@@ -2526,7 +2851,7 @@ export default function AdminPage() {
                 {tr('Hủy', 'Cancel')}
               </button>
               <button onClick={handleCreateTemplate} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? tr('Đang tạo...', 'Creating...') : tr('Tạo mẫu', 'Create Template')}
+                {actionLoading ? tr('?ang tạo...', 'Creating...') : tr('Tạo mẫu', 'Create Template')}
               </button>
             </div>
           </Modal>
@@ -2640,7 +2965,7 @@ export default function AdminPage() {
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                     className="w-4 h-4"
                   />
-                  {tr('Đang hoạt động', 'Active')}
+                  {tr('?ang hoạt động', 'Active')}
                 </label>
                 <label className="flex items-center gap-2 text-sm text-gray-300">
                   <input
@@ -2658,10 +2983,64 @@ export default function AdminPage() {
                 {tr('Hủy', 'Cancel')}
               </button>
               <button onClick={handleUpdateTemplate} disabled={actionLoading} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:opacity-90 disabled:opacity-50">
-                {actionLoading ? tr('Đang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
+                {actionLoading ? tr('?ang lưu...', 'Saving...') : tr('Lưu thay đổi', 'Save Changes')}
               </button>
             </div>
           </Modal>
+        )}
+
+        {resetPasswordForm && (
+          <Modal title={tr('Đặt lại mật khẩu', 'Reset Password')} onClose={() => setResetPasswordForm(null)}>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-400">
+                {tr('Người dùng', 'User')}: <span className="text-gray-200">{resetPasswordForm.username}</span>
+              </p>
+              <input
+                type="password"
+                value={resetPasswordForm.newPassword}
+                onChange={(event) => setResetPasswordForm({ ...resetPasswordForm, newPassword: event.target.value })}
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                placeholder={tr('Mật khẩu mới', 'New password')}
+              />
+              <input
+                type="password"
+                value={resetPasswordForm.confirmPassword}
+                onChange={(event) => setResetPasswordForm({ ...resetPasswordForm, confirmPassword: event.target.value })}
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white"
+                placeholder={tr('Nhập lại mật khẩu', 'Confirm password')}
+              />
+              {resetPasswordStatus && (
+                <div className={`rounded-xl border px-4 py-3 text-sm ${
+                  resetPasswordStatus.type === 'success' ? 'border-green-500/30 bg-green-500/10 text-green-300' : 'border-red-500/30 bg-red-500/10 text-red-300'
+                }`}>
+                  {resetPasswordStatus.message}
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button onClick={() => setResetPasswordForm(null)} className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
+                  {tr('Hủy', 'Cancel')}
+                </button>
+                <button onClick={handleResetPasswordSubmit} disabled={actionLoading} className="flex-1 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-500 disabled:opacity-50">
+                  {actionLoading ? tr('Đang xử lý...', 'Processing...') : tr('Đặt lại', 'Reset')}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showRewardModal && (
+          <RewardModal
+            form={rewardForm}
+            setForm={setRewardForm}
+            onSubmit={handleRewardSubmit}
+            onClose={() => setShowRewardModal(false)}
+            loading={actionLoading}
+            language={language}
+            status={rewardStatus}
+            selectedUserCount={selectedUserIds.length}
+          />
         )}
       </AnimatePresence>
 
@@ -2675,9 +3054,14 @@ export default function AdminPage() {
             onClose={() => setShowBroadcastModal(false)}
             loading={actionLoading}
             language={language}
+            status={broadcastStatus}
+            selectedUserCount={selectedUserIds.length}
           />
         )}
       </AnimatePresence>
     </div>
   );
 }
+
+
+

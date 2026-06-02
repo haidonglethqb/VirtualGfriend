@@ -28,6 +28,7 @@ import {
   deleteMessagesBulk,
   giveCoinsToAll,
   giveGemsToAll,
+  giveBulkRewards,
   giveToUser,
   getAnalytics,
   getSystemInfo,
@@ -91,6 +92,7 @@ router.post('/templates/:id/toggle', toggleTemplateActive);
 // Bulk actions
 router.post('/bulk/coins', giveCoinsToAll);
 router.post('/bulk/gems', giveGemsToAll);
+router.post('/bulk/rewards', giveBulkRewards);
 
 // System
 router.post('/cleanup', cleanupData);

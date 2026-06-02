@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { DatingPreference, PremiumTier, Prisma, UserGender } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AdminRequest, verifyAdminPassword, generateAdminToken, isAdminUsername, isAdminConfigured } from './admin.middleware';
 import { io } from '../../index';
@@ -10,6 +11,11 @@ const DEFAULT_BROADCAST_DURATION_MS = 5000;
 const TEMPLATE_GENDERS = ['FEMALE', 'MALE', 'NON_BINARY', 'OTHER'] as const;
 type TemplateGender = (typeof TEMPLATE_GENDERS)[number];
 const VALID_TEMPLATE_GENDERS = new Set<TemplateGender>(TEMPLATE_GENDERS);
+const PREMIUM_TIERS = Object.values(PremiumTier);
+const USER_GENDERS = Object.values(UserGender);
+const DATING_PREFERENCES = Object.values(DatingPreference);
+type AdminTargetType = 'all' | 'free' | 'premium' | 'tier' | 'selected_users';
+type AdminTarget = { type: AdminTargetType; tiers?: PremiumTier[]; userIds?: string[] };
 
 function parseTemplateGender(value: unknown): TemplateGender | null {
   const normalized = String(value || '').trim() as TemplateGender;
@@ -22,6 +28,56 @@ function parseBroadcastDuration(durationMs: unknown): number {
   const parsed = Number(durationMs);
   if (!Number.isFinite(parsed)) return DEFAULT_BROADCAST_DURATION_MS;
   return Math.min(MAX_BROADCAST_DURATION_MS, Math.max(MIN_BROADCAST_DURATION_MS, Math.floor(parsed)));
+}
+
+function parsePositiveInt(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return Math.floor(parsed);
+}
+
+function parseNonNegativeInt(value: unknown, field: string, errors: string[]): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    errors.push(`${field} must be a non-negative integer`);
+    return undefined;
+  }
+  return parsed;
+}
+
+function normalizeAdminTarget(body: Record<string, unknown>): AdminTarget {
+  const rawTarget = body.target && typeof body.target === 'object' ? body.target as Record<string, unknown> : null;
+  const legacyTarget = String(body.targetFilter || 'all');
+  const rawType = String(rawTarget?.type || legacyTarget);
+  const type: AdminTargetType = ['all', 'free', 'premium', 'tier', 'selected_users'].includes(rawType)
+    ? rawType as AdminTargetType
+    : 'all';
+
+  const tiers = Array.isArray(rawTarget?.tiers)
+    ? rawTarget.tiers.filter((tier): tier is PremiumTier => PREMIUM_TIERS.includes(String(tier) as PremiumTier))
+    : [];
+  const userIds = Array.isArray(rawTarget?.userIds)
+    ? rawTarget.userIds.map((id) => String(id).trim()).filter(Boolean)
+    : [];
+
+  return { type, tiers, userIds };
+}
+
+function buildUserTargetWhere(target: AdminTarget): Prisma.UserWhereInput {
+  switch (target.type) {
+    case 'free':
+      return { isPremium: false };
+    case 'premium':
+      return { isPremium: true };
+    case 'tier':
+      return target.tiers?.length ? { premiumTier: { in: target.tiers } } : { id: { in: [] } };
+    case 'selected_users':
+      return target.userIds?.length ? { id: { in: target.userIds } } : { id: { in: [] } };
+    case 'all':
+    default:
+      return {};
+  }
 }
 
 function validateTemplateInput(payload: Record<string, unknown>, isPatch: boolean) {
@@ -109,12 +165,16 @@ export async function getUsers(req: AdminRequest, res: Response) {
         username: true,
         displayName: true,
         avatar: true,
+        bio: true,
         isEmailVerified: true,
         isPremium: true,
         premiumTier: true,
+        premiumExpiresAt: true,
         coins: true,
         gems: true,
         streak: true,
+        userGender: true,
+        datingPreference: true,
         createdAt: true,
         lastLoginAt: true,
       },
@@ -180,26 +240,102 @@ export async function getUser(req: AdminRequest, res: Response) {
 
 export async function updateUser(req: AdminRequest, res: Response) {
   const { id } = req.params;
-  const { coins, gems, isPremium, premiumTier, premiumExpiresAt, isEmailVerified } = req.body;
+  const payload = req.body as Record<string, unknown>;
+  const errors: string[] = [];
+
+  const existingUser = await prisma.user.findUnique({ where: { id }, select: { id: true } });
+  if (!existingUser) return res.status(404).json({ error: 'User not found' });
+
+  const data: Prisma.UserUpdateInput = {};
+
+  if (payload.email !== undefined) {
+    const email = String(payload.email || '').trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.push('Email is invalid');
+    } else {
+      const duplicate = await prisma.user.findFirst({ where: { email, id: { not: id } }, select: { id: true } });
+      if (duplicate) errors.push('Email already exists');
+      data.email = email;
+    }
+  }
+
+  if (payload.username !== undefined) {
+    const username = String(payload.username || '').trim();
+    if (!username || username.length < 3) {
+      errors.push('Username must be at least 3 characters');
+    } else {
+      const duplicate = await prisma.user.findFirst({ where: { username, id: { not: id } }, select: { id: true } });
+      if (duplicate) errors.push('Username already exists');
+      data.username = username;
+    }
+  }
+
+  if (payload.displayName !== undefined) data.displayName = String(payload.displayName || '').trim() || null;
+  if (payload.bio !== undefined) data.bio = String(payload.bio || '').trim() || null;
+
+  if (payload.userGender !== undefined) {
+    const gender = String(payload.userGender) as UserGender;
+    if (!USER_GENDERS.includes(gender)) errors.push('userGender is invalid');
+    else data.userGender = gender;
+  }
+
+  if (payload.datingPreference !== undefined) {
+    const preference = String(payload.datingPreference) as DatingPreference;
+    if (!DATING_PREFERENCES.includes(preference)) errors.push('datingPreference is invalid');
+    else data.datingPreference = preference;
+  }
+
+  const coins = parseNonNegativeInt(payload.coins, 'coins', errors);
+  const gems = parseNonNegativeInt(payload.gems, 'gems', errors);
+  if (coins !== undefined) data.coins = coins;
+  if (gems !== undefined) data.gems = gems;
+
+  if (payload.isPremium !== undefined) data.isPremium = Boolean(payload.isPremium);
+
+  if (payload.premiumTier !== undefined) {
+    const tier = String(payload.premiumTier) as PremiumTier;
+    if (!PREMIUM_TIERS.includes(tier)) errors.push('premiumTier is invalid');
+    else {
+      data.premiumTier = tier;
+      data.isPremium = tier !== PremiumTier.FREE;
+    }
+  }
+
+  if (payload.premiumExpiresAt !== undefined) {
+    if (payload.premiumExpiresAt === null || payload.premiumExpiresAt === '') {
+      data.premiumExpiresAt = null;
+    } else {
+      const expiresAt = new Date(String(payload.premiumExpiresAt));
+      if (Number.isNaN(expiresAt.getTime())) errors.push('premiumExpiresAt is invalid');
+      else data.premiumExpiresAt = expiresAt;
+    }
+  }
+
+  if (payload.isEmailVerified !== undefined) data.isEmailVerified = Boolean(payload.isEmailVerified);
+
+  if (errors.length > 0) return res.status(400).json({ error: errors.join(', ') });
 
   const user = await prisma.user.update({
     where: { id },
-    data: {
-      ...(coins !== undefined && { coins }),
-      ...(gems !== undefined && { gems }),
-      ...(isPremium !== undefined && { isPremium }),
-      ...(premiumTier !== undefined && { premiumTier }),
-      ...(premiumExpiresAt !== undefined && { premiumExpiresAt: new Date(premiumExpiresAt) }),
-      ...(isEmailVerified !== undefined && { isEmailVerified }),
-    },
+    data,
     select: {
       id: true,
       email: true,
       username: true,
+      displayName: true,
+      avatar: true,
+      bio: true,
       coins: true,
       gems: true,
       isPremium: true,
       premiumTier: true,
+      premiumExpiresAt: true,
+      isEmailVerified: true,
+      userGender: true,
+      datingPreference: true,
+      streak: true,
+      createdAt: true,
+      lastLoginAt: true,
     },
   });
 
@@ -618,59 +754,149 @@ export async function toggleTemplateActive(req: AdminRequest, res: Response) {
 }
 
 // ============== BULK ACTIONS ==============
-export async function giveCoinsToAll(req: AdminRequest, res: Response) {
-  const { amount, onlyFree, onlyPremium } = req.body;
-
-  if (!amount || amount <= 0) {
-    return res.status(400).json({ error: 'Amount must be positive' });
-  }
-
-  const where: Record<string, unknown> = {};
-  if (onlyFree) where.isPremium = false;
-  if (onlyPremium) where.isPremium = true;
-
-  const result = await prisma.user.updateMany({
-    where,
-    data: { coins: { increment: amount } },
-  });
-
-  res.json({ message: `Gave ${amount} coins to ${result.count} users` });
-}
-
-export async function giveGemsToAll(req: AdminRequest, res: Response) {
-  const { amount, onlyFree, onlyPremium } = req.body;
-
-  if (!amount || amount <= 0) {
-    return res.status(400).json({ error: 'Amount must be positive' });
-  }
-
-  const where: Record<string, unknown> = {};
-  if (onlyFree) where.isPremium = false;
-  if (onlyPremium) where.isPremium = true;
-
-  const result = await prisma.user.updateMany({
-    where,
-    data: { gems: { increment: amount } },
-  });
-
-  res.json({ message: `Gave ${amount} gems to ${result.count} users` });
-}
-
 export async function giveToUser(req: AdminRequest, res: Response) {
   const { id } = req.params;
   const { coins, gems } = req.body;
+  const coinAmount = parsePositiveInt(coins);
+  const gemAmount = parsePositiveInt(gems);
 
-  const data: Record<string, unknown> = {};
-  if (coins) data.coins = { increment: coins };
-  if (gems) data.gems = { increment: gems };
+  if (coinAmount <= 0 && gemAmount <= 0) {
+    return res.status(400).json({ error: 'At least one positive reward amount is required' });
+  }
 
   const user = await prisma.user.update({
     where: { id },
-    data,
+    data: {
+      ...(coinAmount > 0 && { coins: { increment: coinAmount } }),
+      ...(gemAmount > 0 && { gems: { increment: gemAmount } }),
+    },
     select: { id: true, email: true, coins: true, gems: true },
   });
 
+  await prisma.notification.create({
+    data: {
+      userId: id,
+      type: 'REWARD',
+      title: 'Admin reward',
+      message: `You received ${coinAmount} coins and ${gemAmount} gems.`,
+      data: { source: 'admin_reward', coins: coinAmount, gems: gemAmount },
+    },
+  });
+
+  io.to(`user:${id}`).emit('user:balance_update', { coins: user.coins, gems: user.gems, source: 'admin_reward' });
+  io.to(`user:${id}`).emit('notification:new', {
+    type: 'reward',
+    title: 'Admin reward',
+    message: `You received ${coinAmount} coins and ${gemAmount} gems.`,
+    data: { source: 'admin_reward', coins: coinAmount, gems: gemAmount },
+    timestamp: new Date().toISOString(),
+  });
+
   res.json({ message: 'Rewards given', user });
+}
+
+async function sendBulkRewards(payload: Record<string, unknown>) {
+  const coins = parsePositiveInt(payload.coins);
+  const gems = parsePositiveInt(payload.gems);
+  const message = String(payload.message || '').trim() || 'Bạn đã nhận được phần thưởng từ quản trị viên.';
+  const target = normalizeAdminTarget(payload);
+  const where = buildUserTargetWhere(target);
+
+  if (coins <= 0 && gems <= 0) {
+    return { status: 400, body: { error: 'At least one positive reward amount is required' } };
+  }
+
+  const users = await prisma.user.findMany({
+    where,
+    select: { id: true, coins: true, gems: true },
+  });
+
+  if (users.length === 0) {
+    return { status: 200, body: { message: 'No users matched target', affected: 0, deliveredRealtime: 0 } };
+  }
+
+  await prisma.user.updateMany({
+    where,
+    data: {
+      ...(coins > 0 && { coins: { increment: coins } }),
+      ...(gems > 0 && { gems: { increment: gems } }),
+    },
+  });
+
+  const notificationData = {
+    source: 'admin_reward',
+    coins,
+    gems,
+    target,
+    sentAt: new Date().toISOString(),
+  };
+
+  const batchSize = 500;
+  for (let i = 0; i < users.length; i += batchSize) {
+    const batch = users.slice(i, i + batchSize);
+    await prisma.notification.createMany({
+      data: batch.map((user) => ({
+        userId: user.id,
+        type: 'REWARD',
+        title: 'Phần thưởng',
+        message,
+        data: notificationData,
+      })),
+    });
+  }
+
+  let deliveredRealtime = 0;
+  for (const user of users) {
+    const room = `user:${user.id}`;
+    const socketCount = io.sockets.adapter.rooms.get(room)?.size || 0;
+    if (socketCount === 0) continue;
+    deliveredRealtime += socketCount;
+    const updatedBalance = { coins: user.coins + coins, gems: user.gems + gems, source: 'admin_reward' };
+    io.to(room).emit('user:balance_update', updatedBalance);
+    io.to(room).emit('notification:new', {
+      type: 'reward',
+      title: 'Phần thưởng',
+      message,
+      data: notificationData,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  return {
+    status: 200,
+    body: {
+      message: `Gave rewards to ${users.length} users`,
+      affected: users.length,
+      deliveredRealtime,
+    },
+  };
+}
+
+export async function giveBulkRewards(req: AdminRequest, res: Response) {
+  const result = await sendBulkRewards(req.body as Record<string, unknown>);
+  res.status(result.status).json(result.body);
+}
+
+export async function giveCoinsToAll(req: AdminRequest, res: Response) {
+  const body = req.body as Record<string, unknown>;
+  const result = await sendBulkRewards({
+    ...body,
+    coins: body.amount,
+    gems: 0,
+    target: { type: body.onlyFree ? 'free' : body.onlyPremium ? 'premium' : 'all' },
+  });
+  res.status(result.status).json(result.body);
+}
+
+export async function giveGemsToAll(req: AdminRequest, res: Response) {
+  const body = req.body as Record<string, unknown>;
+  const result = await sendBulkRewards({
+    ...body,
+    coins: 0,
+    gems: body.amount,
+    target: { type: body.onlyFree ? 'free' : body.onlyPremium ? 'premium' : 'all' },
+  });
+  res.status(result.status).json(result.body);
 }
 
 // ============== ANALYTICS ==============
@@ -849,19 +1075,14 @@ export async function cleanupData(req: AdminRequest, res: Response) {
 
 // ============== BROADCAST ==============
 export async function broadcastNotification(req: AdminRequest, res: Response) {
-  const { title, message, type = 'info', durationMs, targetFilter = 'all' } = req.body;
+  const { title, message, type = 'info', durationMs } = req.body;
 
   if (!title || !message) {
     return res.status(400).json({ error: 'Title and message are required' });
   }
 
-  const normalizedTarget = ['all', 'free', 'premium'].includes(String(targetFilter))
-    ? String(targetFilter)
-    : 'all';
-
-  const where: Record<string, unknown> = {};
-  if (normalizedTarget === 'free') where.isPremium = false;
-  if (normalizedTarget === 'premium') where.isPremium = true;
+  const target = normalizeAdminTarget(req.body as Record<string, unknown>);
+  const where = buildUserTargetWhere(target);
 
   const normalizedDurationMs = parseBroadcastDuration(durationMs);
   const expiresAtIso = new Date(Date.now() + normalizedDurationMs).toISOString();
@@ -885,7 +1106,7 @@ export async function broadcastNotification(req: AdminRequest, res: Response) {
     displayType: String(type),
     durationMs: normalizedDurationMs,
     expiresAt: expiresAtIso,
-    target: normalizedTarget,
+    target,
     sentAt: new Date().toISOString(),
   };
 
@@ -928,7 +1149,8 @@ export async function broadcastNotification(req: AdminRequest, res: Response) {
     deliveredRealtime,
     persisted: users.length,
     durationMs: normalizedDurationMs,
-    targetFilter: normalizedTarget,
+    targetFilter: target.type,
+    target,
   });
 }
 
