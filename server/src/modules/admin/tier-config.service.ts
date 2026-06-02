@@ -11,6 +11,7 @@ export type PremiumTier = 'FREE' | 'BASIC' | 'PRO' | 'ULTIMATE';
 
 export interface TierConfig {
   maxCharacters: number;         // -1 = unlimited
+  maxUserAvatars: number;        // Uploaded profile avatars, -1 = unlimited
   maxMessagesPerDay: number;     // -1 = unlimited
   maxFacts: number;              // Per character
   adFree: boolean;
@@ -44,6 +45,7 @@ const CACHE_TTL_SECS = CacheTTL.QUESTS; // 1 hour
 export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
   FREE: {
     maxCharacters: 1,
+    maxUserAvatars: 1,
     maxMessagesPerDay: 20, // 20 messages/day for free users
     maxFacts: 20,
     adFree: false,
@@ -67,6 +69,7 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
   },
   BASIC: {
     maxCharacters: 5,
+    maxUserAvatars: 3,
     maxMessagesPerDay: -1,
     maxFacts: 40,
     adFree: true,
@@ -90,6 +93,7 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
   },
   PRO: {
     maxCharacters: 5,
+    maxUserAvatars: 10,
     maxMessagesPerDay: -1,
     maxFacts: 80,
     adFree: true,
@@ -113,6 +117,7 @@ export const DEFAULT_TIER_CONFIGS: AllTierConfigs = {
   },
   ULTIMATE: {
     maxCharacters: -1,
+    maxUserAvatars: -1,
     maxMessagesPerDay: -1,
     maxFacts: 160,
     adFree: true,

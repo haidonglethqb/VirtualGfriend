@@ -17,7 +17,7 @@ Next.js 14 App Router with protected routes, auth guards, and public auth pages.
 ├── /memories               → Memory/milestone gallery (protected)
 ├── /leaderboard            → Rankings (protected)
 ├── /settings               → Settings hub (protected)
-│   ├── /profile            → Edit profile
+│   ├── /profile            → Edit profile and manage profile avatars
 │   ├── /character          → Character customization (supports `?characterId=<id>` to edit/break up specific active character)
 │   ├── /facts              → View/manage character facts
 │   ├── /ex-personas        → Manage AI ex-personas and reopen archived chats
@@ -32,7 +32,7 @@ Next.js 14 App Router with protected routes, auth guards, and public auth pages.
 │   ├── /forgot-password    → Password recovery
 │   ├── /verify-otp         → OTP verification
 │   └── /reset-password     → Set new password
-├── /onboarding             → First-time user setup (protected)
+├── /onboarding             → First-time setup with profile avatar + AI character (protected)
 ├── /subscription           → Premium subscription (protected)
 ├── /pricing                → Tier plans (public)
 ├── /payment

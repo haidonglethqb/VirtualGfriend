@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { userService } from './users.service';
+import { userAvatarService } from './user-avatar.service';
 import { z } from 'zod';
 import { AppError } from '../../middlewares/error.middleware';
 import { chatService } from '../chat/chat.service';
@@ -32,6 +33,10 @@ const updatePrivacySchema = z.object({
   allowExPersonaMessages: z.boolean().optional(),
 });
 
+const selectDefaultAvatarSchema = z.object({
+  url: z.string().min(1),
+});
+
 export const userController = {
   async getProfile(req: Request, res: Response, next: NextFunction) {
     try {
@@ -51,6 +56,55 @@ export const userController = {
       if (error instanceof z.ZodError) {
         return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));
       }
+      next(error);
+    }
+  },
+
+  async getAvatars(req: Request, res: Response, next: NextFunction) {
+    try {
+      const avatars = await userAvatarService.list(req.user!.id, req.user!.premiumTier);
+      res.json({ success: true, data: avatars });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async uploadAvatar(req: Request, res: Response, next: NextFunction) {
+    try {
+      const avatar = await userAvatarService.upload(req.user!.id, req.user!.premiumTier, req.file);
+      res.status(201).json({ success: true, data: avatar });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async selectDefaultAvatar(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = selectDefaultAvatarSchema.parse(req.body);
+      const selected = await userAvatarService.selectDefault(req.user!.id, data.url);
+      res.json({ success: true, data: selected });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));
+      }
+      next(error);
+    }
+  },
+
+  async selectUploadedAvatar(req: Request, res: Response, next: NextFunction) {
+    try {
+      const selected = await userAvatarService.selectUploaded(req.user!.id, req.params.id);
+      res.json({ success: true, data: selected });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async deleteAvatar(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await userAvatarService.delete(req.user!.id, req.params.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
       next(error);
     }
   },
@@ -187,6 +241,7 @@ export const userController = {
           // Full dynamic feature config for this tier
           features: {
             maxCharacters: features?.maxCharacters ?? 1,
+            maxUserAvatars: features?.maxUserAvatars ?? 1,
             maxMessagesPerDay: features?.maxMessagesPerDay ?? -1,
             adFree: features?.adFree ?? false,
             voiceMessages: features?.voiceMessages ?? false,

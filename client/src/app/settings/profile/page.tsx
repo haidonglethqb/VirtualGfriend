@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Loader2, Check } from 'lucide-react';
@@ -10,11 +10,12 @@ import { useAuthStore } from '@/store/auth-store';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
 import { useLanguageStore } from '@/store/language-store';
+import { ProfileAvatarManager } from '@/components/profile/profile-avatar-manager';
 
 export default function ProfileSettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, setUser } = useAuthStore();
   const { language } = useLanguageStore();
   const tr = (vi: string, en: string) => (language === 'vi' ? vi : en);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,6 +24,12 @@ export default function ProfileSettingsPage() {
     email: '',
     bio: '',
   });
+
+  const handleAvatarChange = useCallback((url: string | null) => {
+    if (user && url && user.avatar !== url) {
+      setUser({ ...user, avatar: url });
+    }
+  }, [setUser, user]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -103,6 +110,8 @@ export default function ProfileSettingsPage() {
           transition={{ delay: 0.1 }}
           className="rounded-2xl bg-[#271b21] border border-[#392830] p-6 space-y-6"
         >
+          <ProfileAvatarManager onAvatarChange={handleAvatarChange} />
+
           <div>
             <label className="block text-sm font-medium text-[#ba9cab] mb-2">
               {tr('Tên người dùng', 'Username')}

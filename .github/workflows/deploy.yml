@@ -240,6 +240,8 @@ jobs:
             check_required "GROQ_API_KEY" "${{ secrets.GROQ_API_KEY }}"
             check_required "SMTP_USER" "${{ secrets.SMTP_USER }}"
             check_required "SMTP_PASS" "${{ secrets.SMTP_PASS }}"
+            check_required "DO_SPACES_KEY" "${{ secrets.DO_SPACES_KEY }}"
+            check_required "DO_SPACES_SECRET" "${{ secrets.DO_SPACES_SECRET }}"
 
             check_required "CR_PAT" "${{ secrets.CR_PAT }}"
             check_required "VPS_DEPLOY_PATH" "${{ secrets.VPS_DEPLOY_PATH }}"

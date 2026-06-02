@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { api } from '@/services/api';
 import { useLanguageStore } from '@/store/language-store';
 import { EmojiSvgIcon } from '@/components/ui/emoji-svg-icon';
+import { ProfileAvatarManager } from '@/components/profile/profile-avatar-manager';
 
 // User gender options
 const USER_GENDERS = [
@@ -48,12 +49,12 @@ const PERSONALITIES = [
     { value: 'intellectual', label: 'Trí tuệ', description: 'Thông minh, sâu sắc và triết lý' },
 ];
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 
 export default function OnboardingPage() {
     const router = useRouter();
     const { createCharacter } = useCharacterStore();
-    const { isAuthenticated } = useAuthStore();
+    const { isAuthenticated, user, setUser } = useAuthStore();
     const { toast } = useToast();
     const { language } = useLanguageStore();
     const tr = useCallback((vi: string, en: string) => (language === 'vi' ? vi : en), [language]);
@@ -113,6 +114,7 @@ export default function OnboardingPage() {
         personality: 'caring',
         templateId: '',
         avatarUrl: '',
+        profileAvatarUrl: '',
         gender: 'FEMALE' as 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER',
     });
 
@@ -141,6 +143,13 @@ export default function OnboardingPage() {
             gender: template.gender as 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER',
         });
     };
+
+    const handleProfileAvatarChange = useCallback((url: string | null) => {
+        setFormData((current) => ({ ...current, profileAvatarUrl: url || '' }));
+        if (user && url && user.avatar !== url) {
+            setUser({ ...user, avatar: url });
+        }
+    }, [setUser, user]);
 
     const handleNext = () => {
         if (step < TOTAL_STEPS) setStep(step + 1);
@@ -210,8 +219,9 @@ export default function OnboardingPage() {
     const canProceed = () => {
         if (step === 1) return formData.userGender !== '';
         if (step === 2) return formData.datingPreference !== '';
-        if (step === 3) return formData.templateId !== '';
-        if (step === 4) return formData.name.trim().length > 0;
+        if (step === 3) return formData.profileAvatarUrl !== '';
+        if (step === 4) return formData.templateId !== '';
+        if (step === 5) return formData.name.trim().length > 0;
         return true;
     };
 
@@ -321,8 +331,26 @@ export default function OnboardingPage() {
                             </div>
                         )}
 
-                        {/* Step 3: Choose Template */}
+                        {/* Step 3: Profile Avatar */}
                         {step === 3 && (
+                            <div>
+                                <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
+                                    <User className="w-6 h-6 text-love" />
+                                    {tr('Chọn avatar hồ sơ', 'Choose profile avatar')}
+                                </h2>
+                                <p className="text-[#ba9cab] mb-6">
+                                    {tr('Avatar này hiển thị trên tài khoản của bạn, tách biệt với nhân vật AI.', 'This avatar appears on your account and is separate from your AI character.')}
+                                </p>
+                                <ProfileAvatarManager
+                                    compact
+                                    requireSelection
+                                    onAvatarChange={handleProfileAvatarChange}
+                                />
+                            </div>
+                        )}
+
+                        {/* Step 4: Choose Template */}
+                        {step === 4 && (
                             <div>
                                 <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
                                     <Sparkles className="w-6 h-6 text-love" />
@@ -381,8 +409,8 @@ export default function OnboardingPage() {
                             </div>
                         )}
 
-                        {/* Step 4: Name */}
-                        {step === 4 && (
+                        {/* Step 5: Name */}
+                        {step === 5 && (
                             <div>
                                 <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
                                     <Sparkles className="w-6 h-6 text-love" />
@@ -427,8 +455,8 @@ export default function OnboardingPage() {
                             </div>
                         )}
 
-                        {/* Step 5: Age */}
-                        {step === 5 && (
+                        {/* Step 6: Age */}
+                        {step === 6 && (
                             <div>
                                 <h2 className="text-2xl font-bold mb-2">{tr('Người ấy bao nhiêu tuổi?', 'How old is your companion?')}</h2>
                                 <p className="text-[#ba9cab] mb-6">
@@ -455,8 +483,8 @@ export default function OnboardingPage() {
                             </div>
                         )}
 
-                        {/* Step 6: Occupation */}
-                        {step === 6 && (
+                        {/* Step 7: Occupation */}
+                        {step === 7 && (
                             <div>
                                 <h2 className="text-2xl font-bold mb-2">{tr('Nghề nghiệp của người ấy?', 'Companion occupation?')}</h2>
                                 <p className="text-[#ba9cab] mb-6">
@@ -482,8 +510,8 @@ export default function OnboardingPage() {
                             </div>
                         )}
 
-                        {/* Step 7: Personality */}
-                        {step === 7 && (
+                        {/* Step 8: Personality */}
+                        {step === 8 && (
                             <div>
                                 <h2 className="text-2xl font-bold mb-2">{tr('Tính cách?', 'Personality?')}</h2>
                                 <p className="text-[#ba9cab] mb-6">

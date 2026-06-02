@@ -65,6 +65,7 @@ model User {
   notifications     Notification[]
   monitoringEvents  MonitoringEvent[]
   settings          UserSettings?
+  userAvatars       UserAvatar[]
   dailyRewards      DailyReward[]
   relationshipHistory RelationshipHistory[]
   // DM system
@@ -82,6 +83,22 @@ model User {
   @@index([streak])               // Leaderboard: top by streak
   @@index([username])             // Search: find user by username
   @@map("users")
+}
+
+model UserAvatar {
+  id        String   @id @default(uuid())
+  userId    String
+  url       String
+  objectKey String
+  mimeType  String?
+  sizeBytes Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_avatars")
 }
 
 // Premium tiers with clear feature differentiation

@@ -27,12 +27,19 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 | Method | Path | Description |
 |---|---|---|
 | GET/PATCH | `/profile` | Get/update profile |
+| GET | `/avatars` | Active profile avatar, defaults, uploads, quota |
+| POST | `/avatars/upload` | Upload user profile avatar to `Avatar/{userId}/` |
+| POST | `/avatars/select-default` | Select shared default profile avatar |
+| POST | `/avatars/:id/select` | Select owned uploaded profile avatar |
+| DELETE | `/avatars/:id` | Delete owned uploaded profile avatar |
 | GET/PATCH | `/settings` | Get/update settings |
 | GET/PATCH | `/privacy` | Get/update privacy (`allowMessages`, `allowExPersonaMessages`, profile visibility) |
 | GET | `/stats` | User stats summary |
 | GET | `/notifications` | List notifications |
 | POST | `/notifications/read` | Mark notifications as read |
 | GET | `/premium-status` | Current premium tier, features, expiry |
+
+`/users/avatars` keeps `users.avatar` as the active profile-avatar URL. Uploaded avatars are quota-limited by tier `maxUserAvatars`; defaults do not count.
 
 ### Character (`/character`) — Auth required
 | Method | Path | Description |

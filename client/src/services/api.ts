@@ -8,6 +8,12 @@ interface RequestOptions {
   headers?: Record<string, string>;
 }
 
+interface FormRequestOptions {
+  method?: 'POST' | 'PUT' | 'PATCH';
+  body: FormData;
+  headers?: Record<string, string>;
+}
+
 // Common API response type
 interface ApiResponse<T = unknown> {
   success: boolean;
@@ -171,6 +177,53 @@ class ApiClient {
     return data;
   }
 
+  private async formRequest<T>(endpoint: string, options: FormRequestOptions): Promise<ApiResponse<T>> {
+    const { method = 'POST', body, headers = {} } = options;
+    const token = this.getAccessToken();
+
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method,
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...headers,
+      },
+      credentials: 'include',
+      body,
+    });
+
+    if (response.status === 401 && token && !headers['X-Retry']) {
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        return this.formRequest<T>(endpoint, {
+          ...options,
+          headers: { ...headers, 'X-Retry': '1' },
+        });
+      }
+    }
+
+    let data: ApiResponse<T>;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(`Server error (${response.status})`);
+    }
+
+    if (!response.ok) {
+      throw new ApiError(
+        data.error?.message || data.message || 'Request failed',
+        response.status,
+        data.error?.code,
+        data.quota,
+      );
+    }
+
+    if ('success' in data && !data.success) {
+      throw new Error(data.message || 'Request failed');
+    }
+
+    return data;
+  }
+
   private async tryRefreshToken(): Promise<boolean> {
     // If a refresh is already in progress, wait for it
     if (this.refreshPromise) {
@@ -235,6 +288,10 @@ class ApiClient {
 
   post<T = unknown>(endpoint: string, body?: unknown) {
     return this.request<T>(endpoint, { method: 'POST', body });
+  }
+
+  postForm<T = unknown>(endpoint: string, body: FormData) {
+    return this.formRequest<T>(endpoint, { method: 'POST', body });
   }
 
   put<T = unknown>(endpoint: string, body?: unknown) {

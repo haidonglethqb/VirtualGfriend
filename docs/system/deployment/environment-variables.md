@@ -38,6 +38,7 @@
 | `DO_SPACES_ENDPOINT` | `https://sgp1.digitaloceanspaces.com` | S3-compatible endpoint |
 | `DO_SPACES_BUCKET` | `haichu` | Bucket name |
 | `DO_SPACES_REGION` | `sgp1` | Region |
+| `USER_DEFAULT_AVATAR_BASE_URL` | `/avatars/default` | Default profile avatar base URL; set to Spaces `Avatar/default` only after preset assets are uploaded |
 
 ## Client Variables (NEXT_PUBLIC_*)
 

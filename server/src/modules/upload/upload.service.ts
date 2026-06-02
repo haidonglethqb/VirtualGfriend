@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import path from 'path';
 
@@ -13,6 +14,7 @@ const s3 = new S3Client({
 
 const BUCKET = process.env.DO_SPACES_BUCKET || 'haichu';
 const CDN_BASE = `https://${BUCKET}.${(process.env.DO_SPACES_REGION || 'sgp1')}.digitaloceanspaces.com`;
+const DEFAULT_USER_AVATAR_BASE = process.env.USER_DEFAULT_AVATAR_BASE_URL || '/avatars/default';
 
 const ALLOWED_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -47,6 +49,46 @@ export const uploadService = {
     }));
 
     return `${CDN_BASE}/${key}`;
+  },
+
+  async uploadUserAvatar(file: Express.Multer.File, userId: string): Promise<{ url: string; objectKey: string }> {
+    const ext = path.extname(file.originalname) || '.png';
+    const safeName = sanitizeFilename(path.basename(file.originalname, ext)) || 'avatar';
+    const key = `Avatar/${userId}/${Date.now()}-${randomUUID()}-${safeName}${ext}`;
+
+    await s3.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+      ACL: 'public-read',
+    }));
+
+    return { url: `${CDN_BASE}/${key}`, objectKey: key };
+  },
+
+  getDefaultUserAvatars() {
+    return Array.from({ length: 6 }, (_, index) => {
+      const number = String(index + 1).padStart(2, '0');
+      return {
+        id: `default-${number}`,
+        label: `Avatar ${index + 1}`,
+        url: `${DEFAULT_USER_AVATAR_BASE}/user-avatar-${number}.svg`,
+      };
+    });
+  },
+
+  isDefaultUserAvatarUrl(url: string): boolean {
+    return this.getDefaultUserAvatars().some((avatar) => avatar.url === url);
+  },
+
+  async deleteByObjectKey(objectKey: string): Promise<void> {
+    if (!objectKey.startsWith('Avatar/')) return;
+    try {
+      await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: objectKey }));
+    } catch (err) {
+      console.error('Failed to delete from DO Spaces:', err);
+    }
   },
 
   async deleteByUrl(url: string): Promise<void> {

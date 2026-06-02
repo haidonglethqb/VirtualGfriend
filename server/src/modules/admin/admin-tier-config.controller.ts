@@ -18,6 +18,7 @@ const VALID_TIERS: PremiumTier[] = ['FREE', 'BASIC', 'PRO', 'ULTIMATE'];
 
 const tierConfigPatchSchema = z.object({
   maxCharacters: z.number().int().min(-1).optional(),
+  maxUserAvatars: z.number().int().min(-1).optional(),
   maxMessagesPerDay: z.number().int().min(-1).optional(),
   maxFacts: z.number().int().min(-1).optional(),
   adFree: z.boolean().optional(),

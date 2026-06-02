@@ -30,6 +30,7 @@ model User {
 
   // Stripe
   stripeCustomerId  String?       @unique
+  userAvatars       UserAvatar[]
   // ... 20+ relations
 }
 ```
@@ -42,6 +43,29 @@ model User {
 ```
 
 ## UserSettings
+
+## UserAvatar
+
+Uploaded profile-avatar gallery rows. `User.avatar` remains the active selected URL.
+
+```prisma
+model UserAvatar {
+  id        String   @id @default(uuid())
+  userId    String
+  url       String
+  objectKey String
+  mimeType  String?
+  sizeBytes Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+```
+
+Uploaded assets live under `Avatar/{userId}/`; shared defaults are returned from `USER_DEFAULT_AVATAR_BASE_URL` when configured, otherwise local `/avatars/default/`, and do not create rows.
 
 ```prisma
 model UserSettings {

@@ -104,6 +104,7 @@ components/
 ├── ui/              → Radix-based primitives (13)
 ├── chat/            → Chat-specific components
 ├── character/       → Character display & customization
+├── profile/         → Profile avatar manager
 ├── layout/          → Header, sidebar, navigation
 ├── quest/           → Quest cards & progress
 ├── shop/            → Shop items & inventory

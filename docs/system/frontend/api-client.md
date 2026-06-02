@@ -31,6 +31,7 @@ class ApiClient {
 
   get<T>(endpoint) → request<T>(endpoint, { method: 'GET' })
   post<T>(endpoint, body) → request<T>(endpoint, { method: 'POST', body })
+  postForm<T>(endpoint, formData) → multipart upload with Bearer token
   put<T>(endpoint, body) → request<T>(endpoint, { method: 'PUT', body })
   patch<T>(endpoint, body) → request<T>(endpoint, { method: 'PATCH', body })
   delete<T>(endpoint) → request<T>(endpoint, { method: 'DELETE' })
