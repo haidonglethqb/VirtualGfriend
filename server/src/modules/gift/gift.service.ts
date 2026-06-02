@@ -7,6 +7,8 @@ import { gameEventService } from '../game/game-event.service';
 import { getTierConfig } from '../admin/tier-config.service';
 import { applyCharacterRewardEffects, grantRewards } from '../reward/reward-grant.service';
 import { getVipPackSegments as getConfiguredVipPackSegments } from './vip-pack-config.service';
+import { assertCanUseExRelationship } from '../character/ex-access.service';
+import { exComebackService } from '../character/ex-comeback.service';
 
 interface BuyGiftData {
   giftId: string;
@@ -264,6 +266,10 @@ export const giftService = {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
+    if (character.isEnded && !character.isExPersona) {
+      throw new AppError('Use ex gift endpoint for ended relationships', 400, 'EX_GIFT_ENDPOINT_REQUIRED');
+    }
+
     const userProfile = await prisma.user.findUnique({
       where: { id: userId },
       select: { displayName: true, username: true, userGender: true },
@@ -396,6 +402,137 @@ export const giftService = {
       newAffection: updatedCharacter.affection,
       questsCompleted: gameResult.questsCompleted,
       milestonesUnlocked: gameResult.milestonesUnlocked,
+    };
+  },
+
+  async sendExGift(userId: string, data: SendGiftData) {
+    const character = await prisma.character.findFirst({
+      where: { id: data.characterId, userId, isEnded: true, isExPersona: false },
+      include: {
+        characterFacts: {
+          orderBy: { importance: 'desc' },
+          take: 10,
+        },
+      },
+    });
+
+    if (!character) {
+      throw new AppError('Ended character not found', 404, 'CHARACTER_NOT_FOUND');
+    }
+
+    await assertCanUseExRelationship(userId, 'gift');
+    await exComebackService.cancelPendingForCharacter(userId, data.characterId, 'user_sent_ex_gift');
+
+    const userProfile = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true, username: true, userGender: true },
+    });
+
+    let reaction = '';
+    const result = await prisma.$transaction(async (tx) => {
+      const userGift = await tx.userGift.findUnique({
+        where: { userId_giftId: { userId, giftId: data.giftId } },
+        include: { gift: true },
+      });
+
+      if (!userGift || userGift.quantity < 1) {
+        throw new AppError('Gift not in inventory', 400, 'GIFT_NOT_OWNED');
+      }
+
+      const gift = userGift.gift;
+      const updated = await tx.userGift.updateMany({
+        where: { id: userGift.id, quantity: { gte: 1 } },
+        data: { quantity: { decrement: 1 } },
+      });
+      if (updated.count === 0) {
+        throw new AppError('Gift not in inventory', 400, 'GIFT_NOT_OWNED');
+      }
+
+      try {
+        const aiResponse = await aiService.generateResponse({
+          characterId: data.characterId,
+          personality: character.personality as any,
+          mood: 'sad',
+          characterGender: character.gender,
+          userGender: userProfile?.userGender || 'NOT_SPECIFIED',
+          relationshipStage: character.relationshipStage,
+          affection: character.affection,
+          level: character.level,
+          age: character.age,
+          occupation: character.occupation || 'student',
+          recentMessages: [],
+          facts: character.characterFacts,
+          userName: userProfile?.displayName || userProfile?.username || 'ban',
+          characterName: character.name,
+          userMessage: `[EX_GIFT] User gave you "${gift.name}". You are their ex, still sad and cold. React in 1 short Vietnamese sentence. Do not act fully romantic.`,
+          relationshipMode: 'ex',
+          breakupReason: character.endReason,
+        });
+        reaction = aiResponse.content;
+      } catch {
+        reaction = `${gift.name} ha... minh nhan, nhung dung nghi moi thu da binh thuong lai.`;
+      }
+
+      await tx.giftHistory.create({
+        data: {
+          userId,
+          characterId: data.characterId,
+          giftId: data.giftId,
+          message: data.message,
+          reaction,
+          source: 'EX_GIFT',
+        },
+      });
+
+      await tx.message.create({
+        data: {
+          userId,
+          characterId: data.characterId,
+          role: 'SYSTEM',
+          content: `Ban da tang ${gift.name}`,
+          messageType: 'GIFT',
+          metadata: { giftId: data.giftId, giftName: gift.name, source: 'ex_gift' },
+        },
+      });
+
+      const aiMessage = await tx.message.create({
+        data: {
+          userId,
+          characterId: data.characterId,
+          role: 'AI',
+          content: reaction,
+          messageType: 'TEXT',
+          emotion: 'sad',
+          metadata: { source: 'ex_gift', relationshipState: 'ENDED' },
+        },
+      });
+
+      const affectionGained = Math.max(1, Math.min(5, Math.ceil(gift.affectionBonus * 0.25)));
+      const updatedCharacter = await tx.character.update({
+        where: { id: character.id },
+        data: {
+          affection: Math.min(1000, character.affection + affectionGained),
+          mood: 'sad',
+        },
+      });
+
+      return { gift, aiMessage, affectionGained, newAffection: updatedCharacter.affection };
+    });
+
+    await cache.del(CacheKeys.giftInventory(userId));
+    await cache.del(CacheKeys.characterWithFacts(data.characterId));
+
+    return {
+      gift: result.gift,
+      reaction,
+      affectionGained: result.affectionGained,
+      newAffection: result.newAffection,
+      aiMessage: result.aiMessage,
+      relationshipState: 'ENDED',
+      reconcileAvailable: result.newAffection >= 700,
+      reconcileThreshold: 700,
+      questsCompleted: [],
+      milestonesUnlocked: [],
     };
   },
 

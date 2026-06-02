@@ -12,4 +12,5 @@ giftRouter.post('/vip-pack/claim', giftController.claimVipPack);
 giftRouter.get('/inventory', giftController.getInventory);
 giftRouter.post('/buy', giftController.buyGift);
 giftRouter.post('/send', giftController.sendGift);
+giftRouter.post('/send-ex', giftController.sendExGift);
 giftRouter.get('/history', giftController.getGiftHistory);

@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Loader2, Check, Heart, User, RefreshCw, AlertTriangle, MessageCircleHeart, Lock } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, Heart, User, RefreshCw, AlertTriangle, MessageCircleHeart } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AppLayout } from '@/components/layout/app-layout';
@@ -19,6 +19,7 @@ interface EndRelationshipResponse {
   message: string;
   exPersonaCreated: boolean;
   exPersonaId?: string;
+  chatHref?: string;
 }
 
 interface EditableCharacter {
@@ -51,7 +52,7 @@ function CharacterSettingsPageContent() {
   const [selectedCharacter, setSelectedCharacter] = useState<EditableCharacter | null>(null);
   const [showTemplateGrid, setShowTemplateGrid] = useState(false);
   const [breakupReason, setBreakupReason] = useState('');
-  const [wantsExPersona, setWantsExPersona] = useState(true);
+  const [breakupReasonPreset, setBreakupReasonPreset] = useState('distance_needed');
   const [formData, setFormData] = useState({
     name: '',
     bio: '',
@@ -61,11 +62,20 @@ function CharacterSettingsPageContent() {
   });
 
   const personalities = [
-    { value: 'caring', label: tr('Quan tâm', 'Caring'), description: tr('Luôn chăm sóc và lo lắng cho bạn', 'Always caring and attentive') },
-    { value: 'playful', label: tr('Vui vẻ', 'Playful'), description: tr('Năng động, hay đùa và vui tính', 'Energetic, humorous, and fun') },
-    { value: 'shy', label: tr('Nhút nhát', 'Shy'), description: tr('Dễ thương, ngại ngùng và dễ xấu hổ', 'Cute, bashful, and a little shy') },
-    { value: 'passionate', label: tr('Nhiệt huyết', 'Passionate'), description: tr('Mạnh mẽ, quyết đoán và đam mê', 'Strong, decisive, and passionate') },
-    { value: 'intellectual', label: tr('Trí tuệ', 'Intellectual'), description: tr('Thông minh, sâu sắc và triết lý', 'Smart, thoughtful, and philosophical') },
+    { value: 'caring', label: tr('Quan tam', 'Caring'), description: tr('Luon cham soc va lo lang cho ban', 'Always caring and attentive') },
+    { value: 'playful', label: tr('Vui ve', 'Playful'), description: tr('Nang dong, hay dua va vui tinh', 'Energetic, humorous, and fun') },
+    { value: 'shy', label: tr('Nhut nhat', 'Shy'), description: tr('De thuong, ngai ngung va de xau ho', 'Cute, bashful, and a little shy') },
+    { value: 'passionate', label: tr('Nhiet huyet', 'Passionate'), description: tr('Manh me, quyet doan va dam me', 'Strong, decisive, and passionate') },
+    { value: 'intellectual', label: tr('Tri tue', 'Intellectual'), description: tr('Thong minh, sau sac va triet ly', 'Smart, thoughtful, and philosophical') },
+  ];
+
+  const breakupReasonOptions = [
+    { value: 'distance_needed', label: tr('Can khoang cach', 'Need distance') },
+    { value: 'not_feeling_same', label: tr('Khong con cam xuc nhu truoc', 'Feelings changed') },
+    { value: 'too_busy', label: tr('Qua ban de tiep tuc', 'Too busy') },
+    { value: 'hurt_or_disappointed', label: tr('Bi ton thuong hoac that vong', 'Hurt or disappointed') },
+    { value: 'trust_issue', label: tr('Van de niem tin', 'Trust issue') },
+    { value: 'other', label: tr('Ly do khac', 'Other') },
   ];
 
   useEffect(() => {
@@ -220,8 +230,9 @@ function CharacterSettingsPageContent() {
 
       const response = await api.post<EndRelationshipResponse>('/character/relationship/end', {
         characterId: selectedCharacter.id,
-        reason: breakupReason.trim() || undefined,
-        exPersonaConsent: canCreateExPersonaOnBreakup ? wantsExPersona : false,
+        reasonPreset: breakupReasonPreset,
+        reasonNote: breakupReason.trim() || undefined,
+        exPersonaConsent: false,
       });
 
       if (character?.id === selectedCharacter.id) {
@@ -229,33 +240,21 @@ function CharacterSettingsPageContent() {
         await useCharacterStore.getState().fetchCharacter();
       }
 
-      if (response.data?.exPersonaCreated && response.data.exPersonaId) {
-        toast({
-          title: tr('Đã chia tay', 'Breakup complete'),
-          description: tr(
-            'Hệ thống đã tạo phiên bản người cũ và mở lại đoạn chat của hai người.',
-            'The system created the ex persona and reopened your chat.'
-          ),
-        });
-        router.push(`/chat?characterId=${encodeURIComponent(response.data.exPersonaId)}`);
-        return;
-      }
-
       toast({
-        title: tr('Đã chia tay', 'Breakup complete'),
+        title: tr('Da chia tay', 'Breakup complete'),
         description: tr(
-          'Mối quan hệ hiện tại đã kết thúc.',
-          'The current relationship has been ended.'
+          'Moi quan he da ket thuc. Doan chat voi nguoi cu da duoc mo lai.',
+          'The relationship ended. The ex chat has been reopened.'
         ),
       });
-      router.push('/dashboard');
+      router.push(response.data?.chatHref || `/chat?characterId=${encodeURIComponent(selectedCharacter.id)}`);
     } catch (error) {
       const description = error instanceof Error
         ? error.message
-        : tr('Không thể kết thúc mối quan hệ lúc này.', 'Unable to end the relationship right now.');
+        : tr('Khong the ket thuc moi quan he luc nay.', 'Unable to end the relationship right now.');
 
       toast({
-        title: tr('Lỗi', 'Error'),
+        title: tr('Loi', 'Error'),
         description,
         variant: 'destructive',
       });
@@ -492,66 +491,50 @@ function CharacterSettingsPageContent() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[#ba9cab] mb-2">
-                {tr('Lý do chia tay (tuỳ chọn)', 'Breakup reason (optional)')}
-              </label>
-              <textarea
-                value={breakupReason}
-                onChange={(e) => setBreakupReason(e.target.value)}
-                placeholder={tr('Ví dụ: em cần khoảng lặng một thời gian...', 'Example: I need some distance for a while...')}
-                className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#8f7380] px-4 py-3 focus:outline-none focus:border-rose-400 transition-colors resize-none h-24"
-              />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#ba9cab] mb-2">
+                  {tr('Ly do chia tay', 'Breakup reason')}
+                </label>
+                <select
+                  value={breakupReasonPreset}
+                  onChange={(e) => setBreakupReasonPreset(e.target.value)}
+                  className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white px-4 py-3 focus:outline-none focus:border-rose-400 transition-colors"
+                >
+                  {breakupReasonOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#ba9cab] mb-2">
+                  {tr('Ghi chu them (tuy chon)', 'Extra note (optional)')}
+                </label>
+                <textarea
+                  value={breakupReason}
+                  onChange={(e) => setBreakupReason(e.target.value)}
+                  placeholder={tr('Vi du: em can khoang lang mot thoi gian...', 'Example: I need some distance for a while...')}
+                  className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#8f7380] px-4 py-3 focus:outline-none focus:border-rose-400 transition-colors resize-none h-24"
+                />
+              </div>
             </div>
 
-            {canCreateExPersonaOnBreakup ? (
-              <label className="flex items-start gap-3 rounded-xl border border-love/20 bg-love/5 p-4 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={wantsExPersona}
-                  onChange={(e) => setWantsExPersona(e.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-[#4a3640] bg-[#181114] text-love focus:ring-love"
-                />
+            <div className="rounded-xl border border-love/20 bg-love/5 p-4">
+              <div className="flex items-start gap-3">
+                <MessageCircleHeart className="w-5 h-5 text-love mt-0.5" />
                 <div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                    <MessageCircleHeart className="w-4 h-4 text-love" />
-                    {tr('Tiếp tục bằng chế độ người cũ AI', 'Continue with AI ex mode')}
+                  <div className="text-sm font-semibold text-white">
+                    {tr('Nguoi cu se dung chinh ky uc cu', 'Ex chat keeps the original memories')}
                   </div>
                   <p className="text-sm text-[#ba9cab] mt-1">
-                    {tr(
-                      'Nếu đồng ý, hệ thống sẽ tự tạo phiên bản người cũ từ lịch sử vừa có và để họ chủ động nhắn lại sau chia tay.',
-                      'If you consent, the system will automatically create an ex persona from your recent history and let them message you after the breakup.'
-                    )}
+                    {canCreateExPersonaOnBreakup
+                      ? tr('Sau khi chia tay, he thong mo lai chat voi nhan vat cu. VIP co the nhan tin, tang qua va nhan comeback message.', 'After breakup, the original character chat reopens. VIP users can chat, gift, and receive comeback messages.')
+                      : tr('Ban van co archive co ban. Nang cap VIP de nhan tin, tang qua va nhan comeback message tu nguoi cu.', 'You still get the basic archive. Upgrade to VIP to chat, gift, and receive comeback messages from your ex.')}
                   </p>
                 </div>
-              </label>
-            ) : (
-              <div className="rounded-xl border border-[#4a3640] bg-[#181114] p-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#271b21] border border-[#392830] flex items-center justify-center flex-shrink-0">
-                    <Lock className="w-4 h-4 text-[#ba9cab]" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-white">
-                      {tr('Chế độ người cũ AI là tính năng VIP', 'AI ex mode is a premium feature')}
-                    </p>
-                    <p className="text-sm text-[#ba9cab] mt-1">
-                      {tr(
-                        'Bạn vẫn có thể chia tay bình thường. Nâng cấp gói để hệ thống tự tạo người cũ và nhắn lại sau này.',
-                        'You can still break up normally. Upgrade to let the system auto-create an ex persona that messages you later.'
-                      )}
-                    </p>
-                    <Link
-                      href="/subscription"
-                      className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-lg bg-love text-white hover:bg-love/90 transition-colors text-sm font-medium"
-                    >
-                      <Lock className="w-4 h-4" />
-                      {tr('Xem gói VIP', 'View premium plans')}
-                    </Link>
-                  </div>
-                </div>
               </div>
-            )}
+            </div>
 
             <p className="text-xs text-[#8f7380]">
               {tr('Bạn có thể tắt các tin nhắn comeback này bất cứ lúc nào trong ', 'You can mute these comeback messages later in ')}

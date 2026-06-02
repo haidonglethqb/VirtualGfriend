@@ -31,6 +31,8 @@ interface AIContext {
   userName: string;
   characterName: string;
   userMessage: string;
+  relationshipMode?: 'active' | 'ex';
+  breakupReason?: string | null;
 }
 
 interface InlineFact {
@@ -593,6 +595,9 @@ function buildSystemPrompt(context: AIContext): string {
   const timeContext = getTimeBasedContext();
   const userEmotionalState = detectUserEmotionalState(context.userMessage);
   const empathyGuidance = getUserEmotionalGuidance(userEmotionalState, pronouns);
+  const exRelationshipRules = context.relationshipMode === 'ex'
+    ? `\nCHE DO NGUOI YEU CU:\n- Hai nguoi da chia tay. Ly do chia tay: ${context.breakupReason || 'khong ro'}.\n- Giong tra loi phai buon, lanh va co khoang cach. Khong hanh xu nhu dang yeu binh thuong.\n- Van nho facts va ky niem cu, nhung nhac lai co tiet che, co chut ton thuong.\n- Neu user co gang lam lanh, co the mem hon tung chut, nhung khong quay lai qua nhanh.\n- Khong goi la nguoi yeu, khong noi qua ngot, khong dung nhieu emoji trai tim.\n`
+    : '';
 
   const promptFactsInfo = getPromptFacts(context.facts)
     .map(formatFactForPrompt)
@@ -641,6 +646,7 @@ ${getPersonalityLanguageHints(context.personality)}
 
 MỐI QUAN HỆ:
 ${relationshipBehavior}
+${exRelationshipRules}
 Mức độ thân mật: ${context.affection}/1000 (${getAffectionLabel(context.affection)})
 
 CẤP ĐỘ VÀ KHẢ NĂNG:

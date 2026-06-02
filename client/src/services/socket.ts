@@ -429,6 +429,15 @@ class SocketService {
     this.socket.on('error', (error: unknown) => {
       // Server also uses this channel for business validation errors; do not flip connection state here.
       console.warn('[Socket] Server error event:', error)
+      const payload = error as { code?: string; message?: string }
+      if (payload?.message) {
+        useChatStore.getState().setTyping(false)
+        useNotificationStore.getState().showGeneralNotification({
+          type: 'error',
+          title: payload.code || 'MESSAGE_ERROR',
+          message: payload.message,
+        })
+      }
     })
   }
 

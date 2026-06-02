@@ -8,6 +8,7 @@ Users buy gifts with coins/gems, store them in inventory, then send them to a ch
 - `GET /api/gifts` and `/api/shop` return lock metadata: `isLocked`, `canBuy`, `requiredTier`, `lockReason`.
 - FREE users can see locked VIP gifts in the shop but cannot buy, claim, or send them.
 - Buy and send still enforce tier access server-side; UI locks are only presentation.
+- Original ended relationships use the separate VIP-only ex gift flow so normal gift quests, arcs, and game events do not progress.
 
 ## Data Model
 
@@ -69,7 +70,8 @@ VipGiftPackItem {
 - `GET /api/gifts` / `GET /api/shop` - Gift catalog with lock metadata.
 - `GET /api/gifts/inventory` - User gift inventory.
 - `POST /api/gifts/buy` - Buy with coins/gems using atomic balance debit.
-- `POST /api/gifts/send` - Send inventory gift to active/specified character.
+- `POST /api/gifts/send` - Send inventory gift to active/specified character through normal gift flow.
+- `POST /api/gifts/send-ex` - Send inventory gift to an original ended character with `GiftHistory(source=EX_GIFT)`, cold/sad reaction messages, and no normal `SEND_GIFT` progress.
 - `GET /api/gifts/history?page=&limit=` - Paginated gift history.
 - `GET /api/gifts/vip-pack/status` - VIP pack preview, claimed segments, countdown.
 - `POST /api/gifts/vip-pack/claim` - Claim unclaimed eligible tier segments.

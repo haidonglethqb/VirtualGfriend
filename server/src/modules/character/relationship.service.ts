@@ -6,8 +6,32 @@ import { createModuleLogger } from '../../lib/logger'
 import { RELATIONSHIP_THRESHOLDS, SCENE_PROGRESSION } from '../../lib/constants'
 import { exPersonaService } from './ex-persona.service'
 import { getTierConfig, type PremiumTier } from '../admin/tier-config.service'
+import { getExAccess } from './ex-access.service'
+import { exComebackService } from './ex-comeback.service'
 
 const log = createModuleLogger('Relationship')
+const RECONCILE_AFFECTION_THRESHOLD = 700
+
+const BREAKUP_REASON_LABELS: Record<string, string> = {
+  distance_needed: 'Can khoang cach',
+  not_feeling_same: 'Khong con cam xuc nhu truoc',
+  too_busy: 'Qua ban de tiep tuc',
+  hurt_or_disappointed: 'Bi ton thuong hoac that vong',
+  trust_issue: 'Van de niem tin',
+  other: 'Ly do khac',
+}
+
+function formatBreakupReason(reasonPreset?: string, reasonNote?: string) {
+  const preset = reasonPreset && BREAKUP_REASON_LABELS[reasonPreset] ? reasonPreset : 'other'
+  const label = BREAKUP_REASON_LABELS[preset]
+  const note = reasonNote?.trim()
+  return {
+    preset,
+    label,
+    note: note || null,
+    summary: note ? `${label}: ${note}` : label,
+  }
+}
 
 // Calculate relationship stage from affection
 function calculateRelationshipStage(affection: number): RelationshipStage {
@@ -53,7 +77,48 @@ export const relationshipService = {
     })
 
     if (!character) {
-      throw new AppError('No active character found', 404, 'NO_CHARACTER')
+      const latestEnded = await prisma.character.findFirst({
+        where: {
+          userId,
+          isEnded: true,
+          isExPersona: false,
+          endReason: { not: 'source_relationship_reconciled' },
+        },
+        orderBy: { endedAt: 'desc' },
+        include: {
+          template: { select: { avatarUrl: true } },
+          relationshipHistory: {
+            where: { eventType: 'BREAKUP' },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      })
+      const access = await getExAccess(userId)
+
+      return {
+        relationshipState: 'NO_ACTIVE_RELATIONSHIP',
+        characterId: null,
+        characterName: null,
+        latestEndedRelationship: latestEnded ? {
+          id: latestEnded.id,
+          name: latestEnded.name,
+          avatarUrl: latestEnded.avatarUrl || latestEnded.template?.avatarUrl || null,
+          affection: latestEnded.affection,
+          level: latestEnded.level,
+          relationshipStage: latestEnded.relationshipStage,
+          endedAt: latestEnded.endedAt,
+          endReason: latestEnded.endReason,
+          breakup: latestEnded.relationshipHistory[0] || null,
+          canChatEx: access.canChatEx,
+          canGiftEx: access.canGiftEx,
+          requiredTier: access.requiredTier,
+          lockReason: access.lockReason,
+          reconcileAvailable: latestEnded.affection >= RECONCILE_AFFECTION_THRESHOLD && access.canChatEx,
+          reconcileThreshold: RECONCILE_AFFECTION_THRESHOLD,
+        } : null,
+        message: 'No active relationship',
+      }
     }
 
     const currentStage = character.relationshipStage
@@ -68,6 +133,7 @@ export const relationshipService = {
     return {
       characterId: character.id,
       characterName: character.name,
+      relationshipState: 'ACTIVE',
       currentStage,
       affection: character.affection,
       level: character.level,
@@ -180,6 +246,8 @@ export const relationshipService = {
     options?: {
       characterId?: string
       reason?: string
+      reasonPreset?: string
+      reasonNote?: string
       exPersonaConsent?: boolean
       premiumTier?: PremiumTier
     }
@@ -196,37 +264,107 @@ export const relationshipService = {
       throw new AppError('No active relationship found', 404, 'NO_CHARACTER')
     }
 
-    // Record breakup event
-    await this.recordEvent(userId, character.id, 'BREAKUP', {
-      fromStage: character.relationshipStage,
-      note: options?.reason || 'Kết thúc mối quan hệ',
-      metadata: { affectionAtBreakup: character.affection, levelAtBreakup: character.level },
-    })
+    const breakupReason = formatBreakupReason(options?.reasonPreset || options?.reason, options?.reasonNote)
+    const endedAt = new Date()
+    const endedAtIso = endedAt.toISOString()
+    const previousAffection = character.affection
+    const endedAffection = Math.floor(previousAffection * 0.5)
+    const endedStage = calculateRelationshipStage(endedAffection)
 
-    // Mark character as ended
-    const updated = await prisma.character.update({
-      where: { id: character.id },
-      data: {
-        isActive: false,
-        isEnded: true,
-        endedAt: new Date(),
-        endReason: options?.reason || 'user_choice',
-      },
-    })
-
-    let exPersona = null
-    try {
-      exPersona = await exPersonaService.maybeCreateFromBreakup({
-        userId,
-        sourceCharacterId: character.id,
-        premiumTier: options?.premiumTier || 'FREE',
-        consentGiven: options?.exPersonaConsent,
+    const endedCharacter = await prisma.$transaction(async (tx) => {
+      await tx.relationshipHistory.create({
+        data: {
+          userId,
+          characterId: character.id,
+          eventType: 'BREAKUP',
+          fromStage: character.relationshipStage,
+          toStage: endedStage,
+          note: breakupReason.summary,
+          metadata: {
+            reasonPreset: breakupReason.preset,
+            reasonLabel: breakupReason.label,
+            reasonNote: breakupReason.note,
+            affectionAtBreakup: previousAffection,
+            affectionAfterBreakup: endedAffection,
+            levelAtBreakup: character.level,
+            endedAt: endedAtIso,
+          },
+        },
       })
-    } catch (error) {
-      log.error('Failed to auto-create ex persona after breakup', error)
-    }
 
-    // Invalidate caches
+      await tx.characterFact.upsert({
+        where: {
+          characterId_key: {
+            characterId: character.id,
+            key: 'breakup_reason',
+          },
+        },
+        update: {
+          value: breakupReason.summary,
+          category: 'relationship',
+          importance: 9,
+          factType: 'permanent',
+          sourceType: 'system_breakup',
+          metadata: {
+            reasonPreset: breakupReason.preset,
+            reasonLabel: breakupReason.label,
+            reasonNote: breakupReason.note,
+            endedAt: endedAtIso,
+          },
+        },
+        create: {
+          characterId: character.id,
+          key: 'breakup_reason',
+          value: breakupReason.summary,
+          category: 'relationship',
+          importance: 9,
+          factType: 'permanent',
+          sourceType: 'system_breakup',
+          metadata: {
+            reasonPreset: breakupReason.preset,
+            reasonLabel: breakupReason.label,
+            reasonNote: breakupReason.note,
+            endedAt: endedAtIso,
+          },
+        },
+      })
+
+      await tx.memory.create({
+        data: {
+          userId,
+          characterId: character.id,
+          type: 'EVENT',
+          title: 'Da chia tay',
+          description: breakupReason.summary,
+          milestone: 'breakup',
+          isAutoGenerated: true,
+          autoGenSource: 'breakup',
+          metadata: {
+            reasonPreset: breakupReason.preset,
+            reasonLabel: breakupReason.label,
+            reasonNote: breakupReason.note,
+            previousAffection,
+            endedAffection,
+          },
+        },
+      })
+
+      return tx.character.update({
+        where: { id: character.id },
+        data: {
+          isActive: false,
+          isEnded: true,
+          endedAt,
+          endReason: breakupReason.summary,
+          affection: endedAffection,
+          relationshipStage: endedStage,
+          mood: 'sad',
+        },
+      })
+    })
+
+    await exComebackService.scheduleInitial(userId, character.id, endedAt)
+
     await cache.del(
       CacheKeys.character(userId),
       CacheKeys.characterById(character.id),
@@ -236,16 +374,20 @@ export const relationshipService = {
     log.info('Relationship ended', {
       userId,
       characterId: character.id,
-      reason: options?.reason,
-      exPersonaCreated: !!exPersona,
+      reason: breakupReason.summary,
+      exPersonaCreated: false,
     })
 
     return {
-      message: 'Mối quan hệ đã kết thúc',
-      character: updated,
-      exPersonaCreated: !!exPersona,
-      exPersonaId: exPersona?.id,
+      message: 'Relationship ended',
+      character: endedCharacter,
+      relationshipState: 'ENDED',
+      breakupReason,
+      chatHref: `/chat?characterId=${encodeURIComponent(endedCharacter.id)}`,
+      exPersonaCreated: false,
+      exPersonaId: null,
     }
+
   },
 
   /**
@@ -268,6 +410,8 @@ export const relationshipService = {
         },
       },
     })
+
+    const access = await getExAccess(userId)
 
     return characters.map(char => {
       const mappedCharacter = char as typeof char & {
@@ -295,6 +439,13 @@ export const relationshipService = {
       isExPersona: mappedCharacter.isExPersona,
       exPersonaSourceId: mappedCharacter.exPersonaSourceId,
       exMessagingEnabled: mappedCharacter.exMessagingEnabled,
+      relationshipState: char.isEnded ? 'ENDED' : 'ACTIVE',
+      canChatEx: char.isEnded && !mappedCharacter.isExPersona ? access.canChatEx : false,
+      canGiftEx: char.isEnded && !mappedCharacter.isExPersona ? access.canGiftEx : false,
+      requiredTier: char.isEnded ? access.requiredTier : null,
+      lockReason: char.isEnded ? access.lockReason : null,
+      reconcileAvailable: char.isEnded && char.affection >= RECONCILE_AFFECTION_THRESHOLD && access.canChatEx,
+      reconcileThreshold: RECONCILE_AFFECTION_THRESHOLD,
     })
     })
   },
@@ -333,13 +484,20 @@ export const relationshipService = {
       throw new AppError('Character not found or not ended', 404, 'CHARACTER_NOT_FOUND')
     }
 
-    // Check if user has premium or enough gems for reconciliation
-    const user = await prisma.user.findUnique({ where: { id: userId } })
-    if (!user) {
-      throw new AppError('User not found', 404, 'USER_NOT_FOUND')
+    const access = await getExAccess(userId)
+    if (!access.isVip) {
+      throw new AppError(`Nang cap VIP de quay lai voi ${character.name}`, 403, 'RECONCILE_VIP_REQUIRED')
     }
 
-    const tierConfig = await getTierConfig(user.premiumTier)
+    if (character.affection < RECONCILE_AFFECTION_THRESHOLD) {
+      throw new AppError(
+        `Can dat ${RECONCILE_AFFECTION_THRESHOLD} do than mat de quay lai voi ${character.name}`,
+        400,
+        'RECONCILE_AFFECTION_TOO_LOW'
+      )
+    }
+
+    const tierConfig = await getTierConfig(access.tier)
     const maxCharacters = tierConfig.maxCharacters
     if (maxCharacters !== -1) {
       const currentActiveCount = await prisma.character.count({
@@ -348,30 +506,19 @@ export const relationshipService = {
 
       if (currentActiveCount >= maxCharacters) {
         throw new AppError(
-          `Bạn đã đạt giới hạn số nhân vật (${maxCharacters}). Hãy kết thúc một mối quan hệ hoặc nâng cấp VIP để quay lại với ${character.name}.`,
+          `Ban da dat gioi han so nhan vat (${maxCharacters}). Hay ket thuc mot moi quan he hoac nang cap VIP de quay lai voi ${character.name}.`,
           403,
           'CHARACTER_LIMIT_REACHED'
         )
       }
     }
 
-    const reconcileCost = 100 // Gems required to reconcile
-    if (user.premiumTier === 'FREE' && user.gems < reconcileCost) {
-      throw new AppError(
-        `Cần ${reconcileCost} gems để quay lại với ${character.name}`,
-        400,
-        'INSUFFICIENT_GEMS'
-      )
-    }
-
-    const newAffection = Math.floor(character.affection * 0.5) // 50% affection penalty
+    const newAffection = character.affection
     const newStage = calculateRelationshipStage(newAffection)
 
-    // Wrap all DB operations in transaction for atomicity
     await prisma.$transaction(async (tx) => {
       await exPersonaService.archiveForSource(tx, userId, character.id, 'source_relationship_reconciled')
 
-      // Reactivate the character with reduced affection
       await tx.character.update({
         where: { id: character.id },
         data: {
@@ -381,40 +528,34 @@ export const relationshipService = {
           endReason: null,
           affection: newAffection,
           relationshipStage: newStage,
+          mood: 'happy',
         },
       })
 
-      // Deduct gems for non-premium users
-      if (user.premiumTier === 'FREE') {
-        await tx.user.update({
-          where: { id: userId },
-          data: { gems: { decrement: reconcileCost } },
-        })
-      }
-
-      // Record reconciliation event
       await tx.relationshipHistory.create({
         data: {
           userId,
           characterId: character.id,
           eventType: 'RECONCILIATION',
           toStage: newStage,
-          note: 'Quay lại với nhau',
-          metadata: { previousAffection: character.affection, newAffection },
+          note: 'Quay lai voi nhau',
+          metadata: { previousAffection: character.affection, newAffection, costGems: 0 },
         },
       })
     })
 
-    // Invalidate cache
     await cache.del(
       CacheKeys.character(userId),
       CacheKeys.characterById(character.id),
       CacheKeys.characterWithFacts(character.id)
     )
+    await exComebackService.cancelPendingForCharacter(userId, character.id, 'reconciled')
 
     return {
-      message: `Đã quay lại với ${character.name}`,
-      affectionPenalty: character.affection - newAffection,
+      message: `Da quay lai voi ${character.name}`,
+      affectionPenalty: 0,
+      newAffection,
+      relationshipState: 'ACTIVE',
     }
   },
 

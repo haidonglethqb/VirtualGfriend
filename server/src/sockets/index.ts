@@ -66,6 +66,16 @@ export function setupSocketHandlers(io: Server) {
     io.to(`user:${targetUserId}`).emit('character:facts_update', eventPayload)
   })
 
+  realtimeEvents.on('message:receive', (payload) => {
+    io.to(`user:${payload.userId}`).emit('message:receive', {
+      ...payload.message,
+      isOwn: false,
+    })
+    if (payload.notification) {
+      io.to(`user:${payload.userId}`).emit('notification:new', payload.notification)
+    }
+  })
+
   // Authentication middleware
   io.use(async (socket: AuthenticatedSocket, next) => {
     try {
@@ -357,7 +367,11 @@ export function setupSocketHandlers(io: Server) {
 
       } catch (error) {
         log.error('Error sending message:', error)
-        socket.emit('error', { message: 'Failed to send message' })
+        if (error instanceof AppError) {
+          socket.emit('error', { code: error.code, message: error.message })
+          return
+        }
+        socket.emit('error', { code: 'MESSAGE_SEND_FAILED', message: 'Failed to send message' })
       }
     })
 

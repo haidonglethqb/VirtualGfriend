@@ -62,12 +62,27 @@ const typingDelay = Math.min(4000, Math.max(1500, responseLength * 25));
 - Auto-memory creation for milestones
 - Quest progress update
 
-## Ex-Persona Note
+## Ended Relationship Archive
+- Breaking up keeps the original character as `isEnded=true`; facts, memories, chat history, and breakup reason stay attached to that same character.
+- `GET /character/relationship` no longer throws `NO_CHARACTER` only because there is no active companion; it returns `relationshipState=NO_ACTIVE_RELATIONSHIP` and the latest ended relationship summary when available.
+- `GET /chat/history/:characterId` supports original ended characters. FREE users can read a basic archive with upgrade metadata; VIP users can continue chatting in ex mode.
+- Ex chat uses `relationshipMode=ex`, includes the stored breakup reason in the AI prompt, and applies a cold/sad tone.
+- Ex chat does not grant XP, does not update quests/arcs, and does not emit `SEND_MESSAGE` game events.
+- Scheduled comeback rows create real AI `Message` records, emit `message:receive`, and send teaser-only email when `allowExComebackEmails=true`.
+- A user reply in the ex thread cancels pending comeback rows.
+- Scene APIs remain active-character based, so the frontend hides scene switching in ended-character chat.
+
+## Ex Gifts
+- Normal `POST /gifts/send` blocks original ended characters.
+- `POST /gifts/send-ex` is VIP-only, consumes inventory, creates `GiftHistory(source=EX_GIFT)`, creates cold/sad reaction messages, and lightly increases affection.
+- Ex gifts do not trigger `SEND_GIFT`, daily gift quest progress, active relationship milestones, or normal gift achievements.
+
+## Ex-Persona Legacy Note
 - `POST /chat/send` accepts explicit `characterId` and this is the standard path for multi-active chats.
 - If `characterId` is omitted, `/chat/send` falls back to the newest active non-ex character (legacy behavior).
 - `GET /chat/history` is legacy default history for the newest active non-ex character; ex-persona and multi-chat clients should use `GET /chat/history/:characterId`.
 - Ex-persona chat/history access requires all three conditions: active paid tier with ex-persona capability, user privacy `allowExPersonaMessages=true`, and per-character `exMessagingEnabled=true`.
-- Frontend route `/chat?characterId=...` accepts active non-ex characters and ex-personas; ended non-ex characters must be blocked.
+- Frontend route `/chat?characterId=...` accepts active non-ex characters, legacy ex-personas, and original ended characters.
 - Proactive ex messages reuse the same `notification:proactive` socket event with `comeback_message` type.
 - Ex-personas archived during reconciliation are hidden from relationship history and must fail direct chat/history access with `CHARACTER_NOT_FOUND`, so stale links cannot reopen a dead ex thread.
 

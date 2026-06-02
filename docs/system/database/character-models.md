@@ -146,6 +146,35 @@ model RelationshipHistory {
 }
 ```
 
+## ExComebackDelivery
+
+Scheduled real comeback messages for original ended relationships:
+
+```prisma
+model ExComebackDelivery {
+  id          String   @id @default(uuid())
+  userId      String
+  characterId String
+  stageIndex  Int
+  scheduledAt DateTime
+  deliveredAt DateTime?
+  canceledAt  DateTime?
+  status      String   @default("PENDING") // PENDING, PROCESSING, DELIVERED, CANCELED
+  messageId   String?
+  emailSentAt DateTime?
+  emailStatus String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([characterId, stageIndex])
+  @@index([status, scheduledAt])
+  @@index([userId, characterId, status])
+}
+```
+
+Delivery rows are claimed atomically before AI generation. A delivered row points at the real `Message` row created for the old character.
+
 ## Enums
 
 ### RelationshipStage (8 stages)

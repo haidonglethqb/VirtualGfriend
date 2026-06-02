@@ -8,6 +8,15 @@ const log = createModuleLogger('RelationshipController')
 
 const endRelationshipSchema = z.object({
   characterId: z.string().uuid().optional(),
+  reasonPreset: z.enum([
+    'distance_needed',
+    'not_feeling_same',
+    'too_busy',
+    'hurt_or_disappointed',
+    'trust_issue',
+    'other',
+  ]),
+  reasonNote: z.string().max(500).optional(),
   reason: z.string().max(200).optional(),
   exPersonaConsent: z.boolean().optional(),
 })
@@ -52,10 +61,12 @@ export const relationshipController = {
   async endRelationship(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id
-      const { characterId, reason, exPersonaConsent } = endRelationshipSchema.parse(req.body ?? {})
+      const { characterId, reasonPreset, reasonNote, reason, exPersonaConsent } = endRelationshipSchema.parse(req.body ?? {})
       
       const result = await relationshipService.endRelationship(userId, {
         characterId,
+        reasonPreset,
+        reasonNote,
         reason,
         exPersonaConsent,
         premiumTier: req.premiumInfo?.tier || 'FREE',

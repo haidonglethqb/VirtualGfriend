@@ -5,6 +5,7 @@ import { AppError } from '../../middlewares/error.middleware';
 import { factQuotaService, normalizeFactCategory, normalizeFactKey } from './fact-quota.service';
 import { realtimeEvents } from '../../lib/realtime-events';
 import { cleanupLowQualityAiFacts } from '../ai/memory-policy.service';
+import { getExAccess } from './ex-access.service';
 
 const querySchema = z.object({
   characterId: z.string().uuid().optional(),
@@ -43,7 +44,15 @@ export const factsController = {
     const query = querySchema.parse(req.query ?? {});
     const character = await prisma.character.findFirst({
       where: query.characterId
-        ? { id: query.characterId, userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false }
+        ? {
+          id: query.characterId,
+          userId: req.user!.id,
+          isExPersona: false,
+          OR: [
+            { isActive: true, isEnded: false },
+            { isActive: false, isEnded: true },
+          ],
+        }
         : { userId: req.user!.id, isActive: true, isEnded: false, isExPersona: false },
       ...(query.characterId ? {} : { orderBy: { createdAt: 'desc' as const } }),
       include: {
@@ -55,6 +64,13 @@ export const factsController = {
 
     if (!character) {
       throw new AppError('No active character', 404, 'NO_CHARACTER');
+    }
+
+    if (query.characterId && character.isEnded) {
+      const access = await getExAccess(req.user!.id);
+      if (!access.isVip) {
+        throw new AppError('VIP required to view ex relationship facts', 403, 'EX_FACTS_PREMIUM_REQUIRED');
+      }
     }
 
     return character;

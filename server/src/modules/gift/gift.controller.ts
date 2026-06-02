@@ -97,6 +97,19 @@ export const giftController = {
     }
   },
 
+  async sendExGift(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = sendGiftSchema.required({ characterId: true }).parse(req.body);
+      const result = await giftService.sendExGift(req.user!.id, data);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return next(new AppError(error.errors[0].message, 400, 'VALIDATION_ERROR'));
+      }
+      next(error);
+    }
+  },
+
   async getGiftHistory(req: Request, res: Response, next: NextFunction) {
     try {
       const page = parseInt(req.query.page as string) || 1;

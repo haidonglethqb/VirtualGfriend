@@ -31,6 +31,7 @@ const updatePrivacySchema = z.object({
   showActivity: z.boolean().optional(),
   allowMessages: z.boolean().optional(),
   allowExPersonaMessages: z.boolean().optional(),
+  allowExComebackEmails: z.boolean().optional(),
 });
 
 const selectDefaultAvatarSchema = z.object({

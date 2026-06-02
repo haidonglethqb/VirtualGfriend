@@ -290,6 +290,32 @@ Nếu bạn không đăng ký tài khoản, vui lòng bỏ qua email này.
 
     return this.sendEmail({ to: email, subject, html });
   }
+
+  async sendExComebackTeaser(email: string, characterName: string, teaser: string): Promise<boolean> {
+    const safeName = characterName.replace(/[<>&"]/g, '');
+    const safeTeaser = teaser.replace(/[<>&"]/g, '');
+    const subject = `${safeName} vừa nhắn cho bạn`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <body style="margin:0;padding:24px;background:#181114;font-family:Segoe UI,Arial,sans-serif;color:#ffffff;">
+        <div style="max-width:560px;margin:0 auto;background:#271b21;border:1px solid #392830;border-radius:16px;overflow:hidden;">
+          <div style="padding:28px 24px;background:linear-gradient(135deg,#f4258c,#8b5cf6);">
+            <h1 style="margin:0;font-size:24px;">${safeName} vừa gửi một tin nhắn</h1>
+          </div>
+          <div style="padding:28px 24px;">
+            <p style="font-size:16px;line-height:1.6;color:#f4d7e5;margin:0 0 20px;">${safeTeaser}</p>
+            <p style="font-size:14px;color:#ba9cab;margin:0;">Nội dung đầy đủ chỉ hiển thị trong Amoura để giữ riêng tư cho cuộc trò chuyện.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `${safeName} vừa nhắn cho bạn.\n\n${safeTeaser}\n\nNội dung đầy đủ chỉ hiển thị trong Amoura để giữ riêng tư.`;
+    return this.sendEmail({ to: email, subject, html, text });
+  }
 }
 
 export const emailService = new EmailService();

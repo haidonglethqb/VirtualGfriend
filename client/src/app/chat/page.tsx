@@ -47,6 +47,13 @@ interface ChatCharacterSummary {
   mood?: string;
   isEnded?: boolean;
   isExPersona?: boolean;
+  relationshipState?: 'ACTIVE' | 'ENDED';
+  canChatEx?: boolean;
+  canGiftEx?: boolean;
+  requiredTier?: 'BASIC' | 'PRO' | 'ULTIMATE' | null;
+  lockReason?: string | null;
+  reconcileAvailable?: boolean;
+  reconcileThreshold?: number;
 }
 
 interface ChatCharacterUpdateDetail {
@@ -233,6 +240,9 @@ function ChatPageContent() {
     ? (chatCharacter ?? (character?.id === requestedCharacterId ? character : null))
     : character;
   const activeChatCharacterId = activeChatCharacter?.id;
+  const isEndedRelationship = !!requestedCharacterId && !!chatCharacter?.isEnded && !chatCharacter?.isExPersona;
+  const canChatCurrent = !isEndedRelationship || chatCharacter?.canChatEx === true;
+  const canGiftCurrent = !isEndedRelationship || chatCharacter?.canGiftEx === true;
 
   // Memoize fetchMessages for useCallback
   const handleFetchMessages = useCallback(() => {
@@ -271,7 +281,7 @@ function ChatPageContent() {
       const response = await api.get<ChatCharacterSummary[]>('/character/relationship/history')
       const matchedCharacter = response.data?.find((item) => item.id === requestedCharacterId)
 
-      if (matchedCharacter && (matchedCharacter.isExPersona || !matchedCharacter.isEnded)) {
+      if (matchedCharacter) {
         setChatCharacter({
           ...matchedCharacter,
           mood: matchedCharacter.mood || 'sad',
@@ -501,6 +511,14 @@ function ChatPageContent() {
       return;
     }
 
+    if (!canChatCurrent) {
+      toast({
+        title: language === 'vi' ? 'Can VIP' : 'VIP required',
+        description: language === 'vi' ? 'Nang cap VIP de nhan tin voi nguoi cu.' : 'Upgrade to VIP to chat with your ex.',
+      });
+      return;
+    }
+
     if (!inputMessage.trim() || sendingRef.current || isSending) return;
 
     const content = inputMessage.trim();
@@ -544,6 +562,14 @@ function ChatPageContent() {
   };
 
   const openGiftModal = async () => {
+    if (!canGiftCurrent) {
+      toast({
+        title: language === 'vi' ? 'Can VIP' : 'VIP required',
+        description: language === 'vi' ? 'Nang cap VIP de tang qua cho nguoi cu.' : 'Upgrade to VIP to gift your ex.',
+      });
+      return;
+    }
+
     setShowGiftModal(true);
     setIsLoadingInventory(true);
     try {
@@ -567,7 +593,8 @@ function ChatPageContent() {
     
     setIsSendingGift(true);
     try {
-      const response = await api.post<{ newAffection: number; reaction: string }>('/shop/send', {
+      const endpoint = isEndedRelationship ? '/shop/send-ex' : '/shop/send';
+      const response = await api.post<{ newAffection: number; reaction: string }>(endpoint, {
         characterId: activeChatCharacterId,
         giftId: selectedGift.gift.id,
       });
@@ -613,6 +640,11 @@ function ChatPageContent() {
   const displayCharacterName = displayCharacter?.name || t.lover;
   const affectionLevel = Math.floor((displayCharacter?.affection || 0) / 100) + 1;
   const activeScene = getActiveScene();
+  const endedStatusLabel = language === 'vi' ? 'Da chia tay' : 'Broken up';
+  const onlineStatusLabel = isEndedRelationship ? endedStatusLabel : `${t.online} • ${t.happy}`;
+  const inputPlaceholder = !canChatCurrent
+    ? (language === 'vi' ? 'Nang cap VIP de nhan tin voi nguoi cu...' : 'Upgrade to VIP to chat with your ex...')
+    : t.typeMessage.replace('{name}', displayCharacterName);
   const openCharacterSettings = () => {
     if (!activeChatCharacterId) {
       return;
@@ -649,6 +681,34 @@ function ChatPageContent() {
             onSelect={handleSelectCompanion}
             className="mb-4"
           />
+          {isEndedRelationship && (
+            <div className="mb-4 rounded-xl border border-slate-600/40 bg-slate-900/30 p-4">
+              <div className="text-sm font-semibold text-slate-100">{endedStatusLabel}</div>
+              <p className="mt-1 text-xs text-slate-300">
+                {canChatCurrent
+                  ? (language === 'vi' ? 'Cuoc tro chuyen nay dung ky uc va facts cu, nhung tam trang cua nguoi cu se lanh hon.' : 'This archive uses the original memories and facts, with a colder ex tone.')
+                  : (language === 'vi' ? 'Ban co the xem archive co ban. Nang cap VIP de tiep tuc nhan tin va tang qua.' : 'You can view the basic archive. Upgrade to VIP to chat and send gifts.')}
+              </p>
+              {chatCharacter?.reconcileAvailable && (
+                <button
+                  onClick={async () => {
+                    if (!activeChatCharacterId) return
+                    try {
+                      await api.post(`/character/relationship/reconcile/${activeChatCharacterId}`)
+                      toast({ title: language === 'vi' ? 'Da quay lai' : 'Reconciled' })
+                      router.push(`/chat?characterId=${encodeURIComponent(activeChatCharacterId)}`)
+                      await fetchCharacter(activeChatCharacterId)
+                    } catch (error: any) {
+                      toast({ title: t.error, description: error?.message || 'Unable to reconcile', variant: 'destructive' })
+                    }
+                  }}
+                  className="mt-3 rounded-full bg-love px-4 py-2 text-xs font-bold text-white hover:bg-love/90"
+                >
+                  {language === 'vi' ? 'Quay lai voi nhau' : 'Reconcile'}
+                </button>
+              )}
+            </div>
+          )}
           {/* Character Info Card */}
           <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6 flex flex-col items-center">
             {/* Avatar */}
@@ -672,13 +732,13 @@ function ChatPageContent() {
                   </span>
                 )}
               </div>
-              <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 border-3 border-[#271b21] rounded-full" />
+              <div className={`absolute bottom-2 right-2 w-5 h-5 border-3 border-[#271b21] rounded-full ${isEndedRelationship ? 'bg-slate-500' : 'bg-green-500'}`} />
             </div>
 
             <h2 className="text-xl font-bold mb-1">{displayCharacterName}</h2>
-            <p className="text-sm text-green-400 flex items-center gap-1 mb-4">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              {t.online} • <EmojiSvgIcon emoji={getMoodEmoji(displayCharacter?.mood || 'neutral')} className="w-4 h-4" /> {t.happy}
+            <p className={`text-sm flex items-center gap-1 mb-4 ${isEndedRelationship ? 'text-slate-300' : 'text-green-400'}`}>
+              <span className={`w-2 h-2 rounded-full ${isEndedRelationship ? 'bg-slate-400' : 'bg-green-400 animate-pulse'}`} />
+              {onlineStatusLabel} {!isEndedRelationship && <EmojiSvgIcon emoji={getMoodEmoji(displayCharacter?.mood || 'neutral')} className="w-4 h-4" />}
             </p>
 
             {/* Affection Level */}
@@ -703,16 +763,18 @@ function ChatPageContent() {
               <button onClick={() => toast({ title: t.comingSoon, description: t.videoFeature })} className="w-12 h-12 rounded-full bg-[#392830] border border-[#392830] flex items-center justify-center hover:bg-[#392830]/80 transition-colors" title={t.videoCall}>
                 <Video className="w-5 h-5 text-[#ba9cab]" />
               </button>
-              <button
-                onClick={() => setShowSceneSelector(true)}
-                className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center hover:bg-purple-500 hover:text-white text-purple-400 transition-all"
-                title={t.changeBackground}
-              >
-                <ImageIcon className="w-5 h-5" />
-              </button>
+              {!isEndedRelationship && (
+                <button
+                  onClick={() => setShowSceneSelector(true)}
+                  className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center hover:bg-purple-500 hover:text-white text-purple-400 transition-all"
+                  title={t.changeBackground}
+                >
+                  <ImageIcon className="w-5 h-5" />
+                </button>
+              )}
               <button
                 onClick={openGiftModal}
-                className="w-12 h-12 rounded-full bg-love/20 border border-love/30 flex items-center justify-center hover:bg-love hover:text-white text-love light-interactive"
+                className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${canGiftCurrent ? 'bg-love/20 border-love/30 hover:bg-love hover:text-white text-love light-interactive' : 'bg-[#392830] border-[#4a3640] text-[#765866]'}`}
                 title={t.giveGift}
               >
                 <Gift className="w-5 h-5" />
@@ -784,16 +846,18 @@ function ChatPageContent() {
                 <Heart className="w-4 h-4 text-love fill-love" />
                 <span className="text-sm font-bold text-love">Lv.{affectionLevel}</span>
               </div>
-              <button
-                onClick={() => setShowSceneSelector(true)}
-                className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 hover:bg-purple-500 hover:text-white transition-all"
-                title={t.changeBackground}
-              >
-                <ImageIcon className="w-4 h-4" />
-              </button>
+              {!isEndedRelationship && (
+                <button
+                  onClick={() => setShowSceneSelector(true)}
+                  className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 hover:bg-purple-500 hover:text-white transition-all"
+                  title={t.changeBackground}
+                >
+                  <ImageIcon className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={openGiftModal}
-                className="w-10 h-10 rounded-full bg-love/20 border border-love/30 flex items-center justify-center text-love hover:bg-love hover:text-white transition-all light-interactive"
+                className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${canGiftCurrent ? 'bg-love/20 border-love/30 text-love hover:bg-love hover:text-white light-interactive' : 'bg-[#392830] border-[#4a3640] text-[#765866]'}`}
               >
                 <Gift className="w-5 h-5" />
               </button>
@@ -988,7 +1052,7 @@ function ChatPageContent() {
                   // Auto-send after setting text
                   setTimeout(() => {
                     const content = text.trim();
-                    if (content && !sendingRef.current && !isSending && activeChatCharacterId) {
+                    if (content && !sendingRef.current && !isSending && activeChatCharacterId && canChatCurrent) {
                       const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
                       setInputMessage('');
                       setIsSending(true);
@@ -1018,7 +1082,8 @@ function ChatPageContent() {
                     }
                   }, 0);
                 }}
-                className="bg-[#392830]/60 hover:bg-love/20 border border-[#4a3640] hover:border-love/50 px-4 py-2 rounded-full text-xs font-medium text-white/80 hover:text-white whitespace-nowrap transition-all shadow-sm"
+                disabled={!canChatCurrent}
+                className={`border px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all shadow-sm ${canChatCurrent ? 'bg-[#392830]/60 hover:bg-love/20 border-[#4a3640] hover:border-love/50 text-white/80 hover:text-white' : 'bg-[#24191f] border-[#392830] text-white/30 cursor-not-allowed'}`}
               >
                 {text}
               </button>
@@ -1031,9 +1096,9 @@ function ChatPageContent() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyPress}
-              disabled={isSending || !activeChatCharacterId}
+              disabled={isSending || !activeChatCharacterId || !canChatCurrent}
               className="w-full bg-[#392830]/40 hover:bg-[#392830]/60 focus:bg-[#392830]/60 border border-[#4a3640] focus:border-love/50 text-white placeholder-white/40 rounded-full py-4 pl-6 pr-40 outline-none transition-all shadow-lg backdrop-blur-md"
-              placeholder={t.typeMessage.replace('{name}', displayCharacterName)}
+              placeholder={inputPlaceholder}
               type="text"
             />
             {/* Input Actions */}

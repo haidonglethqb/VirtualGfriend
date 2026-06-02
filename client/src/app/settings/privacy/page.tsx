@@ -23,6 +23,7 @@ export default function PrivacySettingsPage() {
     showActivity: false,
     allowMessages: true,
     allowExPersonaMessages: true,
+    allowExComebackEmails: true,
   });
 
   const fetchPrivacySettings = useCallback(async () => {
@@ -186,6 +187,33 @@ export default function PrivacySettingsPage() {
                 <span
                   className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
                     privacySettings.allowExPersonaMessages ? 'left-6' : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="text-lg font-bold mb-2">{tr('Email nhắc tin người cũ', 'Ex message email alerts')}</h3>
+                <p className="text-[#ba9cab]">
+                  {tr(
+                    'Gửi email teaser khi người cũ nhắn lại. Email không chứa toàn bộ nội dung tin nhắn.',
+                    'Send a teaser email when an ex sends a comeback message. The full message stays in the app.'
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => handleToggle('allowExComebackEmails')}
+                disabled={isLoading}
+                className={`w-12 h-7 rounded-full transition-colors relative ${
+                  privacySettings.allowExComebackEmails ? 'bg-gradient-to-r from-love to-pink-600' : 'bg-[#392830]'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                    privacySettings.allowExComebackEmails ? 'left-6' : 'left-1'
                   }`}
                 />
               </button>

@@ -134,14 +134,14 @@ export default function OnboardingPage() {
     }, [templates, formData.datingPreference]);
 
     const handleSelectTemplate = (template: CharacterTemplate) => {
-        setFormData({
-            ...formData,
+        setFormData((current) => ({
+            ...current,
             templateId: template.id,
             avatarUrl: template.avatarUrl,
-            name: formData.name || template.name,
+            name: template.name,
             personality: template.personality,
             gender: template.gender as 'MALE' | 'FEMALE' | 'NON_BINARY' | 'OTHER',
-        });
+        }));
     };
 
     const handleProfileAvatarChange = useCallback((url: string | null) => {
@@ -313,7 +313,15 @@ export default function OnboardingPage() {
                                     {DATING_PREFERENCES.map((pref) => (
                                         <button
                                             key={pref.value}
-                                            onClick={() => setFormData({ ...formData, datingPreference: pref.value, templateId: '' })}
+                                            onClick={() => setFormData({
+                                                ...formData,
+                                                datingPreference: pref.value,
+                                                templateId: '',
+                                                avatarUrl: '',
+                                                name: '',
+                                                personality: 'caring',
+                                                gender: 'FEMALE',
+                                            })}
                                             className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-4 ${
                                                 formData.datingPreference === pref.value
                                                     ? 'border-love bg-love/10'

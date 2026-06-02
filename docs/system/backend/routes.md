@@ -33,7 +33,7 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 | POST | `/avatars/:id/select` | Select owned uploaded profile avatar |
 | DELETE | `/avatars/:id` | Delete owned uploaded profile avatar |
 | GET/PATCH | `/settings` | Get/update settings |
-| GET/PATCH | `/privacy` | Get/update privacy (`allowMessages`, `allowExPersonaMessages`, profile visibility) |
+| GET/PATCH | `/privacy` | Get/update privacy (`allowMessages`, `allowExPersonaMessages`, `allowExComebackEmails`, profile visibility) |
 | GET | `/stats` | User stats summary |
 | GET | `/notifications` | List notifications |
 | POST | `/notifications/read` | Mark notifications as read |
@@ -53,10 +53,10 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 | GET/POST | `/facts` | Get/add facts |
 | PATCH/DELETE | `/facts/:factId` | Update/delete fact |
 | GET | `/templates` | Public template list |
-| GET | `/relationship` | Relationship status + progression |
-| GET | `/relationship/history` | Full relationship list, including live ex-personas and per-character messaging state |
-| POST | `/relationship/end` | Break up with default active character (newest active non-ex), or a specific one via optional body `characterId`; also accepts optional `reason`, `exPersonaConsent` |
-| POST | `/relationship/reconcile/:characterId` | Restore an ended non-ex relationship and archive any linked ex-persona (also enforces tier `maxCharacters`; FREE additionally requires gems) |
+| GET | `/relationship` | Relationship status + progression; if no active relationship, returns `NO_ACTIVE_RELATIONSHIP` plus latest ended relationship summary instead of throwing `NO_CHARACTER` |
+| GET | `/relationship/history` | Full relationship list, including active characters, original ended relationships, live ex-personas, and ex access metadata |
+| POST | `/relationship/end` | Break up with default active character or `characterId`; requires `reasonPreset`, accepts `reasonNote`, stores the reason on the original character, and returns `chatHref` to the archive |
+| POST | `/relationship/reconcile/:characterId` | VIP-only restore for an ended original character once affection is at least 700; no gem cost and no second affection penalty |
 | PATCH | `/relationship/ex-personas/:characterId` | Update ex-persona settings such as `exMessagingEnabled` (enabling messaging requires active paid tier with ex-persona feature) |
 | DELETE | `/relationship/ex-personas/:characterId` | Permanently delete an ex-persona and its character-bound history |
 
@@ -64,9 +64,9 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 | Method | Path | Description |
 |---|---|---|
 | GET | `/history` | Legacy default history for newest active non-ex character |
-| GET | `/history/:characterId` | Paginated messages for a specific character; archived reconciled ex-personas must return not found; ex-persona access also requires premium + user privacy opt-in + per-ex toggle |
+| GET | `/history/:characterId` | Paginated messages for a specific character; ended original characters return basic read-only archive for FREE users and full ex chat metadata for VIP users |
 | GET | `/daily-usage` | Premium-aware daily usage counters |
-| POST | `/send` | Send (REST fallback, socket preferred). `characterId` is the standard multi-chat target; when omitted, server falls back to newest active non-ex character. Ex-persona sends are blocked unless premium and both ex-message flags are enabled |
+| POST | `/send` | Send (REST fallback, socket preferred). `characterId` is the standard multi-chat target; ended original characters use VIP-only ex chat mode without quest/arc/game progress |
 | DELETE | `/message/:messageId` | Delete a message |
 | GET | `/search` | Search messages |
 
@@ -84,7 +84,8 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 | Gifts | `GET /gifts` | Gift catalog |
 | Gifts | `GET /gifts/inventory` | Purchased items |
 | Gifts | `POST /gifts/buy` | Buy with coins/gems (atomic debit with balance guard) |
-| Gifts | `POST /gifts/send` | Send to character |
+| Gifts | `POST /gifts/send` | Send to active character through normal gift flow |
+| Gifts | `POST /gifts/send-ex` | VIP-only ex gift flow for ended original characters; consumes inventory but does not trigger normal `SEND_GIFT` quest/game progress |
 | Gifts | `GET /gifts/history` | Gift history |
 | Gifts | `GET /gifts/vip-pack/status` | VIP monthly pack preview, claim state, countdown |
 | Gifts | `POST /gifts/vip-pack/claim` | Claim unclaimed eligible VIP pack segments |

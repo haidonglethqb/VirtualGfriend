@@ -13,6 +13,8 @@ import { MESSAGE_LIMITS } from '../../lib/constants';
 import { getTierConfig } from '../admin/tier-config.service';
 import type { PremiumTier } from '../../lib/prisma';
 import { factQuotaService, type FactSaveResult } from '../character/fact-quota.service';
+import { assertCanUseExRelationship } from '../character/ex-access.service';
+import { exComebackService } from '../character/ex-comeback.service';
 
 const log = createModuleLogger('Chat');
 
@@ -63,6 +65,10 @@ function isArchivedExPersona(character: {
   endReason?: string | null
 }) {
   return character.isExPersona && character.endReason === 'source_relationship_reconciled'
+}
+
+function isEndedSourceCharacter(character: { isEnded?: boolean | null; isExPersona?: boolean | null }) {
+  return !!character.isEnded && !character.isExPersona
 }
 
 async function assertExPersonaMessagingAccess(
@@ -187,11 +193,25 @@ export const chatService = {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
-    if (character.isEnded && !character.isExPersona) {
-      throw new AppError('Character is not available for chat', 403, 'CHARACTER_UNAVAILABLE');
+    let relationshipAccess = null;
+    if (isEndedSourceCharacter(character)) {
+      const access = await assertCanUseExRelationship(userId, 'chat').catch(async (error) => {
+        if (error instanceof AppError && error.statusCode === 403) {
+          const { getExAccess } = await import('../character/ex-access.service');
+          return getExAccess(userId);
+        }
+        throw error;
+      });
+      relationshipAccess = {
+        relationshipState: 'ENDED',
+        canChatEx: access.canChatEx,
+        canGiftEx: access.canGiftEx,
+        requiredTier: access.requiredTier,
+        lockReason: access.lockReason,
+      };
+    } else {
+      await assertExPersonaMessagingAccess(userId, character)
     }
-
-    await assertExPersonaMessagingAccess(userId, character)
 
     const safeLimit = Math.min(Math.max(1, limit), 100); // Cap at 100
 
@@ -225,6 +245,7 @@ export const chatService = {
       messages: messages.reverse(),
       hasMore,
       nextCursor,
+      relationshipAccess,
     };
   },
 
@@ -268,8 +289,8 @@ export const chatService = {
       throw new AppError('Character not found', 404, 'CHARACTER_NOT_FOUND');
     }
 
-    if (character.isEnded && !character.isExPersona) {
-      throw new AppError('Character is not available for chat', 403, 'CHARACTER_UNAVAILABLE');
+    if (isEndedSourceCharacter(character)) {
+      return this.sendEndedRelationshipMessage(userId, data, character, user, sanitizedContent);
     }
 
     await assertExPersonaMessagingAccess(userId, character)
@@ -482,6 +503,134 @@ export const chatService = {
       questsCompleted: gameResult.questsCompleted,
       milestonesUnlocked: gameResult.milestonesUnlocked,
       factUpdates,
+    };
+  },
+
+  async sendEndedRelationshipMessage(
+    userId: string,
+    data: SendMessageData,
+    character: any,
+    user: { displayName: string | null; username: string | null; userGender: any } | null,
+    sanitizedContent: string,
+  ) {
+    await assertCanUseExRelationship(userId, 'chat');
+    await exComebackService.cancelPendingForCharacter(userId, data.characterId, 'user_replied');
+
+    const userMessage = await prisma.message.create({
+      data: {
+        userId,
+        characterId: data.characterId,
+        role: 'USER',
+        content: sanitizedContent,
+        messageType: data.messageType || 'TEXT',
+        metadata: {
+          ...(data.metadata || {}),
+          relationshipState: 'ENDED',
+          source: 'ex_chat',
+        },
+      },
+    });
+    await this.incrementDailyCount(userId);
+
+    const recentMessages = await prisma.message.findMany({
+      where: { userId, characterId: data.characterId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+    const recentSummaries = await conversationSummaryService.getRecentSummaries(
+      userId,
+      data.characterId,
+      3,
+    );
+
+    const aiResponse = await aiService.generateResponse({
+      characterId: character.id,
+      personality: character.personality as any,
+      mood: 'sad',
+      characterGender: character.gender,
+      userGender: user?.userGender || 'NOT_SPECIFIED',
+      relationshipStage: character.relationshipStage,
+      affection: character.affection,
+      level: character.level,
+      age: character.age,
+      occupation: character.occupation,
+      recentMessages: recentMessages.reverse(),
+      facts: character.characterFacts,
+      recentSummaries,
+      userName: user?.displayName || user?.username || 'ban',
+      characterName: character.name,
+      userMessage: sanitizedContent,
+      relationshipMode: 'ex',
+      breakupReason: character.endReason,
+    });
+
+    let factUpdates: (FactSaveResult & { source: 'ai_inline' | 'ai_batch' }) | undefined;
+    if (aiResponse.inlineFacts && aiResponse.inlineFacts.length > 0) {
+      try {
+        const saveResult = await factQuotaService.saveFactsQuotaAware(
+          data.characterId,
+          aiResponse.inlineFacts.slice(0, 3),
+          'ai_inline',
+          factsLearningService.calculateImportance,
+        );
+        factUpdates = { ...saveResult, source: 'ai_inline' };
+      } catch (err) {
+        log.error('Ex inline facts save error:', err);
+      }
+    }
+
+    const aiMessage = await prisma.message.create({
+      data: {
+        userId,
+        characterId: data.characterId,
+        role: 'AI',
+        content: aiResponse.content,
+        messageType: 'TEXT',
+        emotion: aiResponse.emotion || 'sad',
+        metadata: {
+          relationshipState: 'ENDED',
+          source: 'ex_chat',
+        },
+      },
+    });
+
+    const rawAffectionChange = aiResponse.affectionChange || 0;
+    const affectionChange = Math.max(-1, Math.min(2, rawAffectionChange));
+    let newAffection = character.affection;
+    if (affectionChange !== 0) {
+      const updatedCharacter = await prisma.character.update({
+        where: { id: character.id },
+        data: {
+          affection: Math.max(0, Math.min(1000, character.affection + affectionChange)),
+          mood: aiResponse.moodChange || 'sad',
+        },
+      });
+      newAffection = updatedCharacter.affection;
+    }
+
+    await cache.del(CacheKeys.characterWithFacts(character.id));
+
+    return {
+      userMessage,
+      aiMessage,
+      emotion: aiResponse.emotion || 'sad',
+      moodChange: aiResponse.moodChange || 'sad',
+      affectionChange,
+      newAffection,
+      newLevel: character.level,
+      levelUp: false,
+      relationshipUpgrade: false,
+      previousStage: character.relationshipStage,
+      newStage: character.relationshipStage,
+      unlocks: [],
+      rewards: undefined,
+      accountProgress: undefined,
+      questsCompleted: [],
+      milestonesUnlocked: [],
+      factUpdates,
+      relationshipState: 'ENDED',
+      reconcileAvailable: newAffection >= 700,
+      reconcileThreshold: 700,
     };
   },
 

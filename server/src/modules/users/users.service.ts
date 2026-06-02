@@ -27,6 +27,7 @@ interface UpdatePrivacyData {
   showActivity?: boolean;
   allowMessages?: boolean;
   allowExPersonaMessages?: boolean;
+  allowExComebackEmails?: boolean;
 }
 
 export const userService = {
@@ -249,6 +250,7 @@ export const userService = {
         showActivity: true,
         allowMessages: true,
         allowExPersonaMessages: true,
+        allowExComebackEmails: true,
       },
     });
 
@@ -261,6 +263,7 @@ export const userService = {
         showActivity: created.showActivity ?? false,
         allowMessages: created.allowMessages ?? true,
         allowExPersonaMessages: created.allowExPersonaMessages ?? true,
+        allowExComebackEmails: created.allowExComebackEmails ?? true,
       };
     }
 
@@ -277,6 +280,7 @@ export const userService = {
         showActivity: true,
         allowMessages: true,
         allowExPersonaMessages: true,
+        allowExComebackEmails: true,
       },
     });
 

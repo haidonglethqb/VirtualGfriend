@@ -66,6 +66,7 @@ model User {
   memories          Memory[]
   userAchievements  UserAchievement[]
   notifications     Notification[]
+  exComebackDeliveries ExComebackDelivery[]
   monitoringEvents  MonitoringEvent[]
   settings          UserSettings?
   userAvatars       UserAvatar[]
@@ -150,6 +151,7 @@ model UserSettings {
   language              String   @default("vi")
   theme                 String   @default("dark")
   notificationsEnabled  Boolean  @default(true)
+  allowExComebackEmails Boolean  @default(true)
   soundEnabled          Boolean  @default(true)
   musicEnabled          Boolean  @default(true)
   autoPlayVoice         Boolean  @default(false)
@@ -260,6 +262,7 @@ model Character {
   memories          Memory[]
   relationshipHistory RelationshipHistory[]
   conversationSummaries ConversationSummary[]
+  exComebackDeliveries ExComebackDelivery[]
 
   @@index([userId, isActive])
   @@index([isActive, level, experience])  // Leaderboard: top by level
@@ -397,6 +400,31 @@ enum MessageType {
   GIFT
   STICKER
   EVENT
+}
+
+model ExComebackDelivery {
+  id          String   @id @default(uuid())
+  userId      String
+  characterId String
+  stageIndex  Int
+  scheduledAt DateTime
+  deliveredAt DateTime?
+  canceledAt  DateTime?
+  status      String   @default("PENDING")
+  messageId   String?
+  emailSentAt DateTime?
+  emailStatus String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([characterId, stageIndex])
+  @@index([status, scheduledAt])
+  @@index([userId, characterId, status])
+  @@map("ex_comeback_deliveries")
 }
 
 // ============================================
@@ -589,6 +617,7 @@ model GiftHistory {
 
 enum GiftHistorySource {
   USER_SEND
+  EX_GIFT
   VIP_PACK
   QUEST_REWARD
   ADMIN_REWARD

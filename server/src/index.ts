@@ -17,6 +17,7 @@ import { setupSocketHandlers } from './sockets';
 import { prisma, connectPrisma } from './lib/prisma';
 import { cache } from './lib/redis';
 import { createModuleLogger } from './lib/logger';
+import { exComebackService } from './modules/character/ex-comeback.service';
 
 const log = createModuleLogger('Server');
 
@@ -235,6 +236,16 @@ setInterval(async () => {
     log.error('DM cleanup failed:', err);
   }
 }, DM_CLEANUP_INTERVAL);
+
+// Periodic: deliver real ex comeback chat messages.
+const EX_COMEBACK_INTERVAL = 60 * 1000;
+setInterval(async () => {
+  try {
+    await exComebackService.processDue(25);
+  } catch (err) {
+    log.error('Ex comeback delivery failed:', err);
+  }
+}, EX_COMEBACK_INTERVAL);
 
 // Periodic: clear leaderboard cache every 5 minutes to keep it fresh
 const LEADERBOARD_REFRESH_INTERVAL = 5 * 60 * 1000;

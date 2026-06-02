@@ -8,6 +8,27 @@ type ManualFactUpdate = FactSaveResult & {
 
 interface RealtimeEvents {
   'character:facts_update': ManualFactUpdate;
+  'message:receive': {
+    userId: string;
+    message: {
+      id: string;
+      userId: string;
+      characterId: string;
+      role: string;
+      content: string;
+      messageType: string;
+      metadata?: unknown;
+      isRead?: boolean;
+      emotion?: string | null;
+      createdAt: Date;
+    };
+    notification?: {
+      type: string;
+      title: string;
+      message: string;
+      data?: Record<string, unknown>;
+    };
+  };
 }
 
 class TypedRealtimeEvents {
