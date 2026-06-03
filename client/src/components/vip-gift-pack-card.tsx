@@ -70,7 +70,7 @@ export function VipGiftPackCard({ compact = false, onClaimed }: VipGiftPackCardP
       if (response.success) {
         toast({
           title: isVi ? 'Đã nhận quà VIP' : 'VIP gifts claimed',
-          description: isVi ? 'Quà đã được trao hoặc lưu vào kho của bạn.' : 'Your gifts were delivered or saved to inventory.',
+          description: isVi ? 'Quà đã được lưu vào túi đồ của bạn.' : 'Your gifts were saved to your inventory.',
         });
         await fetchStatus();
         onClaimed?.();

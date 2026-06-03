@@ -58,7 +58,8 @@ VipGiftPackItem {
 - Upgrading mid-month grants only newly eligible segments; downgrading does not remove inventory or claim records.
 - Pack content is admin-configured in `VipGiftPackSegment` + `VipGiftPackItem`, not hardcoded in `gift.service.ts`.
 - Status returns `packPreview[].items[]`, `configWarnings`, claimed segments, claimable segments, and countdown.
-- Claim uses the shared reward grant service. If the user has an active character, gifts are written as silent `GiftHistory` rows (`source=VIP_PACK`) without chat messages, AI reaction, or `SEND_GIFT` quest progress. Without an active character, gifts fall back to `UserGift` inventory.
+- Claim uses the shared reward grant service with inventory delivery forced on. VIP gifts are added to `UserGift` inventory first; affection, chat messages, AI reactions, and `SEND_GIFT` progress happen only when the user later sends a gift from the inventory.
+- Inventory reads reconcile legacy VIP claims from the current month that were previously delivered directly by moving those claimed gift quantities into `UserGift` once and marking the claim JSON as migrated.
 - `VipGiftClaim.grantedGifts` stores the exact granted items for audit even if admin changes the pack later.
 
 ## Admin Gift Pack

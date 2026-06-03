@@ -19,6 +19,7 @@ export interface RewardGrantInput {
   xp?: number;
   affection?: number;
   gifts?: GiftGrantInput[];
+  giftDelivery?: 'AUTO' | 'INVENTORY';
   message?: string;
   notificationTitle?: string;
   skipNotification?: boolean;
@@ -73,6 +74,7 @@ export async function grantRewards(
   const xp = positiveInt(input.xp);
   const affection = positiveInt(input.affection);
   const gifts = normalizeGifts(input.gifts);
+  const giftDelivery = input.giftDelivery || 'AUTO';
 
   if (coins > 0 || gems > 0) {
     await client.user.update({
@@ -84,7 +86,7 @@ export async function grantRewards(
     });
   }
 
-  const character = gifts.length > 0 || xp > 0 || affection > 0
+  const character = (giftDelivery === 'AUTO' && gifts.length > 0) || xp > 0 || affection > 0
     ? await getActiveCharacter(input.userId, client)
     : null;
 
@@ -106,7 +108,7 @@ export async function grantRewards(
     const giftRow = giftById.get(gift.giftId);
     if (!giftRow) continue;
 
-    if (character) {
+    if (giftDelivery === 'AUTO' && character) {
       await client.giftHistory.create({
         data: {
           userId: input.userId,

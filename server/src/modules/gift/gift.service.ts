@@ -124,6 +124,71 @@ async function getVipPackSegments(tier: PremiumTierName, claimMonth: string) {
   return getConfiguredVipPackSegments(tier, claimMonth);
 }
 
+function normalizeClaimedVipGifts(grantedGifts: Prisma.JsonValue) {
+  if (!Array.isArray(grantedGifts)) return [];
+
+  return grantedGifts
+    .map((item) => (
+      item && typeof item === 'object' && !Array.isArray(item)
+        ? item as Record<string, unknown>
+        : null
+    ))
+    .filter((item): item is Record<string, unknown> => Boolean(item))
+    .map((item) => ({
+      raw: item,
+      giftId: typeof item.giftId === 'string' ? item.giftId : '',
+      quantity: Number.isFinite(Number(item.quantity)) ? Math.floor(Number(item.quantity)) : 0,
+      delivery: typeof item.delivery === 'string' ? item.delivery : null,
+    }));
+}
+
+async function reconcileVipClaimInventory(userId: string, claimMonth: string) {
+  const claims = await prisma.vipGiftClaim.findMany({
+    where: { userId, claimMonth },
+    select: { id: true, grantedGifts: true },
+  });
+
+  const claimsToMigrate = claims
+    .map((claim) => ({
+      ...claim,
+      items: normalizeClaimedVipGifts(claim.grantedGifts),
+    }))
+    .filter((claim) => claim.items.some((item) => item.giftId && item.quantity > 0 && item.delivery === 'DIRECT'));
+
+  if (claimsToMigrate.length === 0) return;
+
+  const migratedAt = new Date().toISOString();
+  await prisma.$transaction(async (tx) => {
+    for (const claim of claimsToMigrate) {
+      for (const item of claim.items) {
+        if (!item.giftId || item.quantity <= 0 || item.delivery !== 'DIRECT') continue;
+        await tx.userGift.upsert({
+          where: { userId_giftId: { userId, giftId: item.giftId } },
+          update: { quantity: { increment: item.quantity } },
+          create: { userId, giftId: item.giftId, quantity: item.quantity },
+        });
+      }
+
+      await tx.vipGiftClaim.update({
+        where: { id: claim.id },
+        data: {
+          grantedGifts: claim.items.map((item) => item.delivery === 'DIRECT'
+            ? {
+                ...item.raw,
+                delivery: 'INVENTORY',
+                characterId: null,
+                migratedFromDirect: true,
+                migratedToInventoryAt: migratedAt,
+              }
+            : item.raw) as Prisma.InputJsonValue,
+        },
+      });
+    }
+  });
+
+  await cache.del(CacheKeys.giftInventory(userId));
+}
+
 export const giftService = {
   async getGifts(userId: string, category?: string) {
     const [gifts, { tier }] = await Promise.all([
@@ -149,6 +214,9 @@ export const giftService = {
   },
 
   async getInventory(userId: string) {
+    const { claimMonth } = getClaimWindow();
+    await reconcileVipClaimInventory(userId, claimMonth);
+
     return cache.getOrSet(
       CacheKeys.giftInventory(userId),
       () => prisma.userGift.findMany({
@@ -654,6 +722,7 @@ export const giftService = {
             userId,
             source: 'VIP_PACK',
             sourceRefId: `${claimMonth}:${grant.segment}`,
+            giftDelivery: 'INVENTORY',
             gifts: grant.items.map((item) => ({
               giftId: item.gift.id,
               quantity: item.quantity,
