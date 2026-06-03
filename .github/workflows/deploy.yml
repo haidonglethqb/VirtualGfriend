@@ -237,6 +237,7 @@ jobs:
             check_required "ADMIN_USERNAME" "${{ secrets.ADMIN_USERNAME }}"
             check_required "ADMIN_PASSWORD_HASH" "${{ secrets.ADMIN_PASSWORD_HASH }}"
             check_required "ADMIN_JWT_SECRET" "${{ secrets.ADMIN_JWT_SECRET }}"
+            check_required "AI_CONFIG_ENCRYPTION_KEY" "${{ secrets.AI_CONFIG_ENCRYPTION_KEY }}"
             check_required "GROQ_API_KEY" "${{ secrets.GROQ_API_KEY }}"
             check_required "SMTP_USER" "${{ secrets.SMTP_USER }}"
             check_required "SMTP_PASS" "${{ secrets.SMTP_PASS }}"
@@ -259,6 +260,7 @@ jobs:
             ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
             ADMIN_PASSWORD_HASH=${{ secrets.ADMIN_PASSWORD_HASH }}
             ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}
+            AI_CONFIG_ENCRYPTION_KEY=${{ secrets.AI_CONFIG_ENCRYPTION_KEY }}
             GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
             CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
             NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
