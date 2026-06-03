@@ -691,6 +691,24 @@ function buildFoodRecallFallback(context: AIContext) {
   return `${pronouns.self} nhớ mà: ${parts.join('; ')}.`;
 }
 
+function buildSchedulingFallback(context: AIContext) {
+  const eventFact = extractSchedulingEventFact(context.userMessage);
+  if (!eventFact) return null;
+
+  const pronouns = getPronounStyle(context.characterGender, context.userGender, context.userName);
+  const text = stripVietnamese(context.userMessage);
+  const hourMatch = text.match(/(?:^|\D)([01]?\d|2[0-3])\s*(?:h|gio|:)\s*(\d{1,2})?/);
+  const timeText = hourMatch
+    ? `${hourMatch[1]}h${hourMatch[2] ? hourMatch[2].padStart(2, '0') : ''}`
+    : 'gio do';
+
+  if (text.includes('di choi')) {
+    return `Dạ được, mai ${timeText} ${pronouns.self} dậy sớm chờ ${pronouns.partnerDisplay} qua rồi mình đi chơi nha.`;
+  }
+
+  return `Dạ được, mai ${timeText} ${pronouns.self} nhớ rồi, ${pronouns.self} sẽ dậy sớm chờ ${pronouns.partnerDisplay}.`;
+}
+
 function buildSystemPrompt(context: AIContext): string {
   const personalityTrait = PERSONALITY_TRAITS[context.personality];
   const relationshipBehavior = RELATIONSHIP_BEHAVIOR[context.relationshipStage];
@@ -1033,12 +1051,14 @@ function parseAIJsonResponse(rawResponse: string, context: AIContext): {
       }
     }
 
+    const schedulingFact = extractSchedulingEventFact(context.userMessage);
+
     return {
       message: cleanMessage.trim() || getDefaultAiMessage(context),
       affection_change: extractedAffectionChange,
       quality_score: extractedQualityScore,
       reason: 'Fallback evaluation',
-      facts: [],
+      facts: schedulingFact ? [schedulingFact] : [],
     };
   }
 }
@@ -1210,6 +1230,21 @@ export const aiService = {
           content: foodRecallFallback,
           emotion: 'happy',
           affectionChange: 1,
+        };
+      }
+
+      const schedulingFallback = buildSchedulingFallback(context);
+      if (schedulingFallback) {
+        const schedulingFact = extractSchedulingEventFact(context.userMessage);
+        return {
+          content: schedulingFallback,
+          emotion: 'happy',
+          affectionChange: 2,
+          inlineFacts: schedulingFact ? [{
+            key: schedulingFact.key,
+            value: schedulingFact.value,
+            category: schedulingFact.category as InlineFact['category'],
+          }] : undefined,
         };
       }
 

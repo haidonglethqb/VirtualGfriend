@@ -385,12 +385,21 @@ async function createResponsesCompletion(
   payload: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
   jsonMode = false,
 ) {
+  const instructions = payload.messages
+    .filter((message) => message.role === 'system')
+    .map((message) => (typeof message.content === 'string' ? message.content : JSON.stringify(message.content)))
+    .join('\n\n');
+  const input = payload.messages
+    .filter((message) => message.role !== 'system')
+    .map((message) => ({
+      role: message.role === 'assistant' ? 'assistant' : 'user',
+      content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
+    }));
+
   const body = {
     model: runtime.model,
-    input: payload.messages.map((message) => ({
-      role: message.role,
-      content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
-    })),
+    ...(instructions ? { instructions } : {}),
+    input: input.length > 0 ? input : [{ role: 'user', content: 'Continue.' }],
     temperature: payload.temperature,
     top_p: payload.top_p,
     max_output_tokens: payload.max_tokens,
