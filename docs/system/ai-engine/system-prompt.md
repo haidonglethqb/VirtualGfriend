@@ -2,7 +2,7 @@
 
 Rich Vietnamese system prompt that drives AI character behavior with context-aware dialogue.
 
-**Reference:** `server/src/modules/ai/ai.service.ts`
+**Reference:** `server/src/modules/ai/ai.service.ts`, `server/src/modules/ai/ai-config.service.ts`
 
 ## Prompt Construction Flow
 
@@ -22,6 +22,10 @@ flowchart LR
 ```
 
 ## Core Prompt Sections
+
+### 0. Runtime Model Selection
+
+Admin AI Settings can select the active provider/model for chat, fact extraction, and conversation summaries. Provider API keys are stored encrypted in `SystemConfig`; responses to admin clients only expose masked key state.
 
 ### 1. Identity & Goal
 ```
@@ -104,3 +108,5 @@ Quality scoring evaluates user messages on sincerity (0-10), context fit, emotio
 - Memory should be phrased naturally, not as database facts or key/value recall.
 - Relative events like "mai" and "hom nay" are temporary; if expired, the AI must not present them as future plans.
 - Fact extraction should skip short acknowledgements and isolated date/time fragments; concrete appointments become one event fact.
+- Food preference hints are injected from facts and the last 20 messages for recall questions like "anh thich an nhung gi?".
+- Character-state questions like "em dang lam gi?" must be answered from the character's perspective, not mirrored back to the user.

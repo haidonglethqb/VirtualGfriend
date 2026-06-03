@@ -29,6 +29,7 @@ import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import { TierConfigTab } from './tier-config-tab';
 import { PricingTab } from './pricing-tab';
 import { VipGiftPackAdmin } from './vip-gift-pack-admin';
+import { AiSettingsTab } from './ai-settings-tab';
 import { useLanguageStore } from '@/store/language-store';
 
 ChartJS.register(
@@ -38,7 +39,7 @@ ChartJS.register(
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-type TabType = 'dashboard' | 'users' | 'characters' | 'messages' | 'quests' | 'templates' | 'analytics' | 'system' | 'tier-configs' | 'pricing';
+type TabType = 'dashboard' | 'users' | 'characters' | 'messages' | 'quests' | 'templates' | 'analytics' | 'system' | 'tier-configs' | 'pricing' | 'ai-settings';
 
 interface User {
   id: string;
@@ -276,6 +277,7 @@ const ADMIN_I18N = {
       system: 'Hệ thống',
       tierConfigs: 'Cấu hình VIP',
       pricing: 'Bảng giá',
+      aiSettings: 'Cấu hình AI',
     },
     broadcast: 'Thông báo',
     reward: 'Tặng thưởng',
@@ -300,6 +302,7 @@ const ADMIN_I18N = {
       system: 'System',
       tierConfigs: 'VIP Config',
       pricing: 'Pricing',
+      aiSettings: 'AI Settings',
     },
     broadcast: 'Broadcast',
     reward: 'Give Rewards',
@@ -1172,6 +1175,8 @@ export default function AdminPage() {
             break;
           case 'pricing':
             break;
+          case 'ai-settings':
+            break;
         }
       } catch (err) {
         console.error('Fetch error:', err);
@@ -1622,6 +1627,7 @@ export default function AdminPage() {
     { id: 'templates', icon: ImageIcon, label: t.tabs.templates },
     { id: 'analytics', icon: BarChart3, label: t.tabs.analytics },
     { id: 'system', icon: Server, label: t.tabs.system },
+    { id: 'ai-settings', icon: Brain, label: t.tabs.aiSettings },
     { id: 'tier-configs', icon: Settings, label: t.tabs.tierConfigs },
     { id: 'pricing', icon: Coins, label: t.tabs.pricing },
   ], [t]);
@@ -2679,6 +2685,13 @@ export default function AdminPage() {
           {activeTab === 'pricing' && (
             <motion.div key="pricing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <PricingTab apiCall={apiCall} showToast={showToast} />
+            </motion.div>
+          )}
+
+          {/* AI SETTINGS */}
+          {activeTab === 'ai-settings' && (
+            <motion.div key="ai-settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <AiSettingsTab apiCall={apiCall} showToast={showToast} />
             </motion.div>
           )}
         </AnimatePresence>

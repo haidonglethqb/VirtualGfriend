@@ -52,6 +52,64 @@ function sanitizeUserContent(content: string): string {
   return sanitized;
 }
 
+function stripVietnamese(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+}
+
+function cleanPreferenceItem(value: string): string {
+  return value
+    .replace(/[?!.。]+$/g, '')
+    .replace(/\b(nữa|nua|đó|do|á|ạ|a|nhé|nhe|nhỉ|nhi)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function preferenceKeyForItem(prefix: string, item: string): string {
+  const slug = stripVietnamese(item)
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 32);
+
+  return slug ? `${prefix}_${slug}` : prefix;
+}
+
+function extractFoodPreferenceFacts(content: string) {
+  const match = content.match(
+    /(?:^|\s)(?:anh|em|mình|minh|tôi|toi|tớ|to|t|tao)?\s*(?:cũng|cung)?\s*(không thích|khong thich|ko thích|ko thich|k thích|k thich|ghét|ghet|thích|thich|thíchs|thichs|thihcs)\s*(?:ăn|an|anh)?\s*(?:món|mon)?\s+(.+)/i,
+  );
+
+  if (!match) return [];
+
+  const item = cleanPreferenceItem(match[2]);
+  const normalizedVerb = stripVietnamese(match[1]);
+  const normalizedItem = stripVietnamese(item);
+
+  if (
+    item.length < 2 ||
+    /\b(gi|j|what|nao|nào|khong|không|ko)\b/.test(normalizedItem)
+  ) {
+    return [];
+  }
+
+  const isDislike =
+    normalizedVerb.includes('ghet') ||
+    normalizedVerb.includes('khong') ||
+    normalizedVerb.includes('ko') ||
+    normalizedVerb.startsWith('k ');
+
+  return [{
+    key: preferenceKeyForItem(isDislike ? 'khong_thich_an' : 'thich_an', item),
+    value: item,
+    category: 'preference',
+    importance: 7,
+  }];
+}
+
 interface SendMessageData {
   characterId: string;
   content: string;
@@ -316,6 +374,26 @@ export const chatService = {
     // Keep cached daily count in sync for limit/bonus checks
     await this.incrementDailyCount(userId);
 
+    let factUpdates: (FactSaveResult & { source: 'ai_inline' | 'ai_batch' }) | undefined;
+    const localFacts = extractFoodPreferenceFacts(sanitizedContent);
+    if (localFacts.length > 0) {
+      try {
+        const saveResult = await factQuotaService.saveFactsQuotaAware(
+          data.characterId,
+          localFacts,
+          'ai_inline',
+          factsLearningService.calculateImportance,
+        );
+        if (saveResult.added > 0 || saveResult.updated > 0) {
+          factUpdates = { ...saveResult, source: 'ai_inline' };
+          await cache.del(CacheKeys.characterWithFacts(data.characterId));
+          log.info('Saved local food preference facts:', saveResult);
+        }
+      } catch (err) {
+        log.error('Local food preference facts save error:', err);
+      }
+    }
+
     // Get recent messages for context
     const recentMessages = await prisma.message.findMany({
       where: { userId, characterId: data.characterId },
@@ -327,6 +405,14 @@ export const chatService = {
     const recentSummaries = await conversationSummaryService.getRecentSummaries(
       userId, data.characterId, 3
     );
+
+    const factsForPrompt = localFacts.length > 0
+      ? await prisma.characterFact.findMany({
+          where: { characterId: data.characterId },
+          orderBy: { importance: 'desc' },
+          take: 20,
+        })
+      : character.characterFacts;
 
     // Generate AI response
     const aiResponse = await aiService.generateResponse({
@@ -341,15 +427,13 @@ export const chatService = {
       age: character.age,
       occupation: character.occupation,
       recentMessages: recentMessages.reverse(),
-      facts: character.characterFacts,
+      facts: factsForPrompt,
       recentSummaries,
       userName: user?.displayName || user?.username || 'bạn',
       characterName: character.name,
       userMessage: sanitizedContent,
     });
     log.debug('AI response generated:', aiResponse.content.substring(0, 50));
-
-    let factUpdates: (FactSaveResult & { source: 'ai_inline' | 'ai_batch' }) | undefined;
 
     // Save inline facts extracted by AI before returning so clients can update counts immediately.
     if (aiResponse.inlineFacts && aiResponse.inlineFacts.length > 0) {

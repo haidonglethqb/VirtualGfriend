@@ -44,6 +44,7 @@ import {
 import { getTierConfigs, updateTierConfigHandler } from './admin-tier-config.controller';
 import { getAdminPricing, getStripeLivePricing, updateAdminPricing, syncStripePrice } from './admin-pricing.controller';
 import { getAdminGiftCatalog, getAdminVipGiftPack, updateAdminVipGiftPack } from './admin-vip-pack.controller';
+import { getAiSettings, testAiSettings, updateAiSettingsKey, updateAiSettingsProvider } from './admin-ai-settings.controller';
 
 const router = Router();
 
@@ -118,6 +119,12 @@ router.get('/cleanup/check-avatars', fixMissingAvatars);
 // Tier config management
 router.get('/tier-configs', getTierConfigs);
 router.put('/tier-configs/:tier', updateTierConfigHandler);
+
+// AI runtime settings
+router.get('/ai-settings', getAiSettings);
+router.put('/ai-settings/provider', updateAiSettingsProvider);
+router.put('/ai-settings/keys/:provider', updateAiSettingsKey);
+router.post('/ai-settings/test', testAiSettings);
 
 // Pricing management (Stripe)
 router.get('/pricing', getAdminPricing);

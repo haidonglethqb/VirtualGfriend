@@ -2,14 +2,9 @@ import OpenAI from 'openai';
 import { CharacterFact, Gender, Message, RelationshipStage, UserGender } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
 import { extractSchedulingEventFact, formatFactForPrompt, getPromptFacts } from './memory-policy.service';
+import { createAiChatCompletion } from './ai-config.service';
 
 const log = createModuleLogger('AI');
-
-// Groq API is compatible with OpenAI SDK
-const openai = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY,
-  baseURL: process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1' : undefined,
-});
 
 type Personality = 'caring' | 'playful' | 'shy' | 'passionate' | 'intellectual';
 type Mood = 'happy' | 'sad' | 'excited' | 'sleepy' | 'romantic' | 'neutral';
@@ -584,6 +579,117 @@ function getAttitudeTier(affection: number, level: number): string {
   return 'Yêu sâu đậm: rất gắn bó, mềm mại và yêu thương, nhưng tránh lặp những câu quá kịch hoặc quá giống văn mẫu.';
 }
 
+function stripVietnamese(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+}
+
+function cleanPreferenceItem(value: string) {
+  return value
+    .replace(/[?!.。]+$/g, '')
+    .replace(/\b(nữa|nua|đó|do|á|ạ|a|nhé|nhe|nhỉ|nhi)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractFoodPreference(content: string) {
+  const match = content.match(
+    /(?:^|\s)(?:anh|em|mình|minh|tôi|toi|tớ|to|t|tao)?\s*(?:cũng|cung)?\s*(không thích|khong thich|ko thích|ko thich|k thích|k thich|ghét|ghet|thích|thich|thíchs|thichs|thihcs)\s*(?:ăn|an|anh)?\s*(?:món|mon)?\s+(.+)/i,
+  );
+
+  if (!match) return null;
+
+  const item = cleanPreferenceItem(match[2]);
+  const normalizedItem = stripVietnamese(item);
+  if (item.length < 2 || /\b(gi|j|what|nao|nào|khong|không|ko)\b/.test(normalizedItem)) {
+    return null;
+  }
+
+  const verb = stripVietnamese(match[1]);
+  return {
+    type: verb.includes('ghet') || verb.includes('khong') || verb.includes('ko') || verb.startsWith('k ')
+      ? 'dislike' as const
+      : 'like' as const,
+    item,
+  };
+}
+
+function uniqueItems(values: string[]) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = stripVietnamese(value);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function collectFoodMemory(context: AIContext) {
+  const likes: string[] = [];
+  const dislikes: string[] = [];
+
+  for (const fact of getPromptFacts(context.facts)) {
+    if (fact.category !== 'preference') continue;
+
+    const key = stripVietnamese(fact.key);
+    const value = cleanPreferenceItem(fact.value);
+    if (!value) continue;
+
+    if (key.includes('khong_thich') || key.includes('ghet')) {
+      dislikes.push(value);
+    } else if (key.includes('thich') || key.includes('mon') || key.includes('an')) {
+      likes.push(value);
+    }
+  }
+
+  for (const message of context.recentMessages) {
+    if (message.role !== 'USER') continue;
+    const preference = extractFoodPreference(message.content);
+    if (!preference) continue;
+    if (preference.type === 'like') likes.push(preference.item);
+    else dislikes.push(preference.item);
+  }
+
+  return {
+    likes: uniqueItems(likes),
+    dislikes: uniqueItems(dislikes),
+  };
+}
+
+function buildFoodMemoryHints(context: AIContext) {
+  const { likes, dislikes } = collectFoodMemory(context);
+  const hints: string[] = [];
+  if (likes.length > 0) hints.push(`- Mon user thich an gan day: ${likes.join(', ')}.`);
+  if (dislikes.length > 0) hints.push(`- Mon user khong thich/ghet an: ${dislikes.join(', ')}.`);
+  return hints.join('\n');
+}
+
+function isFoodRecallQuestion(message: string) {
+  const text = stripVietnamese(message);
+  return (
+    /(anh|em|minh|toi|t)\s*(co\s*)?(thich|ghet|khong thich)/.test(text) &&
+    /(an|mon|nhung gi|gi|j)/.test(text)
+  ) || /(do em|em biet|em nho).*(anh|em|minh|toi|t).*(thich|ghet).*(an|mon|gi|j)/.test(text);
+}
+
+function buildFoodRecallFallback(context: AIContext) {
+  if (!isFoodRecallQuestion(context.userMessage)) return null;
+
+  const pronouns = getPronounStyle(context.characterGender, context.userGender, context.userName);
+  const { likes, dislikes } = collectFoodMemory(context);
+  const parts: string[] = [];
+
+  if (likes.length > 0) parts.push(`${pronouns.partnerDisplay} thích ăn ${likes.join(', ')}`);
+  if (dislikes.length > 0) parts.push(`${pronouns.partnerDisplay} ghét ăn ${dislikes.join(', ')}`);
+  if (parts.length === 0) return null;
+
+  return `${pronouns.self} nhớ mà: ${parts.join('; ')}.`;
+}
+
 function buildSystemPrompt(context: AIContext): string {
   const personalityTrait = PERSONALITY_TRAITS[context.personality];
   const relationshipBehavior = RELATIONSHIP_BEHAVIOR[context.relationshipStage];
@@ -606,8 +712,10 @@ function buildSystemPrompt(context: AIContext): string {
 - Neu ${context.userName} hoi "nay vua noi gi", "mai may gio", "anh hen may gio", hay uu tien 20 tin nhan gan nhat truoc facts dai han.
 - Khi nhac lai chuyen cu, noi nhu nguoi that: "anh vua noi mai 6h ghe qua choi a", khong doc key/value va khong noi "theo fact".
 - Event co "mai/hom nay/toi nay" chi la ke hoach tam thoi. Neu thoi gian da qua thi khong noi nhu no van sap dien ra.
+- Neu ${context.userName} hoi "em dang lam gi", "em an gi chua", "em o dau", phai tra loi ve ban than ${context.characterName}; khong hoi nguoc lai cung cau do.
 - Neu khong chac, hoi lai mem va tu nhien thay vi bia.`;
   const factsInfo = `${naturalMemoryRules}\n${promptFactsInfo}`.trim();
+  const foodMemoryHints = buildFoodMemoryHints(context);
 
   // Recent conversation summaries for long-term memory context
   const summariesSection = context.recentSummaries && context.recentSummaries.length > 0
@@ -669,6 +777,7 @@ ${empathyGuidance}
 
 FACTS ÄÃƒ BIáº¾T Vá»€ ${context.userName}:
 ${factsInfo || '- ChÆ°a cÃ³ fact nÃ o. Chá»‰ nháº¯c láº¡i fact khi há»£p ngá»¯ cáº£nh, khÃ´ng nhá»“i táº¥t cáº£ vÃ o cÃ¢u tráº£ lá»i.'}
+${foodMemoryHints ? `\nGOI Y NHO MON AN TU TIN GAN DAY:\n${foodMemoryHints}\n` : ''}
 ${summariesSection}
 
 PHONG CÁCH THEO NGHỀ NGHIỆP:
@@ -1029,26 +1138,7 @@ function detectMoodChange(userMessage: string): Mood | undefined {
 }
 
 async function createStructuredChatCompletion(payload: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming) {
-  try {
-    return await openai.chat.completions.create({
-      ...payload,
-      response_format: { type: 'json_object' },
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-    const isUnsupportedResponseFormat =
-      errorMessage.includes('response_format') ||
-      errorMessage.includes('json_object') ||
-      errorMessage.includes('json schema') ||
-      (errorMessage.includes('unsupported') && errorMessage.includes('json'));
-
-    if (!isUnsupportedResponseFormat) {
-      throw error;
-    }
-
-    log.warn('Structured JSON response not supported, retrying without response_format:', error);
-    return openai.chat.completions.create(payload);
-  }
+  return createAiChatCompletion(payload, { jsonMode: true });
 }
 
 export const aiService = {
@@ -1065,7 +1155,7 @@ export const aiService = {
       const temperature = Math.min(1.0, 0.7 + (context.affection / 1000) * 0.3);
 
       const completion = await createStructuredChatCompletion({
-        model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+        model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
           ...conversationHistory,
@@ -1112,6 +1202,15 @@ export const aiService = {
 
       // Enhanced fallback responses based on affection level
       const pronouns = getPronounStyle(context.characterGender, context.userGender, context.userName);
+      const foodRecallFallback = buildFoodRecallFallback(context);
+      if (foodRecallFallback) {
+        return {
+          content: foodRecallFallback,
+          emotion: 'happy',
+          affectionChange: 1,
+        };
+      }
+
       const petNames = getPetNames(context.affection, pronouns);
       const petName = petNames.length > 0
         ? petNames[Math.floor(Math.random() * petNames.length)]
@@ -1159,8 +1258,8 @@ export const aiService = {
         .map((m) => `${m.role === 'USER' ? 'Người dùng' : 'AI'}: ${m.content}`)
         .join('\n');
 
-      const completion = await openai.chat.completions.create({
-        model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+      const completion = await createAiChatCompletion({
+        model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'system',

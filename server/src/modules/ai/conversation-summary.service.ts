@@ -4,17 +4,12 @@
  * Triggered every 10 messages (same interval as batch fact extraction).
  */
 
-import OpenAI from 'openai';
 import { prisma } from '../../lib/prisma';
 import { Message } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
+import { createAiChatCompletion } from './ai-config.service';
 
 const log = createModuleLogger('ConversationSummary');
-
-const openai = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY,
-  baseURL: process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1' : undefined,
-});
 
 export const conversationSummaryService = {
   /**
@@ -34,8 +29,8 @@ export const conversationSummaryService = {
         .map((m) => `${m.role === 'USER' ? 'Người dùng' : 'Bạn gái AI'}: ${m.content}`)
         .join('\n');
 
-      const completion = await openai.chat.completions.create({
-        model: process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+      const completion = await createAiChatCompletion({
+        model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'system',

@@ -133,3 +133,5 @@ Breakup flow can now auto-create an ended `Character` flagged as `isExPersona=tr
 - Expired AI-learned events and low-quality AI-learned facts are hidden from prompt context and can be cleaned up automatically.
 - Manual/user-edited facts are preserved.
 - Recent chat messages are the priority source for recall questions like "nay anh noi may gio?".
+- Active chat locally extracts simple Vietnamese food likes/dislikes into per-item preference facts before the AI call.
+- Food recall fallback can answer from facts/recent messages if the provider request fails.

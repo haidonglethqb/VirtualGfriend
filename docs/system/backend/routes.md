@@ -125,6 +125,10 @@ Auth user payloads (`/login`, `/refresh`, `/me`) include premium identity fields
 | POST | `/pricing/:tier/sync-stripe` | Sync one tier to Stripe |
 | GET | `/tier-configs` | Tier config list |
 | PUT | `/tier-configs/:tier` | Tier config update |
+| GET | `/ai-settings` | Masked AI provider/model/key config |
+| PUT | `/ai-settings/provider` | Update active AI provider and model |
+| PUT | `/ai-settings/keys/:provider` | Replace or clear encrypted provider API key |
+| POST | `/ai-settings/test` | Test selected AI provider/model/key |
 | USE | `/upload` | Admin file uploads |
 
 ### Payment (`/payment`)
