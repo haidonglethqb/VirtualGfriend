@@ -30,7 +30,7 @@ characterRouter.get('/facts', factsController.getFacts);
 characterRouter.post('/facts', factsController.addFact);
 characterRouter.patch('/facts/:factId', factsController.updateFact);
 characterRouter.delete('/facts/:factId', factsController.deleteFact);
-characterRouter.get('/relationship', characterController.getRelationshipStatus);
+characterRouter.get('/relationship', relationshipController.getStatus);
 
 // Relationship management routes
 characterRouter.get('/relationship/status', relationshipController.getStatus);

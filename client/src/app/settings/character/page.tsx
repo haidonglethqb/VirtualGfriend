@@ -62,20 +62,20 @@ function CharacterSettingsPageContent() {
   });
 
   const personalities = [
-    { value: 'caring', label: tr('Quan tam', 'Caring'), description: tr('Luon cham soc va lo lang cho ban', 'Always caring and attentive') },
-    { value: 'playful', label: tr('Vui ve', 'Playful'), description: tr('Nang dong, hay dua va vui tinh', 'Energetic, humorous, and fun') },
-    { value: 'shy', label: tr('Nhut nhat', 'Shy'), description: tr('De thuong, ngai ngung va de xau ho', 'Cute, bashful, and a little shy') },
-    { value: 'passionate', label: tr('Nhiet huyet', 'Passionate'), description: tr('Manh me, quyet doan va dam me', 'Strong, decisive, and passionate') },
-    { value: 'intellectual', label: tr('Tri tue', 'Intellectual'), description: tr('Thong minh, sau sac va triet ly', 'Smart, thoughtful, and philosophical') },
+    { value: 'caring', label: tr('Quan tâm', 'Caring'), description: tr('Luôn chăm sóc và lo lắng cho bạn', 'Always caring and attentive') },
+    { value: 'playful', label: tr('Vui vẻ', 'Playful'), description: tr('Năng động, hay đùa và vui tính', 'Energetic, humorous, and fun') },
+    { value: 'shy', label: tr('Nhút nhát', 'Shy'), description: tr('Dễ thương, ngại ngùng và dễ xấu hổ', 'Cute, bashful, and a little shy') },
+    { value: 'passionate', label: tr('Nhiệt huyết', 'Passionate'), description: tr('Mạnh mẽ, quyết đoán và đam mê', 'Strong, decisive, and passionate') },
+    { value: 'intellectual', label: tr('Trí tuệ', 'Intellectual'), description: tr('Thông minh, sâu sắc và triết lý', 'Smart, thoughtful, and philosophical') },
   ];
 
   const breakupReasonOptions = [
-    { value: 'distance_needed', label: tr('Can khoang cach', 'Need distance') },
-    { value: 'not_feeling_same', label: tr('Khong con cam xuc nhu truoc', 'Feelings changed') },
-    { value: 'too_busy', label: tr('Qua ban de tiep tuc', 'Too busy') },
-    { value: 'hurt_or_disappointed', label: tr('Bi ton thuong hoac that vong', 'Hurt or disappointed') },
-    { value: 'trust_issue', label: tr('Van de niem tin', 'Trust issue') },
-    { value: 'other', label: tr('Ly do khac', 'Other') },
+    { value: 'distance_needed', label: tr('Cần khoảng cách', 'Need distance') },
+    { value: 'not_feeling_same', label: tr('Không còn cảm xúc như trước', 'Feelings changed') },
+    { value: 'too_busy', label: tr('Quá bận để tiếp tục', 'Too busy') },
+    { value: 'hurt_or_disappointed', label: tr('Bị tổn thương hoặc thất vọng', 'Hurt or disappointed') },
+    { value: 'trust_issue', label: tr('Vấn đề niềm tin', 'Trust issue') },
+    { value: 'other', label: tr('Lý do khác', 'Other') },
   ];
 
   useEffect(() => {
@@ -237,13 +237,18 @@ function CharacterSettingsPageContent() {
 
       if (character?.id === selectedCharacter.id) {
         clearMessages();
-        await useCharacterStore.getState().fetchCharacter();
+        useCharacterStore.setState({
+          character: null,
+          selectedCharacter: null,
+          selectedCharacterId: null,
+          isLoading: false,
+        });
       }
 
       toast({
-        title: tr('Da chia tay', 'Breakup complete'),
+        title: tr('Đã chia tay', 'Breakup complete'),
         description: tr(
-          'Moi quan he da ket thuc. Doan chat voi nguoi cu da duoc mo lai.',
+          'Mối quan hệ đã kết thúc. Đoạn chat với người cũ đã được mở lại.',
           'The relationship ended. The ex chat has been reopened.'
         ),
       });
@@ -251,10 +256,10 @@ function CharacterSettingsPageContent() {
     } catch (error) {
       const description = error instanceof Error
         ? error.message
-        : tr('Khong the ket thuc moi quan he luc nay.', 'Unable to end the relationship right now.');
+        : tr('Không thể kết thúc mối quan hệ lúc này.', 'Unable to end the relationship right now.');
 
       toast({
-        title: tr('Loi', 'Error'),
+        title: tr('Lỗi', 'Error'),
         description,
         variant: 'destructive',
       });
@@ -494,7 +499,7 @@ function CharacterSettingsPageContent() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[#ba9cab] mb-2">
-                  {tr('Ly do chia tay', 'Breakup reason')}
+                  {tr('Lý do chia tay', 'Breakup reason')}
                 </label>
                 <select
                   value={breakupReasonPreset}
@@ -509,12 +514,12 @@ function CharacterSettingsPageContent() {
 
               <div>
                 <label className="block text-sm font-medium text-[#ba9cab] mb-2">
-                  {tr('Ghi chu them (tuy chon)', 'Extra note (optional)')}
+                  {tr('Ghi chú thêm (tuỳ chọn)', 'Extra note (optional)')}
                 </label>
                 <textarea
                   value={breakupReason}
                   onChange={(e) => setBreakupReason(e.target.value)}
-                  placeholder={tr('Vi du: em can khoang lang mot thoi gian...', 'Example: I need some distance for a while...')}
+                  placeholder={tr('Ví dụ: em cần khoảng lặng một thời gian...', 'Example: I need some distance for a while...')}
                   className="w-full bg-[#181114] border border-[#392830] rounded-lg text-white placeholder-[#8f7380] px-4 py-3 focus:outline-none focus:border-rose-400 transition-colors resize-none h-24"
                 />
               </div>
@@ -525,12 +530,12 @@ function CharacterSettingsPageContent() {
                 <MessageCircleHeart className="w-5 h-5 text-love mt-0.5" />
                 <div>
                   <div className="text-sm font-semibold text-white">
-                    {tr('Nguoi cu se dung chinh ky uc cu', 'Ex chat keeps the original memories')}
+                    {tr('Người cũ sẽ dùng chính ký ức cũ', 'Ex chat keeps the original memories')}
                   </div>
                   <p className="text-sm text-[#ba9cab] mt-1">
                     {canCreateExPersonaOnBreakup
-                      ? tr('Sau khi chia tay, he thong mo lai chat voi nhan vat cu. VIP co the nhan tin, tang qua va nhan comeback message.', 'After breakup, the original character chat reopens. VIP users can chat, gift, and receive comeback messages.')
-                      : tr('Ban van co archive co ban. Nang cap VIP de nhan tin, tang qua va nhan comeback message tu nguoi cu.', 'You still get the basic archive. Upgrade to VIP to chat, gift, and receive comeback messages from your ex.')}
+                      ? tr('Sau khi chia tay, hệ thống mở lại chat với nhân vật cũ. VIP có thể nhắn tin, tặng quà và nhận comeback message.', 'After breakup, the original character chat reopens. VIP users can chat, gift, and receive comeback messages.')
+                      : tr('Bạn vẫn có archive cơ bản. Nâng cấp VIP để nhắn tin, tặng quà và nhận comeback message từ người cũ.', 'You still get the basic archive. Upgrade to VIP to chat, gift, and receive comeback messages from your ex.')}
                   </p>
                 </div>
               </div>

@@ -489,7 +489,7 @@ export const giftService = {
           userId,
           characterId: data.characterId,
           role: 'SYSTEM',
-          content: `Ban da tang ${gift.name}`,
+          content: `Bạn đã tặng ${gift.name}`,
           messageType: 'GIFT',
           metadata: { giftId: data.giftId, giftName: gift.name, source: 'ex_gift' },
         },

@@ -58,8 +58,16 @@ export interface ActiveCharacter {
   level: number;
   experience: number;
   relationshipStage: string;
-  age: number;
-  occupation: string;
+  age?: number;
+  occupation?: string;
+  isActive?: boolean;
+  isEnded?: boolean;
+  isExPersona?: boolean;
+  relationshipState?: 'ACTIVE' | 'ENDED' | string;
+  canChatEx?: boolean;
+  canGiftEx?: boolean;
+  requiredTier?: 'BASIC' | 'PRO' | 'ULTIMATE' | null;
+  lockReason?: string | null;
   stats?: {
     messages: number;
     gifts: number;
@@ -218,8 +226,11 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       set({ isLoading: true });
       const activeResponse = await api.get<ActiveCharacter[]>('/character/active');
       const activeCharacters = activeResponse.success ? (activeResponse.data || []) : [];
+      const currentSelected = get().selectedCharacterId;
+      const persistedSelected = loadPersistedSelectedCharacterId();
+      const requestedId = characterId || currentSelected || persistedSelected;
 
-      if (activeCharacters.length === 0) {
+      if (activeCharacters.length === 0 && !characterId) {
         set({
           character: null,
           selectedCharacter: null,
@@ -232,11 +243,21 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
         return;
       }
 
-      const currentSelected = get().selectedCharacterId;
-      const persistedSelected = loadPersistedSelectedCharacterId();
-      const requestedId = characterId || currentSelected || persistedSelected;
       const exists = requestedId ? activeCharacters.some((item) => item.id === requestedId) : false;
-      const effectiveCharacterId: string = exists && requestedId ? requestedId : activeCharacters[0].id;
+      const effectiveCharacterId = characterId || (exists && requestedId ? requestedId : activeCharacters[0]?.id);
+
+      if (!effectiveCharacterId) {
+        set({
+          character: null,
+          selectedCharacter: null,
+          characters: [],
+          selectedCharacterId: null,
+          isLoading: false,
+          needsCreation: true,
+        });
+        persistSelectedCharacterId(null);
+        return;
+      }
 
       const characterResponse = await api.get<Character>(`/character?characterId=${encodeURIComponent(effectiveCharacterId)}`);
       if (!characterResponse.success || !characterResponse.data) {
@@ -244,7 +265,10 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
       }
 
       const selectedCharacter = characterResponse.data;
-      const mergedCharacters = mergeSelectedIntoList(activeCharacters, selectedCharacter);
+      const selectedIsActive = activeCharacters.some((item) => item.id === selectedCharacter.id);
+      const mergedCharacters = selectedIsActive
+        ? mergeSelectedIntoList(activeCharacters, selectedCharacter)
+        : activeCharacters;
       set({
         character: selectedCharacter,
         selectedCharacter,

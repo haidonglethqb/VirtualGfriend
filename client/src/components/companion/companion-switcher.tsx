@@ -12,6 +12,10 @@ interface CompanionSwitcherProps {
   className?: string;
 }
 
+function getStatusLabel(item: ActiveCharacter) {
+  return item.isEnded ? 'Đã chia tay' : getRelationshipLabel(item.relationshipStage);
+}
+
 export function CompanionSwitcher({
   companions,
   selectedCharacterId,
@@ -61,7 +65,9 @@ export function CompanionSwitcher({
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-white truncate">{selected.name}</p>
-            <p className="text-xs text-[#ba9cab] truncate">{getRelationshipLabel(selected.relationshipStage)} · {selected.affection}</p>
+            <p className="text-xs text-[#ba9cab] truncate">
+              {getStatusLabel(selected)} · {selected.affection}
+            </p>
           </div>
         </div>
 
@@ -94,6 +100,11 @@ export function CompanionSwitcher({
               <Heart className="w-3 h-3 fill-current" />
               {item.affection}
             </span>
+            {item.isEnded && (
+              <span className="rounded-full bg-slate-500/15 px-1.5 py-0.5 text-[10px] text-slate-300">
+                Ex
+              </span>
+            )}
           </button>
         ))}
       </div>

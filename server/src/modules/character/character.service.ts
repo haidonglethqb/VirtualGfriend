@@ -4,8 +4,10 @@ import { AppError } from '../../middlewares/error.middleware';
 import { RelationshipStage, Gender } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
 import { VALIDATION } from '../../lib/constants';
+import { getExAccess } from './ex-access.service';
 
 const log = createModuleLogger('Character');
+const RECONCILE_AFFECTION_THRESHOLD = 700;
 
 interface CreateCharacterData {
   name: string;
@@ -278,10 +280,19 @@ export const characterService = {
       if (cached) return cached;
     }
 
-    // Try full query with all includes first
+    // Try full query with all includes first. Default lookup stays active-only.
+    // Explicit characterId can load the original ended relationship for archive/ex chat flows.
     let character = await prisma.character.findFirst({
       where: targetCharacterId
-        ? { id: targetCharacterId, userId, isActive: true, isEnded: false, isExPersona: false }
+        ? {
+          id: targetCharacterId,
+          userId,
+          isExPersona: false,
+          OR: [
+            { isActive: true, isEnded: false },
+            { isEnded: true, endReason: { not: 'source_relationship_reconciled' } },
+          ],
+        }
         : { userId, isActive: true, isEnded: false, isExPersona: false },
       ...(targetCharacterId ? {} : { orderBy: { createdAt: 'desc' as const } }),
       include: {
@@ -294,7 +305,11 @@ export const characterService = {
     });
 
     if (!character) {
-      throw new AppError('No active character found', 404, 'NO_CHARACTER');
+      throw new AppError(
+        targetCharacterId ? 'Character not found' : 'No active character found',
+        404,
+        targetCharacterId ? 'CHARACTER_NOT_FOUND' : 'NO_CHARACTER',
+      );
     }
 
     // Try to load scenes separately to avoid cascading failure
@@ -314,12 +329,20 @@ export const characterService = {
     const xpForNextLevel = getXpRequiredForLevel(character.level);
     const progressPercent = Math.round((character.experience / xpForNextLevel) * 100);
 
+    const exAccess = character.isEnded ? await getExAccess(userId) : null;
     const result = {
       ...character,
       scenes,
       unlockedFeatures,
       xpForNextLevel,
       progressPercent,
+      relationshipState: character.isEnded ? 'ENDED' : 'ACTIVE',
+      canChatEx: character.isEnded ? exAccess?.canChatEx ?? false : false,
+      canGiftEx: character.isEnded ? exAccess?.canGiftEx ?? false : false,
+      requiredTier: character.isEnded ? exAccess?.requiredTier ?? 'BASIC' : null,
+      lockReason: character.isEnded ? exAccess?.lockReason ?? null : null,
+      reconcileAvailable: character.isEnded && character.affection >= RECONCILE_AFFECTION_THRESHOLD && (exAccess?.canChatEx ?? false),
+      reconcileThreshold: character.isEnded ? RECONCILE_AFFECTION_THRESHOLD : null,
     };
 
     // Cache only default active-character lookup.

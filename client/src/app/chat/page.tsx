@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/app-layout'
 import { useAuthStore } from '@/store/auth-store'
-import { useCharacterStore } from '@/store/character-store'
+import { useCharacterStore, type ActiveCharacter } from '@/store/character-store'
 import { useChatStore } from '@/store/chat-store'
 import { useNotificationStore } from '@/store/notification-store'
 import { socketService } from '@/services/socket'
@@ -45,6 +45,8 @@ interface ChatCharacterSummary {
   affection: number;
   level: number;
   mood?: string;
+  age?: number;
+  occupation?: string;
   isEnded?: boolean;
   isExPersona?: boolean;
   relationshipState?: 'ACTIVE' | 'ENDED';
@@ -54,6 +56,13 @@ interface ChatCharacterSummary {
   lockReason?: string | null;
   reconcileAvailable?: boolean;
   reconcileThreshold?: number;
+  relationshipStage: string;
+  stats?: {
+    messages: number;
+    gifts?: number;
+    receivedGifts?: number;
+    memories: number;
+  };
 }
 
 interface ChatCharacterUpdateDetail {
@@ -160,6 +169,36 @@ const CHAT_I18N = {
   },
 } as const;
 
+function toChatThread(item: ChatCharacterSummary): ActiveCharacter {
+  return {
+    id: item.id,
+    name: item.name,
+    avatarUrl: item.avatarUrl,
+    mood: item.mood || (item.isEnded ? 'sad' : 'happy'),
+    affection: item.affection,
+    level: item.level,
+    experience: 0,
+    relationshipStage: item.relationshipStage,
+    age: item.age,
+    occupation: item.occupation,
+    isActive: !item.isEnded,
+    isEnded: item.isEnded,
+    isExPersona: item.isExPersona,
+    relationshipState: item.isEnded ? 'ENDED' : 'ACTIVE',
+    canChatEx: item.canChatEx,
+    canGiftEx: item.canGiftEx,
+    requiredTier: item.requiredTier,
+    lockReason: item.lockReason,
+    stats: item.stats
+      ? {
+        messages: item.stats.messages,
+        gifts: item.stats.receivedGifts ?? item.stats.gifts ?? 0,
+        memories: item.stats.memories,
+      }
+      : undefined,
+  };
+}
+
 function ChatPageFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#1a0f13] px-6">
@@ -231,23 +270,45 @@ function ChatPageContent() {
   const [isSendingGift, setIsSendingGift] = useState(false)
   const [giftSuccess, setGiftSuccess] = useState(false)
   const [chatCharacter, setChatCharacter] = useState<ChatCharacterSummary | null>(null)
+  const [chatThreads, setChatThreads] = useState<ActiveCharacter[]>([])
   const [factsCount, setFactsCount] = useState(0)
   const [factsQuota, setFactsQuota] = useState<FactQuota | null>(null)
   const previousRequestedCharacterIdRef = useRef<string | null>(null)
   const handledMissingCharacterIdRef = useRef<string | null>(null)
 
+  const chatSwitchCompanions = chatThreads.length > 0
+    ? chatThreads.map((thread) => characters.find((item) => item.id === thread.id) ?? thread)
+    : characters;
+  const requestedThread = requestedCharacterId
+    ? chatSwitchCompanions.find((item) => item.id === requestedCharacterId)
+    : null;
   const activeChatCharacter = requestedCharacterId
-    ? (chatCharacter ?? (character?.id === requestedCharacterId ? character : null))
+    ? (chatCharacter ?? (character?.id === requestedCharacterId ? character : null) ?? requestedThread)
     : character;
   const activeChatCharacterId = activeChatCharacter?.id;
-  const isEndedRelationship = !!requestedCharacterId && !!chatCharacter?.isEnded && !chatCharacter?.isExPersona;
-  const canChatCurrent = !isEndedRelationship || chatCharacter?.canChatEx === true;
-  const canGiftCurrent = !isEndedRelationship || chatCharacter?.canGiftEx === true;
+  const isEndedRelationship = !!requestedCharacterId && !!activeChatCharacter?.isEnded && !activeChatCharacter?.isExPersona;
+  const canChatCurrent = !isEndedRelationship || activeChatCharacter?.canChatEx === true;
+  const canGiftCurrent = !isEndedRelationship || activeChatCharacter?.canGiftEx === true;
 
   // Memoize fetchMessages for useCallback
   const handleFetchMessages = useCallback(() => {
     return fetchMessages(requestedCharacterId || undefined)
   }, [fetchMessages, requestedCharacterId])
+
+  const loadChatThreads = useCallback(async () => {
+    try {
+      const response = await api.get<ChatCharacterSummary[]>('/character/relationship/history')
+      if (response.success && response.data) {
+        setChatThreads(
+          response.data
+            .filter((item) => !item.isExPersona || item.isEnded)
+            .map(toChatThread)
+        )
+      }
+    } catch {
+      setChatThreads([])
+    }
+  }, [])
 
   const handleMissingRequestedCharacter = useCallback(() => {
     if (!requestedCharacterId || handledMissingCharacterIdRef.current === requestedCharacterId) {
@@ -280,6 +341,13 @@ function ChatPageContent() {
     try {
       const response = await api.get<ChatCharacterSummary[]>('/character/relationship/history')
       const matchedCharacter = response.data?.find((item) => item.id === requestedCharacterId)
+      if (response.success && response.data) {
+        setChatThreads(
+          response.data
+            .filter((item) => !item.isExPersona || item.isEnded)
+            .map(toChatThread)
+        )
+      }
 
       if (matchedCharacter) {
         setChatCharacter({
@@ -377,10 +445,11 @@ function ChatPageContent() {
     void fetchCharacter(requestedCharacterId || undefined)
     
     fetchMessages(requestedCharacterId || undefined)
+    void loadChatThreads()
     fetchScenes() // Load scenes for background selector
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, router, fetchMessages, fetchScenes, fetchCharacter, needsCreation, requestedCharacterId])
+  }, [isAuthenticated, router, fetchMessages, fetchScenes, fetchCharacter, loadChatThreads, needsCreation, requestedCharacterId])
 
   useEffect(() => {
     if (!requestedCharacterId) {
@@ -513,8 +582,8 @@ function ChatPageContent() {
 
     if (!canChatCurrent) {
       toast({
-        title: language === 'vi' ? 'Can VIP' : 'VIP required',
-        description: language === 'vi' ? 'Nang cap VIP de nhan tin voi nguoi cu.' : 'Upgrade to VIP to chat with your ex.',
+        title: language === 'vi' ? 'Cần VIP' : 'VIP required',
+        description: language === 'vi' ? 'Nâng cấp VIP để nhắn tin với người cũ.' : 'Upgrade to VIP to chat with your ex.',
       });
       return;
     }
@@ -564,8 +633,8 @@ function ChatPageContent() {
   const openGiftModal = async () => {
     if (!canGiftCurrent) {
       toast({
-        title: language === 'vi' ? 'Can VIP' : 'VIP required',
-        description: language === 'vi' ? 'Nang cap VIP de tang qua cho nguoi cu.' : 'Upgrade to VIP to gift your ex.',
+        title: language === 'vi' ? 'Cần VIP' : 'VIP required',
+        description: language === 'vi' ? 'Nâng cấp VIP để tặng quà cho người cũ.' : 'Upgrade to VIP to gift your ex.',
       });
       return;
     }
@@ -640,10 +709,10 @@ function ChatPageContent() {
   const displayCharacterName = displayCharacter?.name || t.lover;
   const affectionLevel = Math.floor((displayCharacter?.affection || 0) / 100) + 1;
   const activeScene = getActiveScene();
-  const endedStatusLabel = language === 'vi' ? 'Da chia tay' : 'Broken up';
+  const endedStatusLabel = language === 'vi' ? 'Đã chia tay' : 'Broken up';
   const onlineStatusLabel = isEndedRelationship ? endedStatusLabel : `${t.online} • ${t.happy}`;
   const inputPlaceholder = !canChatCurrent
-    ? (language === 'vi' ? 'Nang cap VIP de nhan tin voi nguoi cu...' : 'Upgrade to VIP to chat with your ex...')
+    ? (language === 'vi' ? 'Nâng cấp VIP để nhắn tin với người cũ...' : 'Upgrade to VIP to chat with your ex...')
     : t.typeMessage.replace('{name}', displayCharacterName);
   const openCharacterSettings = () => {
     if (!activeChatCharacterId) {
@@ -658,11 +727,14 @@ function ChatPageContent() {
     router.push(`/settings/facts?characterId=${encodeURIComponent(activeChatCharacterId)}`)
   }
   const handleSelectCompanion = async (characterId: string) => {
+    const selectedThread = chatSwitchCompanions.find((item) => item.id === characterId)
     setSelectedCharacterId(characterId)
     useChatStore.getState().clearMessages()
     setChatCharacter(null)
     router.push(`/chat?characterId=${encodeURIComponent(characterId)}`)
-    await fetchCharacter(characterId)
+    if (!selectedThread?.isEnded) {
+      await fetchCharacter(characterId)
+    }
   }
   const knowledgeLabel = t.knowledgeScope.replace('{name}', displayCharacterName)
   const factsDisplayCount = factsQuota
@@ -676,7 +748,7 @@ function ChatPageContent() {
         {/* Left Side: Character Card */}
         <div className="hidden lg:flex lg:w-80 flex-col">
           <CompanionSwitcher
-            companions={characters}
+            companions={chatSwitchCompanions}
             selectedCharacterId={requestedCharacterId || selectedCharacterId}
             onSelect={handleSelectCompanion}
             className="mb-4"
@@ -686,8 +758,8 @@ function ChatPageContent() {
               <div className="text-sm font-semibold text-slate-100">{endedStatusLabel}</div>
               <p className="mt-1 text-xs text-slate-300">
                 {canChatCurrent
-                  ? (language === 'vi' ? 'Cuoc tro chuyen nay dung ky uc va facts cu, nhung tam trang cua nguoi cu se lanh hon.' : 'This archive uses the original memories and facts, with a colder ex tone.')
-                  : (language === 'vi' ? 'Ban co the xem archive co ban. Nang cap VIP de tiep tuc nhan tin va tang qua.' : 'You can view the basic archive. Upgrade to VIP to chat and send gifts.')}
+                  ? (language === 'vi' ? 'Cuộc trò chuyện này dùng ký ức và facts cũ, nhưng tâm trạng của người cũ sẽ lạnh hơn.' : 'This archive uses the original memories and facts, with a colder ex tone.')
+                  : (language === 'vi' ? 'Bạn có thể xem archive cơ bản. Nâng cấp VIP để tiếp tục nhắn tin và tặng quà.' : 'You can view the basic archive. Upgrade to VIP to chat and send gifts.')}
               </p>
               {chatCharacter?.reconcileAvailable && (
                 <button
@@ -695,7 +767,7 @@ function ChatPageContent() {
                     if (!activeChatCharacterId) return
                     try {
                       await api.post(`/character/relationship/reconcile/${activeChatCharacterId}`)
-                      toast({ title: language === 'vi' ? 'Da quay lai' : 'Reconciled' })
+                      toast({ title: language === 'vi' ? 'Đã quay lại' : 'Reconciled' })
                       router.push(`/chat?characterId=${encodeURIComponent(activeChatCharacterId)}`)
                       await fetchCharacter(activeChatCharacterId)
                     } catch (error: any) {
@@ -704,7 +776,7 @@ function ChatPageContent() {
                   }}
                   className="mt-3 rounded-full bg-love px-4 py-2 text-xs font-bold text-white hover:bg-love/90"
                 >
-                  {language === 'vi' ? 'Quay lai voi nhau' : 'Reconcile'}
+                  {language === 'vi' ? 'Quay lại với nhau' : 'Reconcile'}
                 </button>
               )}
             </div>
@@ -881,7 +953,7 @@ function ChatPageContent() {
           </div>
           <div className="lg:hidden px-3 py-2 border-b border-[#392830] bg-[#24191f]">
             <CompanionSwitcher
-              companions={characters}
+              companions={chatSwitchCompanions}
               selectedCharacterId={requestedCharacterId || selectedCharacterId}
               onSelect={handleSelectCompanion}
             />

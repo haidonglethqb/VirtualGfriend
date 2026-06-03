@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Heart, MessageCircle, Gift, Star, Target,
-  Calendar, Sparkles, ImageIcon, CheckCircle, Trophy, TrendingUp, UserPlus, Settings
+  Calendar, Sparkles, ImageIcon, CheckCircle, Trophy, TrendingUp, UserPlus, Settings, MessageCircleHeart
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -156,6 +156,26 @@ interface CanStartRelationshipInfo {
   maxAllowed: number;
 }
 
+interface RelationshipHistoryItem {
+  id: string;
+  name: string;
+  avatarUrl?: string | null;
+  affection: number;
+  relationshipStage: string;
+  endedAt?: string | null;
+  isEnded?: boolean;
+  isExPersona?: boolean;
+  canChatEx?: boolean;
+  canGiftEx?: boolean;
+  lockReason?: string | null;
+  stats?: {
+    messages: number;
+    receivedGifts?: number;
+    gifts?: number;
+    memories: number;
+  };
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
@@ -173,6 +193,7 @@ export default function DashboardPage() {
   const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([]);
   const [recentMemories, setRecentMemories] = useState<Memory[]>([]);
   const [canStartRelationship, setCanStartRelationship] = useState<CanStartRelationshipInfo | null>(null);
+  const [exRelationships, setExRelationships] = useState<RelationshipHistoryItem[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     messagesToday: 0,
     streak: 1,
@@ -181,12 +202,13 @@ export default function DashboardPage() {
 
   const fetchDashboardData = useCallback(async () => {
     // Fetch all dashboard data in parallel for faster load
-    const [questsResult, chatResult, giftResult, memoriesResult, canStartResult] = await Promise.allSettled([
+    const [questsResult, chatResult, giftResult, memoriesResult, canStartResult, relationshipHistoryResult] = await Promise.allSettled([
       api.get<DailyQuest[]>('/quests/daily'),
       api.get<{ messages: Array<{ createdAt: string }> }>('/chat/history?limit=100'),
       api.get<{ items: unknown[]; total: number }>('/shop/history'),
       api.get<{ items: Memory[] }>('/memories?limit=3'),
       api.get<CanStartRelationshipInfo>('/character/relationship/can-start-new'),
+      api.get<RelationshipHistoryItem[]>('/character/relationship/history'),
     ]);
 
     if (questsResult.status === 'fulfilled' && questsResult.value.success) {
@@ -212,6 +234,13 @@ export default function DashboardPage() {
 
     if (canStartResult.status === 'fulfilled' && canStartResult.value.success) {
       setCanStartRelationship(canStartResult.value.data);
+    }
+
+    if (relationshipHistoryResult.status === 'fulfilled' && relationshipHistoryResult.value.success) {
+      const ended = relationshipHistoryResult.value.data
+        .filter((item) => item.isEnded && !item.isExPersona)
+        .sort((a, b) => new Date(b.endedAt || 0).getTime() - new Date(a.endedAt || 0).getTime());
+      setExRelationships(ended);
     }
   }, []);
 
@@ -537,6 +566,66 @@ export default function DashboardPage() {
                       </Link>
                     )}
                   </div>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Ended Relationship Archive */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.28 }}
+            >
+              <div className="rounded-2xl bg-[#271b21] border border-[#392830] p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-lg font-bold">{language === 'vi' ? 'Người cũ' : 'Exes'}</h3>
+                    <p className="text-sm text-[#ba9cab]">
+                      {language === 'vi'
+                        ? 'Archive và chat lại với nhân vật đã chia tay'
+                        : 'Archive and reopen chats with ended relationships'}
+                    </p>
+                  </div>
+                  <MessageCircleHeart className="w-5 h-5 text-love" />
+                </div>
+
+                {exRelationships.length > 0 ? (
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {exRelationships.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-3 rounded-xl bg-[#181114] border border-[#392830] p-3 hover:border-love/50 transition-colors"
+                      >
+                        <Link href={`/chat?characterId=${encodeURIComponent(item.id)}`} className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-600 to-love flex items-center justify-center overflow-hidden text-white font-bold">
+                            {item.avatarUrl ? (
+                              <Image src={item.avatarUrl} alt={item.name} width={48} height={48} className="w-full h-full object-cover" sizes="48px" />
+                            ) : (
+                              item.name.charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold truncate">{item.name}</p>
+                            <p className="text-xs text-[#ba9cab]">
+                              {language === 'vi' ? 'Đã chia tay' : 'Broken up'} • {item.affection}
+                            </p>
+                            {!item.canChatEx && (
+                              <p className="mt-1 text-[11px] text-amber-300">
+                                {language === 'vi'
+                                  ? 'VIP mới nhắn hoặc tặng quà cho người cũ'
+                                  : 'VIP required to chat or gift exes'}
+                              </p>
+                            )}
+                          </div>
+                        </Link>
+                        <Link href={`/chat?characterId=${encodeURIComponent(item.id)}`} className="text-xs text-love font-semibold hover:underline">
+                          {language === 'vi' ? 'Mở archive' : 'Open archive'}
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#ba9cab]">{language === 'vi' ? 'Chưa có người cũ nào' : 'No exes yet'}</p>
                 )}
               </div>
             </motion.div>
