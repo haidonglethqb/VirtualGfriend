@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Brain, CheckCircle2, Key, RefreshCw, Save, Trash2, Zap } from 'lucide-react';
+import { Brain, CheckCircle2, Key, RefreshCw, Save, SlidersHorizontal, Trash2, Zap } from 'lucide-react';
 
 type Provider = 'system' | 'groq' | 'codex_router' | 'openai';
 
@@ -18,7 +18,15 @@ interface ProviderInfo {
 interface AiSettings {
   activeProvider: Provider;
   selectedModels: Record<Exclude<Provider, 'system'>, string>;
+  contextLimits: ContextLimits;
+  maxContextLimits: ContextLimits;
   providers: Record<Provider, ProviderInfo>;
+}
+
+interface ContextLimits {
+  messageLimit: number;
+  factLimit: number;
+  summaryLimit: number;
 }
 
 const PROVIDERS: Provider[] = ['system', 'groq', 'codex_router', 'openai'];
@@ -34,6 +42,11 @@ export function AiSettingsTab({
   const [settings, setSettings] = useState<AiSettings | null>(null);
   const [provider, setProvider] = useState<Provider>('system');
   const [models, setModels] = useState<Record<string, string>>({});
+  const [contextLimits, setContextLimits] = useState<ContextLimits>({
+    messageLimit: 300,
+    factLimit: 200,
+    summaryLimit: 20,
+  });
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,6 +63,7 @@ export function AiSettingsTab({
       setSettings(data);
       setProvider(data.activeProvider);
       setModels(data.selectedModels || {});
+      setContextLimits(data.contextLimits);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Unable to load AI settings', 'error');
     } finally {
@@ -105,6 +119,25 @@ export function AiSettingsTab({
       showToast(action === 'clear' ? 'API key cleared' : 'API key saved', 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Unable to update key', 'error');
+    }
+  }
+
+  async function saveContextLimits() {
+    setSaving(true);
+    try {
+      const res = await apiCall('/ai-settings/context', {
+        method: 'PUT',
+        body: JSON.stringify(contextLimits),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || json.error || 'Context update failed');
+      setSettings(json.data as AiSettings);
+      setContextLimits((json.data as AiSettings).contextLimits);
+      showToast('AI context limits saved', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to save context limits', 'error');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -218,6 +251,53 @@ export function AiSettingsTab({
             <span>{testResult}</span>
           </div>
         )}
+      </div>
+
+      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+        <div className="flex items-center gap-3 mb-6">
+          <SlidersHorizontal className="w-6 h-6 text-cyan-400" />
+          <div>
+            <h3 className="text-lg font-semibold text-white">Context Memory</h3>
+            <p className="text-sm text-gray-400">Controls how much conversation memory is sent to the selected model.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            ['messageLimit', 'Recent messages', settings?.maxContextLimits.messageLimit || 1000],
+            ['factLimit', 'Stored facts', settings?.maxContextLimits.factLimit || 500],
+            ['summaryLimit', 'Summaries', settings?.maxContextLimits.summaryLimit || 50],
+          ].map(([key, label, max]) => (
+            <label key={key} className="space-y-2">
+              <span className="text-sm text-gray-300">{label}</span>
+              <input
+                type="number"
+                min={1}
+                max={max as number}
+                value={contextLimits[key as keyof ContextLimits]}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  setContextLimits((prev) => ({
+                    ...prev,
+                    [key]: Number.isFinite(value) ? value : prev[key as keyof ContextLimits],
+                  }));
+                }}
+                className="w-full px-4 py-3 rounded-lg bg-gray-900 border border-gray-700 text-white"
+              />
+              <p className="text-xs text-gray-500">Max {max}</p>
+            </label>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={saveContextLimits}
+          disabled={saving}
+          className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 rounded-lg text-white"
+        >
+          <Save className="w-4 h-4" />
+          {saving ? 'Saving...' : 'Save context limits'}
+        </button>
       </div>
 
       <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">

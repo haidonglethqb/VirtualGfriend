@@ -16,6 +16,7 @@ export type AiRuntimeConfig = {
   activeProvider: AiProvider;
   selectedModels: Record<Exclude<AiProvider, 'system'>, string>;
   keys: Partial<Record<Exclude<AiProvider, 'system'>, ApiKeyState>>;
+  contextLimits: AiContextLimits;
 };
 
 export type AiRuntime = {
@@ -25,6 +26,12 @@ export type AiRuntime = {
   wireApi: AiWireApi;
   apiKey?: string;
   source: 'admin' | 'env';
+};
+
+export type AiContextLimits = {
+  messageLimit: number;
+  factLimit: number;
+  summaryLimit: number;
 };
 
 export const GROQ_FREE_MODELS = [
@@ -54,6 +61,18 @@ const CACHE_TTL_SECS = CacheTTL.QUESTS;
 const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
 const CODEX_ROUTER_BASE_URL = 'https://luongchidung.online/v1';
 
+const DEFAULT_CONTEXT_LIMITS: AiContextLimits = {
+  messageLimit: 300,
+  factLimit: 200,
+  summaryLimit: 20,
+};
+
+const MAX_CONTEXT_LIMITS: AiContextLimits = {
+  messageLimit: 1000,
+  factLimit: 500,
+  summaryLimit: 50,
+};
+
 const DEFAULT_CONFIG: AiRuntimeConfig = {
   activeProvider: 'system',
   selectedModels: {
@@ -62,7 +81,35 @@ const DEFAULT_CONFIG: AiRuntimeConfig = {
     openai: process.env.AI_MODEL || DEFAULT_MODEL,
   },
   keys: {},
+  contextLimits: DEFAULT_CONTEXT_LIMITS,
 };
+
+function boundedNumber(value: unknown, fallback: number, max: number) {
+  const numberValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numberValue) || numberValue <= 0) return fallback;
+  return Math.min(Math.floor(numberValue), max);
+}
+
+function normalizeContextLimits(value: unknown): AiContextLimits {
+  const raw = (value || {}) as Partial<AiContextLimits>;
+  return {
+    messageLimit: boundedNumber(
+      raw.messageLimit ?? process.env.AI_CONTEXT_MESSAGE_LIMIT,
+      DEFAULT_CONTEXT_LIMITS.messageLimit,
+      MAX_CONTEXT_LIMITS.messageLimit,
+    ),
+    factLimit: boundedNumber(
+      raw.factLimit ?? process.env.AI_CONTEXT_FACT_LIMIT,
+      DEFAULT_CONTEXT_LIMITS.factLimit,
+      MAX_CONTEXT_LIMITS.factLimit,
+    ),
+    summaryLimit: boundedNumber(
+      raw.summaryLimit ?? process.env.AI_CONTEXT_SUMMARY_LIMIT,
+      DEFAULT_CONTEXT_LIMITS.summaryLimit,
+      MAX_CONTEXT_LIMITS.summaryLimit,
+    ),
+  };
+}
 
 function mergeConfig(value: unknown): AiRuntimeConfig {
   const raw = (value || {}) as Partial<AiRuntimeConfig>;
@@ -73,6 +120,7 @@ function mergeConfig(value: unknown): AiRuntimeConfig {
       ...(raw.selectedModels || {}),
     },
     keys: raw.keys || {},
+    contextLimits: normalizeContextLimits(raw.contextLimits),
   };
 }
 
@@ -198,6 +246,8 @@ export async function getAdminAiSettings() {
   return {
     activeProvider: config.activeProvider,
     selectedModels: config.selectedModels,
+    contextLimits: config.contextLimits,
+    maxContextLimits: MAX_CONTEXT_LIMITS,
     providers,
   };
 }
@@ -219,6 +269,23 @@ export async function updateActiveAiProvider(provider: AiProvider, model?: strin
 
   await saveConfig(next);
   return getAdminAiSettings();
+}
+
+export async function updateAiContextLimits(limits: Partial<AiContextLimits>) {
+  const config = await getAiRuntimeConfig();
+  await saveConfig({
+    ...config,
+    contextLimits: normalizeContextLimits({
+      ...config.contextLimits,
+      ...limits,
+    }),
+  });
+  return getAdminAiSettings();
+}
+
+export async function getAiContextLimits() {
+  const config = await getAiRuntimeConfig();
+  return config.contextLimits;
 }
 
 export async function updateAiProviderKey(

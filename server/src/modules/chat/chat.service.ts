@@ -4,6 +4,7 @@ import { AppError } from '../../middlewares/error.middleware';
 import { aiService } from '../ai/ai.service';
 import { factsLearningService } from '../ai/facts-learning.service';
 import { conversationSummaryService } from '../ai/conversation-summary.service';
+import { getAiContextLimits } from '../ai/ai-config.service';
 import { autoMemoryService } from '../memory/auto-memory.service';
 import { characterService } from '../character/character.service';
 import { gameEventService } from '../game/game-event.service';
@@ -310,6 +311,7 @@ export const chatService = {
   async sendMessage(userId: string, data: SendMessageData) {
     // Sanitize user content to prevent prompt injection
     const sanitizedContent = sanitizeUserContent(data.content);
+    const aiContextLimits = await getAiContextLimits();
 
     // Try to get character from cache first
     const cacheKey = CacheKeys.characterWithFacts(data.characterId);
@@ -322,7 +324,7 @@ export const chatService = {
         include: {
           characterFacts: {
             orderBy: { importance: 'desc' },
-            take: 20, // Increased from 10 for richer context
+            take: aiContextLimits.factLimit,
           },
         },
       });
@@ -398,19 +400,19 @@ export const chatService = {
     const recentMessages = await prisma.message.findMany({
       where: { userId, characterId: data.characterId },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: aiContextLimits.messageLimit,
     });
 
     // Load recent conversation summaries for long-term AI memory context
     const recentSummaries = await conversationSummaryService.getRecentSummaries(
-      userId, data.characterId, 3
+      userId, data.characterId, aiContextLimits.summaryLimit
     );
 
     const factsForPrompt = localFacts.length > 0
       ? await prisma.characterFact.findMany({
           where: { characterId: data.characterId },
           orderBy: { importance: 'desc' },
-          take: 20,
+          take: aiContextLimits.factLimit,
         })
       : character.characterFacts;
 
@@ -429,6 +431,7 @@ export const chatService = {
       recentMessages: recentMessages.reverse(),
       facts: factsForPrompt,
       recentSummaries,
+      contextLimits: aiContextLimits,
       userName: user?.displayName || user?.username || 'bạn',
       characterName: character.name,
       userMessage: sanitizedContent,
@@ -599,6 +602,7 @@ export const chatService = {
   ) {
     await assertCanUseExRelationship(userId, 'chat');
     await exComebackService.cancelPendingForCharacter(userId, data.characterId, 'user_replied');
+    const aiContextLimits = await getAiContextLimits();
 
     const userMessage = await prisma.message.create({
       data: {
@@ -619,12 +623,12 @@ export const chatService = {
     const recentMessages = await prisma.message.findMany({
       where: { userId, characterId: data.characterId },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: aiContextLimits.messageLimit,
     });
     const recentSummaries = await conversationSummaryService.getRecentSummaries(
       userId,
       data.characterId,
-      3,
+      aiContextLimits.summaryLimit,
     );
 
     const aiResponse = await aiService.generateResponse({
@@ -641,6 +645,7 @@ export const chatService = {
       recentMessages: recentMessages.reverse(),
       facts: character.characterFacts,
       recentSummaries,
+      contextLimits: aiContextLimits,
       userName: user?.displayName || user?.username || 'ban',
       characterName: character.name,
       userMessage: sanitizedContent,

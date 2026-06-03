@@ -6,6 +6,7 @@ import {
   getAdminAiSettings,
   testAiProvider,
   updateActiveAiProvider,
+  updateAiContextLimits,
   updateAiProviderKey,
 } from '../ai/ai-config.service';
 import { AppError } from '../../middlewares/error.middleware';
@@ -27,6 +28,12 @@ const testSchema = z.object({
   provider: z.enum(providers),
   model: z.string().min(1).max(100).optional(),
   apiKey: z.string().min(1).max(500).optional(),
+}).strict();
+
+const contextLimitsSchema = z.object({
+  messageLimit: z.number().int().min(1).max(1000).optional(),
+  factLimit: z.number().int().min(1).max(500).optional(),
+  summaryLimit: z.number().int().min(1).max(50).optional(),
 }).strict();
 
 export async function getAiSettings(_req: AdminRequest, res: Response, next: NextFunction) {
@@ -69,6 +76,20 @@ export async function updateAiSettingsKey(req: AdminRequest, res: Response, next
       parsed.data.apiKey,
     );
     res.json({ success: true, data, message: parsed.data.action === 'clear' ? 'AI key cleared' : 'AI key updated' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateAiSettingsContext(req: AdminRequest, res: Response, next: NextFunction) {
+  try {
+    const parsed = contextLimitsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0]?.message || 'Invalid AI context payload', 400, 'VALIDATION_ERROR');
+    }
+
+    const data = await updateAiContextLimits(parsed.data);
+    res.json({ success: true, data, message: 'AI context limits updated' });
   } catch (error) {
     next(error);
   }

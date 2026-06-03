@@ -40,6 +40,9 @@
 | `DO_SPACES_BUCKET` | `haichu` | Bucket name |
 | `DO_SPACES_REGION` | `sgp1` | Region |
 | `AI_MODEL` | `llama-3.3-70b-versatile` | Fallback model when Admin AI Settings uses `system` provider |
+| `AI_CONTEXT_MESSAGE_LIMIT` | `300` | Initial fallback for Admin AI Settings context limit, capped at 1000 |
+| `AI_CONTEXT_FACT_LIMIT` | `200` | Initial fallback for Admin AI Settings fact limit, capped at 500 |
+| `AI_CONTEXT_SUMMARY_LIMIT` | `20` | Initial fallback for Admin AI Settings summary limit, capped at 50 |
 | `USER_DEFAULT_AVATAR_BASE_URL` | `/avatars/default` | Default profile avatar base URL; set to Spaces `Avatar/default` only after preset assets are uploaded |
 
 ## Client Variables (NEXT_PUBLIC_*)

@@ -107,12 +107,13 @@ export function normalizeIncomingMemoryFact(fact: {
   };
 }
 
-export function getPromptFacts(facts: CharacterFact[]) {
+export function getPromptFacts(facts: CharacterFact[], limit?: number) {
   const now = new Date();
+  const promptFactLimit = Math.min(Math.max(limit || 200, 1), 500);
   return facts
     .filter((fact) => !fact.expiresAt || fact.expiresAt > now)
     .filter((fact) => !(fact.sourceType.startsWith('ai_') && isNoisyStoredFact(fact)))
-    .slice(0, 20);
+    .slice(0, promptFactLimit);
 }
 
 export function formatFactForPrompt(fact: CharacterFact) {

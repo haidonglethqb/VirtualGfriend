@@ -23,7 +23,7 @@ sequenceDiagram
     ChatService->>DB: Get character (cache → DB)
     ChatService->>DB: CREATE USER message
     ChatService->>ChatService: Increment cached daily USER-message counter
-    ChatService->>DB: Get recent 20 messages
+    ChatService->>DB: Get configured recent message context window
     ChatService->>AIService: generateResponse(context)
     Note over AIService: Groq API, personality-aware<br/>typing delay: min(4000, max(1500, len*25))
     AIService-->>ChatService: {content, emotion, moodChange, affectionChange, inlineFacts}

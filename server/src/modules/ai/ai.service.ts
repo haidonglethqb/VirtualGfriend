@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { CharacterFact, Gender, Message, RelationshipStage, UserGender } from '@prisma/client';
 import { createModuleLogger } from '../../lib/logger';
 import { extractSchedulingEventFact, formatFactForPrompt, getPromptFacts } from './memory-policy.service';
-import { createAiChatCompletion } from './ai-config.service';
+import { createAiChatCompletion, type AiContextLimits } from './ai-config.service';
 
 const log = createModuleLogger('AI');
 
@@ -23,6 +23,7 @@ interface AIContext {
   recentMessages: Message[];
   facts: CharacterFact[];
   recentSummaries?: string[]; // Recent conversation summaries for long-term context
+  contextLimits?: AiContextLimits;
   userName: string;
   characterName: string;
   userMessage: string;
@@ -632,7 +633,7 @@ function collectFoodMemory(context: AIContext) {
   const likes: string[] = [];
   const dislikes: string[] = [];
 
-  for (const fact of getPromptFacts(context.facts)) {
+  for (const fact of getPromptFacts(context.facts, context.contextLimits?.factLimit)) {
     if (fact.category !== 'preference') continue;
 
     const key = stripVietnamese(fact.key);
@@ -705,11 +706,11 @@ function buildSystemPrompt(context: AIContext): string {
     ? `\nCHE DO NGUOI YEU CU:\n- Hai nguoi da chia tay. Ly do chia tay: ${context.breakupReason || 'khong ro'}.\n- Giong tra loi phai buon, lanh va co khoang cach. Khong hanh xu nhu dang yeu binh thuong.\n- Van nho facts va ky niem cu, nhung nhac lai co tiet che, co chut ton thuong.\n- Neu user co gang lam lanh, co the mem hon tung chut, nhung khong quay lai qua nhanh.\n- Khong goi la nguoi yeu, khong noi qua ngot, khong dung nhieu emoji trai tim.\n`
     : '';
 
-  const promptFactsInfo = getPromptFacts(context.facts)
+  const promptFactsInfo = getPromptFacts(context.facts, context.contextLimits?.factLimit)
     .map(formatFactForPrompt)
     .join('\n');
   const naturalMemoryRules = `QUY TAC NHO TU NHIEN:
-- Neu ${context.userName} hoi "nay vua noi gi", "mai may gio", "anh hen may gio", hay uu tien 20 tin nhan gan nhat truoc facts dai han.
+- Neu ${context.userName} hoi "nay vua noi gi", "mai may gio", "anh hen may gio", hay uu tien ${context.contextLimits?.messageLimit || context.recentMessages.length} tin nhan gan nhat truoc facts dai han.
 - Khi nhac lai chuyen cu, noi nhu nguoi that: "anh vua noi mai 6h ghe qua choi a", khong doc key/value va khong noi "theo fact".
 - Event co "mai/hom nay/toi nay" chi la ke hoach tam thoi. Neu thoi gian da qua thi khong noi nhu no van sap dien ra.
 - Neu ${context.userName} hoi "em dang lam gi", "em an gi chua", "em o dau", phai tra loi ve ban than ${context.characterName}; khong hoi nguoc lai cung cau do.
@@ -910,8 +911,9 @@ function getAffectionLabel(affection: number): string {
   return 'Mới gặp 👋';
 }
 
-function buildConversationHistory(messages: Message[]): OpenAI.ChatCompletionMessageParam[] {
-  return messages.slice(-20).map((msg) => ({
+function buildConversationHistory(messages: Message[], messageLimit?: number): OpenAI.ChatCompletionMessageParam[] {
+  const limit = Math.min(Math.max(messageLimit || messages.length, 1), 1000);
+  return messages.slice(-limit).map((msg) => ({
     role: msg.role === 'USER' ? 'user' as const : 'assistant' as const,
     content: msg.content,
   }));
@@ -1149,7 +1151,7 @@ export const aiService = {
       log.debug('Affection: ' + context.affection + ' Level: ' + context.level);
 
       const systemPrompt = buildSystemPrompt(context);
-      const conversationHistory = buildConversationHistory(context.recentMessages);
+      const conversationHistory = buildConversationHistory(context.recentMessages, context.contextLimits?.messageLimit);
 
       // Adjust temperature based on relationship - more romantic = more creative
       const temperature = Math.min(1.0, 0.7 + (context.affection / 1000) * 0.3);
