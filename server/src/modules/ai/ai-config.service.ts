@@ -35,6 +35,12 @@ export type AiContextLimits = {
   summaryLimit: number;
 };
 
+type AiContextLimitCap = {
+  messageLimit: number;
+  factLimit: number;
+  summaryLimit: number;
+};
+
 export const GROQ_FREE_MODELS = [
   'allam-2-7b',
   'canopylabs/orpheus-arabic-saudi',
@@ -72,6 +78,14 @@ const MAX_CONTEXT_LIMITS: AiContextLimits = {
   messageLimit: 1000,
   factLimit: 500,
   summaryLimit: 50,
+};
+
+const PROVIDER_CONTEXT_CAPS: Partial<Record<AiProvider, AiContextLimitCap>> = {
+  codex_router: {
+    messageLimit: 40,
+    factLimit: 60,
+    summaryLimit: 6,
+  },
 };
 
 const DEFAULT_CONFIG: AiRuntimeConfig = {
@@ -289,6 +303,19 @@ export async function getAiContextLimits() {
   return config.contextLimits;
 }
 
+export async function getEffectiveAiContextLimits() {
+  const config = await getAiRuntimeConfig();
+  const provider = config.activeProvider;
+  const cap = PROVIDER_CONTEXT_CAPS[provider];
+  if (!cap) return config.contextLimits;
+
+  return {
+    messageLimit: Math.min(config.contextLimits.messageLimit, cap.messageLimit),
+    factLimit: Math.min(config.contextLimits.factLimit, cap.factLimit),
+    summaryLimit: Math.min(config.contextLimits.summaryLimit, cap.summaryLimit),
+  };
+}
+
 export async function updateAiProviderKey(
   provider: Exclude<AiProvider, 'system'>,
   action: 'replace' | 'clear',
@@ -406,15 +433,35 @@ async function createResponsesCompletion(
     max_output_tokens: payload.max_tokens,
     ...(jsonMode ? { text: { format: { type: 'json_object' } } } : {}),
   };
+  const serializedBody = JSON.stringify(body);
 
-  const response = await fetch(`${runtime.baseUrl}/responses`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${runtime.apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
+  let response: globalThis.Response;
+  try {
+    response = await fetch(`${runtime.baseUrl}/responses`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${runtime.apiKey}`,
+      },
+      body: serializedBody,
+      signal: AbortSignal.timeout(45000),
+    });
+  } catch (error) {
+    const rootCause = (() => {
+      if (error && typeof error === 'object' && 'cause' in error) {
+        const cause = (error as { cause?: unknown }).cause;
+        if (cause instanceof Error) return cause.message;
+        if (cause) return String(cause);
+      }
+      return '';
+    })();
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new AppError(
+      rootCause ? `Upstream request failed: ${errorMessage} | cause: ${rootCause}` : `Upstream request failed: ${errorMessage}`,
+      502,
+      'AI_PROVIDER_UPSTREAM_FAILED',
+    );
+  }
 
   const data = await response.json().catch(() => ({})) as {
     error?: { message?: string };
@@ -460,6 +507,12 @@ export async function createAiChatCompletion(
     jsonMode: Boolean(options.jsonMode),
     messageCount: payload.messages.length,
     maxTokens: payload.max_tokens,
+    systemPromptChars: payload.messages
+      .filter((message) => message.role === 'system')
+      .reduce((sum, message) => sum + (typeof message.content === 'string' ? message.content.length : JSON.stringify(message.content).length), 0),
+    nonSystemChars: payload.messages
+      .filter((message) => message.role !== 'system')
+      .reduce((sum, message) => sum + (typeof message.content === 'string' ? message.content.length : JSON.stringify(message.content).length), 0),
   };
 
   await recordAiDebugEvent({
@@ -512,12 +565,21 @@ export async function createAiChatCompletion(
     return completion;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const rootCause = (() => {
+      if (error && typeof error === 'object' && 'cause' in error) {
+        const cause = (error as { cause?: unknown }).cause;
+        if (cause instanceof Error) return cause.message;
+        if (cause) return String(cause);
+      }
+      return '';
+    })();
     await recordAiDebugEvent({
       metricKey: 'ai.chat.error',
       severity: 'error',
       metadata: {
         ...debugMetadata,
         errorMessage: message,
+        errorCause: rootCause || undefined,
       },
     });
     throw error;

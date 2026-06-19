@@ -4,7 +4,7 @@ import { AppError } from '../../middlewares/error.middleware';
 import { aiService } from '../ai/ai.service';
 import { factsLearningService } from '../ai/facts-learning.service';
 import { conversationSummaryService } from '../ai/conversation-summary.service';
-import { getAiContextLimits } from '../ai/ai-config.service';
+import { getAiContextLimits, getEffectiveAiContextLimits } from '../ai/ai-config.service';
 import { autoMemoryService } from '../memory/auto-memory.service';
 import { characterService } from '../character/character.service';
 import { gameEventService } from '../game/game-event.service';
@@ -311,7 +311,8 @@ export const chatService = {
   async sendMessage(userId: string, data: SendMessageData) {
     // Sanitize user content to prevent prompt injection
     const sanitizedContent = sanitizeUserContent(data.content);
-    const aiContextLimits = await getAiContextLimits();
+    const configuredAiContextLimits = await getAiContextLimits();
+    const aiContextLimits = await getEffectiveAiContextLimits();
 
     // Try to get character from cache first
     const cacheKey = CacheKeys.characterWithFacts(data.characterId);
@@ -395,6 +396,11 @@ export const chatService = {
         log.error('Local food preference facts save error:', err);
       }
     }
+
+    log.debug('AI context limits:', {
+      configured: configuredAiContextLimits,
+      effective: aiContextLimits,
+    });
 
     // Get recent messages for context
     const recentMessages = await prisma.message.findMany({
@@ -602,7 +608,13 @@ export const chatService = {
   ) {
     await assertCanUseExRelationship(userId, 'chat');
     await exComebackService.cancelPendingForCharacter(userId, data.characterId, 'user_replied');
-    const aiContextLimits = await getAiContextLimits();
+    const configuredAiContextLimits = await getAiContextLimits();
+    const aiContextLimits = await getEffectiveAiContextLimits();
+
+    log.debug('AI context limits (ended relationship):', {
+      configured: configuredAiContextLimits,
+      effective: aiContextLimits,
+    });
 
     const userMessage = await prisma.message.create({
       data: {

@@ -464,6 +464,10 @@ export function AiSettingsTab({
             const wireApi = typeof metadata.wireApi === 'string' ? metadata.wireApi : '';
             const responsePreview = typeof metadata.responsePreview === 'string' ? metadata.responsePreview : '';
             const errorMessage = typeof metadata.errorMessage === 'string' ? metadata.errorMessage : '';
+            const errorCause = typeof metadata.errorCause === 'string' ? metadata.errorCause : '';
+            const systemPromptChars = typeof metadata.systemPromptChars === 'number' ? metadata.systemPromptChars : null;
+            const nonSystemChars = typeof metadata.nonSystemChars === 'number' ? metadata.nonSystemChars : null;
+            const messageCount = typeof metadata.messageCount === 'number' ? metadata.messageCount : null;
 
             return (
               <div key={item.id} className="rounded-lg border border-gray-700 bg-gray-900/50 p-4">
@@ -486,6 +490,9 @@ export function AiSettingsTab({
                   <p><span className="text-gray-500">Model:</span> {modelName}</p>
                   <p><span className="text-gray-500">Wire API:</span> {wireApi || '-'}</p>
                   <p><span className="text-gray-500">Source:</span> {item.source}</p>
+                  {messageCount !== null && <p><span className="text-gray-500">Messages:</span> {messageCount}</p>}
+                  {systemPromptChars !== null && <p><span className="text-gray-500">System chars:</span> {systemPromptChars}</p>}
+                  {nonSystemChars !== null && <p><span className="text-gray-500">User/history chars:</span> {nonSystemChars}</p>}
                 </div>
 
                 {baseUrl && (
@@ -497,6 +504,9 @@ export function AiSettingsTab({
                 {errorMessage && (
                   <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-100">
                     {errorMessage}
+                    {errorCause && (
+                      <div className="mt-2 text-xs text-red-100/80">{errorCause}</div>
+                    )}
                   </div>
                 )}
 
