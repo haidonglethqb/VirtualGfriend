@@ -475,8 +475,9 @@ async function createResponsesCompletion(
       (message.toLowerCase().includes('text.format') ||
         message.toLowerCase().includes('json_object') ||
         message.toLowerCase().includes('unsupported'));
+    const upstream5xxWithJsonMode = jsonMode && response.status >= 500;
 
-    if (unsupportedJsonMode) {
+    if (unsupportedJsonMode || upstream5xxWithJsonMode) {
       return createResponsesCompletion(runtime, payload, false);
     }
 
