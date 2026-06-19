@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { prisma } from '../../lib/prisma';
 import { cache, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
+import { clearAiDebugEvents, listAiDebugEvents, recordAiDebugEvent } from './ai-debug.service';
 
 export type AiProvider = 'system' | 'groq' | 'codex_router' | 'openai';
 export type AiWireApi = 'chat_completions' | 'responses';
@@ -224,7 +225,7 @@ export async function getAdminAiSettings() {
       keyUpdatedAt: config.keys.groq?.updatedAt,
     },
     codex_router: {
-      label: 'Codex Router',
+      label: 'Codex Router (luongchidung.online)',
       baseUrl: CODEX_ROUTER_BASE_URL,
       wireApi: 'responses' as AiWireApi,
       models: CODEX_ROUTER_MODELS,
@@ -233,7 +234,7 @@ export async function getAdminAiSettings() {
       keyUpdatedAt: config.keys.codex_router?.updatedAt,
     },
     openai: {
-      label: 'OpenAI',
+      label: 'OpenAI (official/default)',
       baseUrl: 'OpenAI default',
       wireApi: 'chat_completions' as AiWireApi,
       models: [config.selectedModels.openai || DEFAULT_MODEL],
@@ -450,26 +451,76 @@ export async function createAiChatCompletion(
 ) {
   const runtime = await resolveAiRuntime(options.runtimeOverride);
   const requestPayload = { ...payload, model: runtime.model };
+  const debugMetadata = {
+    provider: runtime.provider,
+    model: runtime.model,
+    baseUrl: runtime.baseUrl || 'default',
+    wireApi: runtime.wireApi,
+    source: runtime.source,
+    jsonMode: Boolean(options.jsonMode),
+    messageCount: payload.messages.length,
+    maxTokens: payload.max_tokens,
+  };
 
-  if (runtime.wireApi === 'responses') {
-    return createResponsesCompletion(runtime, requestPayload, options.jsonMode);
-  }
-
-  const client = new OpenAI({ apiKey: runtime.apiKey, baseURL: runtime.baseUrl });
-  if (!options.jsonMode) {
-    return client.chat.completions.create(requestPayload);
-  }
+  await recordAiDebugEvent({
+    metricKey: 'ai.chat.request',
+    severity: 'info',
+    metadata: debugMetadata,
+  });
 
   try {
-    return await client.chat.completions.create({
-      ...requestPayload,
-      response_format: { type: 'json_object' },
+    if (runtime.wireApi === 'responses') {
+      const completion = await createResponsesCompletion(runtime, requestPayload, options.jsonMode);
+      await recordAiDebugEvent({
+        metricKey: 'ai.chat.success',
+        severity: 'info',
+        metadata: {
+          ...debugMetadata,
+          responsePreview: String(completion.choices[0]?.message?.content || '').slice(0, 300),
+        },
+      });
+      return completion;
+    }
+
+    const client = new OpenAI({ apiKey: runtime.apiKey, baseURL: runtime.baseUrl });
+    let completion: Awaited<ReturnType<typeof client.chat.completions.create>>;
+    if (!options.jsonMode) {
+      completion = await client.chat.completions.create(requestPayload);
+    } else {
+      try {
+        completion = await client.chat.completions.create({
+          ...requestPayload,
+          response_format: { type: 'json_object' },
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+        const unsupported = message.includes('response_format') || message.includes('json_object') || message.includes('json schema');
+        if (!unsupported) throw error;
+        completion = await client.chat.completions.create(requestPayload);
+      }
+    }
+
+    await recordAiDebugEvent({
+      metricKey: 'ai.chat.success',
+      severity: 'info',
+      metadata: {
+        ...debugMetadata,
+        responsePreview: String(completion.choices[0]?.message?.content || '').slice(0, 300),
+      },
     });
+
+    return completion;
   } catch (error) {
-    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-    const unsupported = message.includes('response_format') || message.includes('json_object') || message.includes('json schema');
-    if (!unsupported) throw error;
-    return client.chat.completions.create(requestPayload);
+    const message = error instanceof Error ? error.message : String(error);
+    await recordAiDebugEvent({
+      metricKey: 'ai.chat.error',
+      severity: 'error',
+      metadata: {
+        ...debugMetadata,
+        errorMessage: message,
+      },
+    });
+    throw error;
   }
 }
 
@@ -478,25 +529,54 @@ export async function testAiProvider(input: {
   model?: string;
   apiKey?: string;
 }) {
-  const completion = await createAiChatCompletion(
-    {
-      model: input.model || DEFAULT_MODEL,
-      messages: [
-        { role: 'system', content: 'Reply with exactly: ok' },
-        { role: 'user', content: 'test' },
-      ],
-      temperature: 0,
-      max_tokens: 16,
-    },
-    { runtimeOverride: input },
-  );
+  try {
+    const completion = await createAiChatCompletion(
+      {
+        model: input.model || DEFAULT_MODEL,
+        messages: [
+          { role: 'system', content: 'Reply with exactly: ok' },
+          { role: 'user', content: 'test' },
+        ],
+        temperature: 0,
+        max_tokens: 16,
+      },
+      { runtimeOverride: input },
+    );
 
-  const runtime = await resolveAiRuntime(input);
-  return {
-    provider: runtime.provider,
-    model: runtime.model,
-    baseUrl: runtime.baseUrl || 'default',
-    wireApi: runtime.wireApi,
-    response: completion.choices[0]?.message?.content || '',
-  };
+    const runtime = await resolveAiRuntime(input);
+    const result = {
+      provider: runtime.provider,
+      model: runtime.model,
+      baseUrl: runtime.baseUrl || 'default',
+      wireApi: runtime.wireApi,
+      response: completion.choices[0]?.message?.content || '',
+    };
+
+    await recordAiDebugEvent({
+      metricKey: 'ai.test.success',
+      severity: 'info',
+      metadata: result,
+    });
+
+    return result;
+  } catch (error) {
+    await recordAiDebugEvent({
+      metricKey: 'ai.test.error',
+      severity: 'error',
+      metadata: {
+        provider: input.provider,
+        model: input.model || DEFAULT_MODEL,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+    });
+    throw error;
+  }
+}
+
+export async function getAiDebugLog(limit?: number) {
+  return listAiDebugEvents(limit);
+}
+
+export async function clearAiDebugLog() {
+  return clearAiDebugEvents();
 }

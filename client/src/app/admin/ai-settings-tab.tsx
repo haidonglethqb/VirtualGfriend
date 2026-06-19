@@ -29,6 +29,17 @@ interface ContextLimits {
   summaryLimit: number;
 }
 
+interface AiDebugLogItem {
+  id: string;
+  createdAt: string;
+  metricKey: string;
+  severity: string;
+  source: string;
+  requestId?: string | null;
+  userId?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
 const PROVIDERS: Provider[] = ['system', 'groq', 'codex_router', 'openai'];
 const KEY_PROVIDERS: Array<Exclude<Provider, 'system'>> = ['groq', 'codex_router', 'openai'];
 
@@ -52,6 +63,9 @@ export function AiSettingsTab({
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [debugLogs, setDebugLogs] = useState<AiDebugLogItem[]>([]);
+  const [debugLoading, setDebugLoading] = useState(false);
+  const [debugClearing, setDebugClearing] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -71,9 +85,24 @@ export function AiSettingsTab({
     }
   }, [apiCall, showToast]);
 
+  const fetchDebugLogs = useCallback(async () => {
+    setDebugLoading(true);
+    try {
+      const res = await apiCall('/ai-settings/debug?limit=50');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || json.error || 'Unable to load AI debug logs');
+      setDebugLogs(Array.isArray(json.data) ? json.data as AiDebugLogItem[] : []);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to load AI debug logs', 'error');
+    } finally {
+      setDebugLoading(false);
+    }
+  }, [apiCall, showToast]);
+
   useEffect(() => {
     void fetchSettings();
-  }, [fetchSettings]);
+    void fetchDebugLogs();
+  }, [fetchDebugLogs, fetchSettings]);
 
   const providerInfo = settings?.providers[provider];
   const modelOptions = useMemo(() => providerInfo?.models || [], [providerInfo]);
@@ -81,6 +110,11 @@ export function AiSettingsTab({
     if (provider === 'system') return modelOptions[0] || 'system';
     return models[provider] || modelOptions[0] || '';
   }, [modelOptions, models, provider]);
+  const codexRouterHint = useMemo(() => {
+    const info = settings?.providers.codex_router;
+    if (!info) return null;
+    return `${info.label}: ${info.baseUrl} (${info.wireApi})`;
+  }, [settings]);
 
   async function saveProvider() {
     setSaving(true);
@@ -156,12 +190,31 @@ export function AiSettingsTab({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || json.error || 'Test failed');
-      setTestResult(`${json.data.provider} - ${json.data.model}: ${json.data.response || 'ok'}`);
+      setTestResult(`${json.data.provider} - ${json.data.model} - ${json.data.wireApi}: ${json.data.response || 'ok'}`);
+      void fetchDebugLogs();
       showToast('AI test succeeded', 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'AI test failed', 'error');
+      void fetchDebugLogs();
     } finally {
       setTesting(false);
+    }
+  }
+
+  async function clearDebugLogs() {
+    setDebugClearing(true);
+    try {
+      const res = await apiCall('/ai-settings/debug', {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || json.error || 'Unable to clear AI debug logs');
+      setDebugLogs([]);
+      showToast(`Cleared ${json.data?.deletedCount || 0} AI debug logs`, 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to clear AI debug logs', 'error');
+    } finally {
+      setDebugClearing(false);
     }
   }
 
@@ -222,6 +275,16 @@ export function AiSettingsTab({
             <span className="text-gray-500">Wire API</span>
             <p className="text-gray-200 mt-1">{providerInfo?.wireApi}</p>
           </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+          <p className="font-medium">Compatibility note</p>
+          <p className="mt-1 text-amber-100/80">
+            If your key follows the `luongchidung.online/v1` guide with `wire_api = responses`, use the `codex_router` provider, not `openai`.
+          </p>
+          {codexRouterHint && (
+            <p className="mt-2 text-xs text-amber-100/70">{codexRouterHint}</p>
+          )}
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -349,6 +412,99 @@ export function AiSettingsTab({
                     Save key
                   </button>
                 </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3">
+            <Brain className="w-6 h-6 text-emerald-400" />
+            <div>
+              <h3 className="text-lg font-semibold text-white">AI Debug Log</h3>
+              <p className="text-sm text-gray-400">Recent provider/runtime/test activity from staging for fast diagnosis.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void fetchDebugLogs()}
+              disabled={debugLoading}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-60 rounded-lg text-white"
+            >
+              <RefreshCw className={`w-4 h-4 ${debugLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={clearDebugLogs}
+              disabled={debugClearing || debugLogs.length === 0}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 rounded-lg text-red-200"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {debugLogs.length === 0 && (
+            <div className="rounded-lg border border-dashed border-gray-700 bg-gray-900/40 p-4 text-sm text-gray-400">
+              No AI debug logs yet. Run a test connection or send a chat message on staging, then refresh here.
+            </div>
+          )}
+
+          {debugLogs.map((item) => {
+            const metadata = item.metadata || {};
+            const providerName = typeof metadata.provider === 'string' ? metadata.provider : '-';
+            const modelName = typeof metadata.model === 'string' ? metadata.model : '-';
+            const baseUrl = typeof metadata.baseUrl === 'string' ? metadata.baseUrl : '';
+            const wireApi = typeof metadata.wireApi === 'string' ? metadata.wireApi : '';
+            const responsePreview = typeof metadata.responsePreview === 'string' ? metadata.responsePreview : '';
+            const errorMessage = typeof metadata.errorMessage === 'string' ? metadata.errorMessage : '';
+
+            return (
+              <div key={item.id} className="rounded-lg border border-gray-700 bg-gray-900/50 p-4">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+                  <span className="rounded-full bg-gray-800 px-2.5 py-1 text-xs font-medium text-gray-200">{item.metricKey}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                    item.severity === 'error' || item.severity === 'critical'
+                      ? 'bg-red-500/15 text-red-200'
+                      : item.severity === 'warn'
+                        ? 'bg-amber-500/15 text-amber-200'
+                        : 'bg-emerald-500/15 text-emerald-200'
+                  }`}>
+                    {item.severity}
+                  </span>
+                  <span className="text-gray-400">{new Date(item.createdAt).toLocaleString()}</span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-300 lg:grid-cols-2">
+                  <p><span className="text-gray-500">Provider:</span> {providerName}</p>
+                  <p><span className="text-gray-500">Model:</span> {modelName}</p>
+                  <p><span className="text-gray-500">Wire API:</span> {wireApi || '-'}</p>
+                  <p><span className="text-gray-500">Source:</span> {item.source}</p>
+                </div>
+
+                {baseUrl && (
+                  <p className="mt-2 break-all text-sm text-gray-300">
+                    <span className="text-gray-500">Base URL:</span> {baseUrl}
+                  </p>
+                )}
+
+                {errorMessage && (
+                  <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-100">
+                    {errorMessage}
+                  </div>
+                )}
+
+                {responsePreview && !errorMessage && (
+                  <div className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+                    {responsePreview}
+                  </div>
+                )}
               </div>
             );
           })}

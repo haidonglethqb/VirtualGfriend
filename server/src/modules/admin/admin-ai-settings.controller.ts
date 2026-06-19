@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { AdminRequest } from './admin.middleware';
 import {
   AiProvider,
+  clearAiDebugLog,
+  getAiDebugLog,
   getAdminAiSettings,
   testAiProvider,
   updateActiveAiProvider,
@@ -39,6 +41,24 @@ const contextLimitsSchema = z.object({
 export async function getAiSettings(_req: AdminRequest, res: Response, next: NextFunction) {
   try {
     res.json({ success: true, data: await getAdminAiSettings() });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getAiDebugSettings(req: AdminRequest, res: Response, next: NextFunction) {
+  try {
+    const rawLimit = Number(req.query.limit);
+    const limit = Number.isFinite(rawLimit) ? rawLimit : undefined;
+    res.json({ success: true, data: await getAiDebugLog(limit) });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function clearAiDebugSettings(_req: AdminRequest, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await clearAiDebugLog(), message: 'AI debug log cleared' });
   } catch (error) {
     next(error);
   }
