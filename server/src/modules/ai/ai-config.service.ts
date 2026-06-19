@@ -82,9 +82,9 @@ const MAX_CONTEXT_LIMITS: AiContextLimits = {
 
 const PROVIDER_CONTEXT_CAPS: Partial<Record<AiProvider, AiContextLimitCap>> = {
   codex_router: {
-    messageLimit: 40,
-    factLimit: 60,
-    summaryLimit: 6,
+    messageLimit: 20,
+    factLimit: 20,
+    summaryLimit: 3,
   },
 };
 
