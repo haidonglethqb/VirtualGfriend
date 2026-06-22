@@ -590,4 +590,17 @@ MIT License — see [LICENSE](LICENSE) file.
 
 ---
 
-Made by VGfriend Team
+## Thành viên thực hiện & Tỷ lệ đóng góp
+
+| MSSV | Họ và tên | Tỷ lệ đóng góp |
+| :--- | :--- | :---: |
+| 22520378 | Chu Đức Hải | 65% |
+| 22520485 | Đỗ Huy Hoàng | 35% |
+| 24521071 | Nguyễn Quang Minh | 0% |
+
+*Tổng tỷ lệ đóng góp: 65% + 35% + 0% = 100%*
+
+---
+
+Chúng em đã biết làm web và hiểu hệ thống web hoạt động như thế nào.
+
