@@ -103,11 +103,7 @@ export async function chatCompletionsHandler(req: Request, res: Response, next: 
       throw new AppError('messages is required and must be a non-empty array', 400, 'INVALID_REQUEST');
     }
 
-    // Streaming is not supported (underlying service doesn't stream)
-    if (body.stream === true) {
-      throw new AppError('Streaming is not supported by this proxy', 400, 'STREAMING_NOT_SUPPORTED');
-    }
-
+    const isStream = body.stream === true;
     const jsonMode = body.response_format?.type === 'json_object';
 
     // Read the target provider from the verified key (if any)
@@ -123,7 +119,7 @@ export async function chatCompletionsHandler(req: Request, res: Response, next: 
     if (requestedModel) {
       log.info(`Proxy request for model "${requestedModel}", serving with "${runtime.model}" via ${runtime.provider}${
         targetProvider ? ` (key-specific target: ${targetProvider})` : ' (global active)'
-      }`);
+      } [stream=${isStream}]`);
     }
 
     const payload = {
@@ -135,8 +131,50 @@ export async function chatCompletionsHandler(req: Request, res: Response, next: 
     };
 
     const completion = await createAiChatCompletion(payload, { jsonMode });
+    const content = completion.choices[0]?.message?.content ?? '';
 
-    // Return OpenAI-compatible response
+    if (isStream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const chunkId = `chatcmpl-proxy-${Date.now()}`;
+
+      const chunk1 = {
+        id: chunkId,
+        object: 'chat.completion.chunk',
+        created: Math.floor(Date.now() / 1000),
+        model: runtime.model,
+        choices: [
+          {
+            index: 0,
+            delta: { content },
+            finish_reason: null,
+          },
+        ],
+      };
+      res.write(`data: ${JSON.stringify(chunk1)}\n\n`);
+
+      const chunk2 = {
+        id: chunkId,
+        object: 'chat.completion.chunk',
+        created: Math.floor(Date.now() / 1000),
+        model: runtime.model,
+        choices: [
+          {
+            index: 0,
+            delta: {},
+            finish_reason: 'stop',
+          },
+        ],
+      };
+      res.write(`data: ${JSON.stringify(chunk2)}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
+    // Return OpenAI-compatible response (non-stream)
     res.json({
       id: `chatcmpl-proxy-${Date.now()}`,
       object: 'chat.completion',
