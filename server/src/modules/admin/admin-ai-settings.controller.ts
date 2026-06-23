@@ -137,7 +137,7 @@ const customProviderSchema = z.object({
   baseUrl: z.string().min(1).max(300).refine((val) => val.startsWith('http://') || val.startsWith('https://'), {
     message: 'Base URL must start with http:// or https://',
   }),
-  modelId: z.string().min(1).max(100),
+  models: z.array(z.string().min(1).max(100)).min(1, 'At least one model is required'),
   apiKey: z.string().min(1).max(500),
 }).strict();
 
@@ -146,7 +146,7 @@ const updateCustomProviderSchema = z.object({
   baseUrl: z.string().min(1).max(300).refine((val) => val.startsWith('http://') || val.startsWith('https://'), {
     message: 'Base URL must start with http:// or https://',
   }),
-  modelId: z.string().min(1).max(100),
+  models: z.array(z.string().min(1).max(100)).min(1, 'At least one model is required'),
   apiKey: z.string().min(1).max(500).optional(),
 }).strict();
 

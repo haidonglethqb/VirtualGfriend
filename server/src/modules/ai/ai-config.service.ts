@@ -12,7 +12,7 @@ export type CustomProvider = {
   id: string;
   label: string;
   baseUrl: string;
-  modelId: string;
+  models: string[];
 };
 
 type ApiKeyState = {
@@ -145,7 +145,15 @@ function mergeConfig(value: unknown): AiRuntimeConfig {
     },
     keys: raw.keys || {},
     contextLimits: normalizeContextLimits(raw.contextLimits),
-    customProviders: Array.isArray(raw.customProviders) ? raw.customProviders : [],
+    customProviders: Array.isArray(raw.customProviders)
+      ? raw.customProviders.map((cp: any) => ({
+          id: cp.id,
+          label: cp.label,
+          baseUrl: cp.baseUrl,
+          // Migrate old modelId format to new models array format
+          models: Array.isArray(cp.models) ? cp.models : (cp.modelId ? [cp.modelId] : []),
+        }))
+      : [],
   };
 }
 
@@ -275,7 +283,7 @@ export async function getAdminAiSettings() {
         label: custom.label,
         baseUrl: custom.baseUrl,
         wireApi: 'chat_completions' as AiWireApi,
-        models: [custom.modelId],
+        models: custom.models,
         apiKeyConfigured: Boolean(config.keys[custom.id]?.encrypted),
         maskedKey: maskKey(undefined, config.keys[custom.id]?.encrypted),
         keyUpdatedAt: config.keys[custom.id]?.updatedAt,
@@ -302,7 +310,7 @@ export async function updateActiveAiProvider(provider: string, model?: string) {
   let selectedModel = model;
   if (provider.startsWith('custom_') && !selectedModel) {
     const custom = config.customProviders?.find((c) => c.id === provider);
-    selectedModel = custom?.modelId;
+    selectedModel = custom?.models[0];
   }
 
   validateModel(provider, selectedModel);
@@ -431,7 +439,7 @@ export async function resolveAiRuntime(override?: {
     if (!custom) {
       throw new AppError(`Custom provider ${provider} not found`, 404, 'CUSTOM_PROVIDER_NOT_FOUND');
     }
-    const model = override?.model || config.selectedModels[provider] || custom.modelId;
+    const model = override?.model || config.selectedModels[provider] || custom.models[0];
     validateModel(provider, model);
 
     const encrypted = config.keys[provider]?.encrypted;
@@ -720,18 +728,23 @@ export async function clearAiDebugLog() {
 export async function addCustomProvider(input: {
   label: string;
   baseUrl: string;
-  modelId: string;
+  models: string[];
   apiKey: string;
 }) {
   const config = await getAiRuntimeConfig();
   const id = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+  const trimmedModels = input.models.map((m) => m.trim()).filter(Boolean);
+  if (trimmedModels.length === 0) {
+    throw new AppError('At least one model is required', 400, 'AI_MODEL_REQUIRED');
+  }
 
   const customProviders = config.customProviders ? [...config.customProviders] : [];
   customProviders.push({
     id,
     label: input.label.trim(),
     baseUrl: input.baseUrl.trim(),
-    modelId: input.modelId.trim(),
+    models: trimmedModels,
   });
 
   const keys = { ...config.keys };
@@ -743,7 +756,7 @@ export async function addCustomProvider(input: {
   }
 
   const selectedModels = { ...config.selectedModels };
-  selectedModels[id] = input.modelId.trim();
+  selectedModels[id] = trimmedModels[0];
 
   await saveConfig({
     ...config,
@@ -760,7 +773,7 @@ export async function updateCustomProvider(
   input: {
     label: string;
     baseUrl: string;
-    modelId: string;
+    models: string[];
     apiKey?: string;
   }
 ) {
@@ -774,12 +787,17 @@ export async function updateCustomProvider(
     throw new AppError('Custom provider not found', 404, 'CUSTOM_PROVIDER_NOT_FOUND');
   }
 
+  const trimmedModels = input.models.map((m) => m.trim()).filter(Boolean);
+  if (trimmedModels.length === 0) {
+    throw new AppError('At least one model is required', 400, 'AI_MODEL_REQUIRED');
+  }
+
   const customProviders = [...config.customProviders];
   customProviders[index] = {
     id,
     label: input.label.trim(),
     baseUrl: input.baseUrl.trim(),
-    modelId: input.modelId.trim(),
+    models: trimmedModels,
   };
 
   const keys = { ...config.keys };
@@ -791,7 +809,11 @@ export async function updateCustomProvider(
   }
 
   const selectedModels = { ...config.selectedModels };
-  selectedModels[id] = input.modelId.trim();
+  // Keep current selection if it's still in the list, otherwise pick first
+  const currentSelection = selectedModels[id];
+  if (!currentSelection || !trimmedModels.includes(currentSelection)) {
+    selectedModels[id] = trimmedModels[0];
+  }
 
   await saveConfig({
     ...config,

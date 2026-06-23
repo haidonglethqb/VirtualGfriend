@@ -75,6 +75,7 @@ export function AiSettingsTab({
   const [formLabel, setFormLabel] = useState('');
   const [formBaseUrl, setFormBaseUrl] = useState('');
   const [formModelId, setFormModelId] = useState('');
+  const [formModels, setFormModels] = useState<string[]>([]);
   const [formApiKey, setFormApiKey] = useState('');
 
   const customProviders = useMemo(() => {
@@ -89,6 +90,7 @@ export function AiSettingsTab({
     setFormLabel('');
     setFormBaseUrl('');
     setFormModelId('');
+    setFormModels([]);
     setFormApiKey('');
     setShowForm(false);
   }
@@ -97,7 +99,8 @@ export function AiSettingsTab({
     setEditingId(custom.id);
     setFormLabel(custom.label);
     setFormBaseUrl(custom.baseUrl);
-    setFormModelId(custom.models[0] || '');
+    setFormModels(custom.models || []);
+    setFormModelId('');
     setFormApiKey('');
     setShowForm(true);
   }
@@ -238,8 +241,8 @@ export function AiSettingsTab({
 
   async function handleSaveCustomProvider(event: React.FormEvent) {
     event.preventDefault();
-    if (!formLabel.trim() || !formBaseUrl.trim() || !formModelId.trim()) {
-      showToast('All fields are required', 'error');
+    if (!formLabel.trim() || !formBaseUrl.trim() || formModels.length === 0) {
+      showToast('Label, Base URL and at least one model are required', 'error');
       return;
     }
     if (!editingId && !formApiKey.trim()) {
@@ -258,7 +261,7 @@ export function AiSettingsTab({
         body: JSON.stringify({
           label: formLabel,
           baseUrl: formBaseUrl,
-          modelId: formModelId,
+          models: formModels,
           ...(formApiKey.trim() ? { apiKey: formApiKey } : {}),
         }),
       });
@@ -553,16 +556,52 @@ export function AiSettingsTab({
                 />
               </label>
 
-              <label className="space-y-1 block">
-                <span className="text-xs text-gray-400">Model ID</span>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. llama3"
-                  value={formModelId}
-                  onChange={(e) => setFormModelId(e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg bg-gray-950 border border-gray-700 text-white text-sm"
-                />
+              <label className="space-y-1 block md:col-span-2">
+                <span className="text-xs text-gray-400">Models (press Enter or comma to add)</span>
+                <div className="flex flex-wrap gap-1.5 p-2 rounded-lg bg-gray-950 border border-gray-700 min-h-[42px]">
+                  {formModels.map((m, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 rounded-md bg-purple-500/20 border border-purple-500/30 px-2 py-0.5 text-xs text-purple-200">
+                      {m}
+                      <button
+                        type="button"
+                        onClick={() => setFormModels((prev) => prev.filter((_, idx) => idx !== i))}
+                        className="hover:text-red-300 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    placeholder={formModels.length === 0 ? 'e.g. llama3, gpt-4o' : 'Add more...'}
+                    value={formModelId}
+                    onChange={(e) => setFormModelId(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ',') && formModelId.trim()) {
+                        e.preventDefault();
+                        const newModel = formModelId.trim().replace(/,$/,'');
+                        if (newModel && !formModels.includes(newModel)) {
+                          setFormModels((prev) => [...prev, newModel]);
+                        }
+                        setFormModelId('');
+                      }
+                      if (e.key === 'Backspace' && !formModelId && formModels.length > 0) {
+                        setFormModels((prev) => prev.slice(0, -1));
+                      }
+                    }}
+                    onBlur={() => {
+                      if (formModelId.trim()) {
+                        const newModel = formModelId.trim();
+                        if (!formModels.includes(newModel)) {
+                          setFormModels((prev) => [...prev, newModel]);
+                        }
+                        setFormModelId('');
+                      }
+                    }}
+                    className="flex-1 min-w-[120px] bg-transparent text-white text-sm outline-none placeholder-gray-600"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Add models you want available for this provider</p>
               </label>
 
               <label className="space-y-1 block">
@@ -616,7 +655,7 @@ export function AiSettingsTab({
                     )}
                   </div>
                   <p className="text-xs text-gray-500">
-                    <span className="text-gray-400">Base URL:</span> {custom.baseUrl} | <span className="text-gray-400">Model:</span> {custom.models[0]}
+                    <span className="text-gray-400">Base URL:</span> {custom.baseUrl} | <span className="text-gray-400">Models:</span> {custom.models.join(', ')}
                   </p>
                   <p className="text-xs text-gray-500">
                     {custom.apiKeyConfigured ? `Key: ${custom.maskedKey}` : 'No key configured'}
