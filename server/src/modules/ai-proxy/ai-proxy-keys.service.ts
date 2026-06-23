@@ -14,6 +14,7 @@ export type ProxyApiKey = {
   createdAt: string;
   lastUsedAt?: string;
   isActive: boolean;
+  targetProvider?: string; // If set, this key always routes to this provider; otherwise uses global active
 };
 
 type ProxyKeysConfig = {
@@ -74,13 +75,22 @@ export async function listProxyApiKeys(): Promise<Omit<ProxyApiKey, 'keyHash'>[]
   return config.keys.map(({ keyHash: _hash, ...rest }) => rest);
 }
 
-/** Update label of a proxy key. */
-export async function updateProxyApiKey(id: string, label: string): Promise<Omit<ProxyApiKey, 'keyHash'>[]> {
+/** Update a proxy key properties (label, targetProvider). */
+export async function updateProxyApiKey(
+  id: string,
+  updates: { label?: string; targetProvider?: string | null },
+): Promise<Omit<ProxyApiKey, 'keyHash'>[]> {
   const config = await loadConfig();
   const index = config.keys.findIndex((k) => k.id === id);
   if (index === -1) throw new Error('Proxy API key not found');
 
-  config.keys[index] = { ...config.keys[index], label: label.trim() };
+  if (updates.label !== undefined) {
+    config.keys[index].label = updates.label.trim();
+  }
+  if (updates.targetProvider !== undefined) {
+    config.keys[index].targetProvider = updates.targetProvider || undefined;
+  }
+
   await saveConfig(config);
   return listProxyApiKeys();
 }
@@ -106,13 +116,14 @@ export async function deleteProxyApiKey(id: string): Promise<Omit<ProxyApiKey, '
 
 /**
  * Verify an incoming raw key against stored hashes.
- * Also updates lastUsedAt (fire-and-forget, no await needed).
+ * Returns the key info (without hash) if valid and active, or null if not.
+ * Also updates lastUsedAt asynchronously (fire-and-forget).
  */
-export async function verifyProxyApiKey(rawKey: string): Promise<boolean> {
+export async function verifyProxyApiKey(rawKey: string): Promise<Omit<ProxyApiKey, 'keyHash'> | null> {
   const config = await loadConfig();
   const hash = crypto.createHash('sha256').update(rawKey).digest('hex');
   const found = config.keys.find((k) => k.isActive && k.keyHash === hash);
-  if (!found) return false;
+  if (!found) return null;
 
   // Update lastUsedAt asynchronously (don't block the request)
   const updated = config.keys.map((k) =>
@@ -122,5 +133,8 @@ export async function verifyProxyApiKey(rawKey: string): Promise<boolean> {
     // Silently fail — lastUsedAt is non-critical
   });
 
-  return true;
+  const { keyHash: _hash, ...rest } = found;
+  return rest;
 }
+
+

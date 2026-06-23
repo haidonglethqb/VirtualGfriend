@@ -49,6 +49,7 @@ interface ProxyKey {
   createdAt: string;
   lastUsedAt?: string;
   isActive: boolean;
+  targetProvider?: string;
 }
 
 // Using dynamic providers from backend settings instead of static list
@@ -866,6 +867,35 @@ export function AiSettingsTab({
                       {' '}&mdash; Created {new Date(pk.createdAt).toLocaleDateString()}
                       {pk.lastUsedAt ? ` — Last used ${new Date(pk.lastUsedAt).toLocaleString()}` : ' — Never used'}
                     </p>
+                    <div className="mt-2 flex items-center gap-2 text-xs">
+                      <span className="text-gray-400">Route to:</span>
+                      <select
+                        value={pk.targetProvider || ''}
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          try {
+                            const res = await apiCall(`/ai-proxy-keys/${pk.id}`, {
+                              method: 'PATCH',
+                              body: JSON.stringify({ targetProvider: val || null }),
+                            });
+                            const json = await res.json();
+                            if (!res.ok) throw new Error(json.error?.message || 'Failed to update routing');
+                            setProxyKeys(json.data as ProxyKey[]);
+                            showToast('Routing updated successfully', 'success');
+                          } catch (error) {
+                            showToast(error instanceof Error ? error.message : 'Update failed', 'error');
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded bg-gray-950 border border-gray-700 text-white text-xs focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="">Default (Global active provider)</option>
+                        {settings && Object.keys(settings.providers).map((prov) => (
+                          <option key={prov} value={prov}>
+                            {settings.providers[prov].label || prov}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2">

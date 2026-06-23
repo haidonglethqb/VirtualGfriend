@@ -15,7 +15,8 @@ const generateSchema = z.object({
 }).strict();
 
 const updateSchema = z.object({
-  label: z.string().min(1).max(100),
+  label: z.string().min(1).max(100).optional(),
+  targetProvider: z.string().nullable().optional(),
 }).strict();
 
 const toggleSchema = z.object({
@@ -56,7 +57,7 @@ export async function generateProxyKeyHandler(req: AdminRequest, res: Response, 
   }
 }
 
-/** PATCH /admin/ai-proxy-keys/:id — update label */
+/** PATCH /admin/ai-proxy-keys/:id — update key properties */
 export async function updateProxyKeyHandler(req: AdminRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
@@ -65,7 +66,10 @@ export async function updateProxyKeyHandler(req: AdminRequest, res: Response, ne
       throw new AppError(parsed.error.issues[0]?.message || 'Invalid payload', 400, 'VALIDATION_ERROR');
     }
 
-    const keys = await updateProxyApiKey(id, parsed.data.label);
+    const keys = await updateProxyApiKey(id, {
+      label: parsed.data.label,
+      targetProvider: parsed.data.targetProvider,
+    });
     res.json({ success: true, data: keys, message: 'API key updated' });
   } catch (error) {
     next(error);

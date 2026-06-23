@@ -28,15 +28,17 @@ export async function aiProxyAuthMiddleware(req: Request, res: Response, next: N
 
   const token = authHeader.slice(7).trim();
 
-  // Check DB-stored keys first
-  const valid = await verifyProxyApiKey(token).catch(() => false);
-  if (valid) {
+  // Check DB-stored keys first — also stores key info for downstream handlers
+  const keyInfo = await verifyProxyApiKey(token).catch(() => null);
+  if (keyInfo) {
+    res.locals.proxyKey = keyInfo; // { id, label, targetProvider?, ... }
     return next();
   }
 
   // Fallback: single env var (backward compat / initial setup)
   const envKey = process.env.AI_PROXY_API_KEY;
   if (envKey && token === envKey) {
+    res.locals.proxyKey = null; // env key has no per-key config
     return next();
   }
 
@@ -108,16 +110,20 @@ export async function chatCompletionsHandler(req: Request, res: Response, next: 
 
     const jsonMode = body.response_format?.type === 'json_object';
 
-    // Resolve the runtime to find out which model will actually be used
-    // (we let the server pick its own provider/model from config)
-    const runtime = await resolveAiRuntime();
+    // Read the target provider from the verified key (if any)
+    // If the key has a targetProvider set, route to that provider.
+    // Otherwise fall back to the global active provider.
+    const proxyKey = res.locals.proxyKey as { targetProvider?: string } | null;
+    const targetProvider = proxyKey?.targetProvider || undefined;
 
-    // Build the payload — use the runtime model (server's configured model),
-    // not whatever model the caller requested. This is intentional: the server
-    // decides which model to use based on its own admin settings.
+    // Resolve runtime — pass targetProvider as override if set
+    const runtime = await resolveAiRuntime(targetProvider ? { provider: targetProvider } : undefined);
+
     const requestedModel = body.model;
     if (requestedModel) {
-      log.info(`Proxy request for model "${requestedModel}", serving with "${runtime.model}" via ${runtime.provider}`);
+      log.info(`Proxy request for model "${requestedModel}", serving with "${runtime.model}" via ${runtime.provider}${
+        targetProvider ? ` (key-specific target: ${targetProvider})` : ' (global active)'
+      }`);
     }
 
     const payload = {
