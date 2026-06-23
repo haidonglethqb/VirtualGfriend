@@ -3,6 +3,7 @@ import {
   aiProxyAuthMiddleware,
   chatCompletionsHandler,
   listModelsHandler,
+  responsesHandler,
 } from './ai-proxy.controller';
 
 export const aiProxyRouter = Router();
@@ -15,3 +16,6 @@ aiProxyRouter.get('/models', listModelsHandler);
 
 // POST /v1/chat/completions — OpenAI-compatible chat completions
 aiProxyRouter.post('/chat/completions', chatCompletionsHandler);
+
+// POST /v1/responses — Custom Responses API completions (compatibility with Codex Router)
+aiProxyRouter.post('/responses', responsesHandler);

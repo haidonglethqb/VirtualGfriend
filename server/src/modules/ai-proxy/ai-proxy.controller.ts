@@ -171,3 +171,122 @@ export async function chatCompletionsHandler(req: Request, res: Response, next: 
     next(error);
   }
 }
+
+/**
+ * POST /v1/responses
+ * Custom Responses API endpoint (for compatibility with Codex Router / responses wire format).
+ */
+export async function responsesHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const body = req.body as {
+      model?: string;
+      instructions?: string;
+      input?: { role?: string; content?: string }[];
+      temperature?: number;
+      max_output_tokens?: number;
+      top_p?: number;
+      response_format?: any;
+    };
+
+    // Determine target provider from key
+    const proxyKey = res.locals.proxyKey as { targetProvider?: string } | null;
+    const targetProvider = proxyKey?.targetProvider || undefined;
+
+    // Resolve runtime
+    const runtime = await resolveAiRuntime(targetProvider ? { provider: targetProvider } : undefined);
+
+    log.info(`Proxy responses request, serving with "${runtime.model}" via ${runtime.provider}${
+      targetProvider ? ` (key-specific target: ${targetProvider})` : ' (global active)'
+    }`);
+
+    if (runtime.wireApi === 'responses') {
+      // Direct forward to the responses API upstream
+      const payload = {
+        model: runtime.model,
+        instructions: body.instructions,
+        input: body.input,
+        temperature: body.temperature,
+        top_p: body.top_p,
+        max_output_tokens: body.max_output_tokens,
+        response_format: body.response_format,
+      };
+
+      const upstreamRes = await fetch(`${runtime.baseUrl}/responses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${runtime.apiKey}`,
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(45000),
+      });
+
+      const data = await upstreamRes.json().catch(() => ({})) as Record<string, unknown>;
+      if (!upstreamRes.ok) {
+        throw new AppError(
+          (data?.error as any)?.message || data?.message || 'Upstream responses request failed',
+          upstreamRes.status,
+          'AI_PROVIDER_ERROR',
+        );
+      }
+      res.json(data);
+      return;
+    }
+
+    // Translate responses format to chat completions format
+    const messages: any[] = [];
+    if (body.instructions) {
+      messages.push({ role: 'system', content: body.instructions });
+    }
+    if (Array.isArray(body.input)) {
+      for (const msg of body.input) {
+        messages.push({
+          role: msg.role === 'assistant' ? 'assistant' : 'user',
+          content: msg.content || '',
+        });
+      }
+    } else {
+      messages.push({ role: 'user', content: 'Continue.' });
+    }
+
+    const payload = {
+      model: runtime.model,
+      messages,
+      temperature: typeof body.temperature === 'number' ? body.temperature : 0.8,
+      max_tokens: typeof body.max_output_tokens === 'number' ? body.max_output_tokens : 1024,
+      top_p: typeof body.top_p === 'number' ? body.top_p : undefined,
+    };
+
+    const completion = await createAiChatCompletion(payload);
+    const content = completion.choices[0]?.message?.content ?? '';
+
+    // Return in responses API format
+    res.json({
+      output_text: content,
+      text: content,
+      output: [
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: content,
+            },
+          ],
+        },
+      ],
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      res.status(error.statusCode ?? 500).json({
+        error: {
+          message: error.message,
+          type: 'api_error',
+          code: error.code ?? 'internal_error',
+        },
+      });
+      return;
+    }
+    next(error);
+  }
+}
