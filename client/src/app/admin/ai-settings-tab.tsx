@@ -2,7 +2,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Brain, CheckCircle2, Edit, Key, Plus, RefreshCw, Save, SlidersHorizontal, Trash2, X, Zap } from 'lucide-react';
+import { Brain, CheckCircle2, Copy, Edit, Key, Plus, RefreshCw, Save, Shield, SlidersHorizontal, Trash2, X, Zap } from 'lucide-react';
 
 type Provider = string;
 
@@ -42,6 +42,15 @@ interface AiDebugLogItem {
   metadata?: Record<string, unknown> | null;
 }
 
+interface ProxyKey {
+  id: string;
+  label: string;
+  keyPrefix: string;
+  createdAt: string;
+  lastUsedAt?: string;
+  isActive: boolean;
+}
+
 // Using dynamic providers from backend settings instead of static list
 const KEY_PROVIDERS = ['groq', 'codex_router', 'openai'];
 
@@ -68,6 +77,15 @@ export function AiSettingsTab({
   const [debugLogs, setDebugLogs] = useState<AiDebugLogItem[]>([]);
   const [debugLoading, setDebugLoading] = useState(false);
   const [debugClearing, setDebugClearing] = useState(false);
+
+  // Proxy API Keys state
+  const [proxyKeys, setProxyKeys] = useState<ProxyKey[]>([]);
+  const [proxyKeysLoading, setProxyKeysLoading] = useState(false);
+  const [newKeyLabel, setNewKeyLabel] = useState('');
+  const [generatingKey, setGeneratingKey] = useState(false);
+  const [revealedKey, setRevealedKey] = useState<{ id: string; rawKey: string } | null>(null);
+  const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
+  const [editingKeyLabel, setEditingKeyLabel] = useState('');
 
   // Custom AI provider form states
   const [showForm, setShowForm] = useState(false);
@@ -137,10 +155,25 @@ export function AiSettingsTab({
     }
   }, [apiCall, showToast]);
 
+  const fetchProxyKeys = useCallback(async () => {
+    setProxyKeysLoading(true);
+    try {
+      const res = await apiCall('/ai-proxy-keys');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || json.error || 'Unable to load proxy keys');
+      setProxyKeys(Array.isArray(json.data) ? json.data as ProxyKey[] : []);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to load proxy keys', 'error');
+    } finally {
+      setProxyKeysLoading(false);
+    }
+  }, [apiCall, showToast]);
+
   useEffect(() => {
     void fetchSettings();
     void fetchDebugLogs();
-  }, [fetchDebugLogs, fetchSettings]);
+    void fetchProxyKeys();
+  }, [fetchDebugLogs, fetchSettings, fetchProxyKeys]);
 
   const providerInfo = settings?.providers[provider];
   const modelOptions = useMemo(() => providerInfo?.models || [], [providerInfo]);
@@ -686,6 +719,226 @@ export function AiSettingsTab({
         </div>
       </div>
 
+      {/* Proxy API Keys */}
+      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3">
+            <Shield className="w-6 h-6 text-green-400" />
+            <div>
+              <h3 className="text-lg font-semibold text-white">AI Proxy API Keys</h3>
+              <p className="text-sm text-gray-400">Keys that allow external instances to use this server as an OpenAI-compatible AI gateway (<code className="text-green-300">/v1/chat/completions</code>).</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => void fetchProxyKeys()}
+            disabled={proxyKeysLoading}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-60 rounded-lg text-white text-sm"
+          >
+            <RefreshCw className={`w-4 h-4 ${proxyKeysLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {/* Generate new key form */}
+        <div className="flex gap-3 mb-5">
+          <input
+            type="text"
+            placeholder="Label for this key (e.g. Local Dev, CI Bot)"
+            value={newKeyLabel}
+            onChange={(e) => setNewKeyLabel(e.target.value)}
+            className="flex-1 px-4 py-2.5 rounded-lg bg-gray-900 border border-gray-700 text-white text-sm placeholder-gray-500"
+          />
+          <button
+            type="button"
+            disabled={!newKeyLabel.trim() || generatingKey}
+            onClick={async () => {
+              if (!newKeyLabel.trim()) return;
+              setGeneratingKey(true);
+              try {
+                const res = await apiCall('/ai-proxy-keys', {
+                  method: 'POST',
+                  body: JSON.stringify({ label: newKeyLabel.trim() }),
+                });
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.error?.message || json.error || 'Failed to generate key');
+                setProxyKeys((prev) => [...prev, json.data.key as ProxyKey]);
+                setRevealedKey({ id: json.data.key.id, rawKey: json.data.rawKey });
+                setNewKeyLabel('');
+                showToast('API key generated — save it now!', 'success');
+              } catch (error) {
+                showToast(error instanceof Error ? error.message : 'Failed to generate key', 'error');
+              } finally {
+                setGeneratingKey(false);
+              }
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-lg text-white text-sm font-semibold"
+          >
+            <Plus className="w-4 h-4" />
+            {generatingKey ? 'Generating...' : 'Generate Key'}
+          </button>
+        </div>
+
+        {/* Revealed key — show once */}
+        {revealedKey && (
+          <div className="mb-5 p-4 rounded-lg border border-amber-500/40 bg-amber-500/10">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-amber-200">⚠️ Save this key now — it will not be shown again</p>
+              <button type="button" onClick={() => setRevealedKey(null)} className="text-gray-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 block px-3 py-2 rounded bg-gray-950 text-green-300 text-sm font-mono break-all">
+                {revealedKey.rawKey}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(revealedKey.rawKey);
+                  showToast('Copied to clipboard', 'success');
+                }}
+                className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white"
+                title="Copy to clipboard"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Keys list */}
+        <div className="space-y-3">
+          {proxyKeys.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-700 bg-gray-900/40 p-6 text-center text-sm text-gray-400">
+              No API keys yet. Generate one above to allow external access to the AI proxy.
+            </div>
+          ) : (
+            proxyKeys.map((pk) => (
+              <div key={pk.id} className="p-4 bg-gray-900/60 rounded-lg border border-gray-700">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1 min-w-0">
+                    {editingKeyId === pk.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editingKeyLabel}
+                          onChange={(e) => setEditingKeyLabel(e.target.value)}
+                          className="px-3 py-1 rounded-lg bg-gray-950 border border-gray-600 text-white text-sm"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await apiCall(`/ai-proxy-keys/${pk.id}`, {
+                                method: 'PATCH',
+                                body: JSON.stringify({ label: editingKeyLabel }),
+                              });
+                              const json = await res.json();
+                              if (!res.ok) throw new Error(json.error?.message || 'Update failed');
+                              setProxyKeys(json.data as ProxyKey[]);
+                              setEditingKeyId(null);
+                              showToast('Key label updated', 'success');
+                            } catch (error) {
+                              showToast(error instanceof Error ? error.message : 'Update failed', 'error');
+                            }
+                          }}
+                          className="p-1.5 bg-green-600 hover:bg-green-700 rounded-lg text-white"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" onClick={() => setEditingKeyId(null)} className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-white">{pk.label}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          pk.isActive ? 'bg-green-500/15 text-green-300' : 'bg-gray-600/40 text-gray-400'
+                        }`}>
+                          {pk.isActive ? 'Active' : 'Disabled'}
+                        </span>
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      <span className="text-gray-400">Prefix:</span> <code className="text-gray-300">{pk.keyPrefix}...</code>
+                      {' '}&mdash; Created {new Date(pk.createdAt).toLocaleDateString()}
+                      {pk.lastUsedAt ? ` — Last used ${new Date(pk.lastUsedAt).toLocaleString()}` : ' — Never used'}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Edit label */}
+                    <button
+                      type="button"
+                      onClick={() => { setEditingKeyId(pk.id); setEditingKeyLabel(pk.label); }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-200 text-xs"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      Rename
+                    </button>
+                    {/* Toggle enable/disable */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await apiCall(`/ai-proxy-keys/${pk.id}/toggle`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ isActive: !pk.isActive }),
+                          });
+                          const json = await res.json();
+                          if (!res.ok) throw new Error(json.error?.message || 'Toggle failed');
+                          setProxyKeys(json.data as ProxyKey[]);
+                          showToast(`Key ${!pk.isActive ? 'enabled' : 'disabled'}`, 'success');
+                        } catch (error) {
+                          showToast(error instanceof Error ? error.message : 'Toggle failed', 'error');
+                        }
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs ${
+                        pk.isActive
+                          ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300'
+                          : 'bg-green-500/15 hover:bg-green-500/25 text-green-300'
+                      }`}
+                    >
+                      {pk.isActive ? 'Disable' : 'Enable'}
+                    </button>
+                    {/* Delete */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!confirm(`Delete key "${pk.label}"? This cannot be undone.`)) return;
+                        try {
+                          const res = await apiCall(`/ai-proxy-keys/${pk.id}`, { method: 'DELETE' });
+                          const json = await res.json();
+                          if (!res.ok) throw new Error(json.error?.message || 'Delete failed');
+                          setProxyKeys(json.data as ProxyKey[]);
+                          showToast('Key deleted', 'success');
+                        } catch (error) {
+                          showToast(error instanceof Error ? error.message : 'Delete failed', 'error');
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 rounded-lg text-red-300 text-xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Usage hint */}
+        <div className="mt-4 p-3 rounded-lg border border-gray-700 bg-gray-900/40 text-xs text-gray-400">
+          <p className="font-medium text-gray-300 mb-1">How to use</p>
+          <code className="block text-green-300">POST https://your-server.com/v1/chat/completions</code>
+          <code className="block text-gray-400 mt-1">Authorization: Bearer &lt;your-key&gt;</code>
+        </div>
+      </div>
+
+      {/* Debug Log */}
       <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
           <div className="flex items-center gap-3">

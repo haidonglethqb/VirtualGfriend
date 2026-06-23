@@ -10,6 +10,7 @@ import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 
 import { router } from './routes';
+import { aiProxyRouter } from './modules/ai-proxy/ai-proxy.routes';
 import { handleWebhook } from './modules/payment/payment.controller';
 import { errorHandler } from './middlewares/error.middleware';
 import { requestIdMiddleware } from './middlewares/request-id.middleware';
@@ -174,6 +175,19 @@ app.get('/ready', async (_: Request, res: Response) => {
     res.status(503).json({ ready: false, reason: 'database unavailable' });
   }
 });
+
+// OpenAI-compatible AI Proxy — mounted at /v1
+// Auth: Bearer token via AI_PROXY_API_KEY env var (separate from user JWT)
+// Rate limit: 60 req/min per IP
+const aiProxyLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  message: { error: { message: 'Too many requests', type: 'rate_limit_error', code: 'rate_limit_exceeded' } },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: isPlaywrightTest,
+});
+app.use('/v1', aiProxyLimiter, aiProxyRouter);
 
 // API Routes
 app.use('/api', router);
