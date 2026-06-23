@@ -5,8 +5,15 @@ import { cache, CacheTTL } from '../../lib/redis';
 import { AppError } from '../../middlewares/error.middleware';
 import { clearAiDebugEvents, listAiDebugEvents, recordAiDebugEvent } from './ai-debug.service';
 
-export type AiProvider = 'system' | 'groq' | 'codex_router' | 'openai';
+export type AiProvider = 'system' | 'groq' | 'codex_router' | 'openai' | string;
 export type AiWireApi = 'chat_completions' | 'responses';
+
+export type CustomProvider = {
+  id: string;
+  label: string;
+  baseUrl: string;
+  modelId: string;
+};
 
 type ApiKeyState = {
   encrypted?: string;
@@ -14,14 +21,15 @@ type ApiKeyState = {
 };
 
 export type AiRuntimeConfig = {
-  activeProvider: AiProvider;
-  selectedModels: Record<Exclude<AiProvider, 'system'>, string>;
-  keys: Partial<Record<Exclude<AiProvider, 'system'>, ApiKeyState>>;
+  activeProvider: string;
+  selectedModels: Record<string, string>;
+  keys: Record<string, ApiKeyState>;
   contextLimits: AiContextLimits;
+  customProviders?: CustomProvider[];
 };
 
 export type AiRuntime = {
-  provider: AiProvider;
+  provider: string;
   model: string;
   baseUrl?: string;
   wireApi: AiWireApi;
@@ -80,7 +88,7 @@ const MAX_CONTEXT_LIMITS: AiContextLimits = {
   summaryLimit: 50,
 };
 
-const PROVIDER_CONTEXT_CAPS: Partial<Record<AiProvider, AiContextLimitCap>> = {
+const PROVIDER_CONTEXT_CAPS: Partial<Record<string, AiContextLimitCap>> = {
   codex_router: {
     messageLimit: 20,
     factLimit: 20,
@@ -97,6 +105,7 @@ const DEFAULT_CONFIG: AiRuntimeConfig = {
   },
   keys: {},
   contextLimits: DEFAULT_CONTEXT_LIMITS,
+  customProviders: [],
 };
 
 function boundedNumber(value: unknown, fallback: number, max: number) {
@@ -136,11 +145,13 @@ function mergeConfig(value: unknown): AiRuntimeConfig {
     },
     keys: raw.keys || {},
     contextLimits: normalizeContextLimits(raw.contextLimits),
+    customProviders: Array.isArray(raw.customProviders) ? raw.customProviders : [],
   };
 }
 
 function isProvider(value: unknown): value is AiProvider {
-  return value === 'system' || value === 'groq' || value === 'codex_router' || value === 'openai';
+  if (typeof value !== 'string') return false;
+  return value === 'system' || value === 'groq' || value === 'codex_router' || value === 'openai' || value.startsWith('custom_');
 }
 
 function getEncryptionKey() {
@@ -183,7 +194,7 @@ function maskKey(key?: string, encrypted?: string) {
   return `${key.slice(0, 6)}...${key.slice(-4)}`;
 }
 
-function validateModel(provider: AiProvider, model?: string) {
+function validateModel(provider: string, model?: string) {
   if (provider === 'system') return;
   if (!model) {
     throw new AppError('Model is required', 400, 'AI_MODEL_REQUIRED');
@@ -220,7 +231,7 @@ export async function getAiRuntimeConfig(): Promise<AiRuntimeConfig> {
 
 export async function getAdminAiSettings() {
   const config = await getAiRuntimeConfig();
-  const providers = {
+  const providers: Record<string, any> = {
     system: {
       label: 'System default',
       baseUrl: process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1' : 'OpenAI default',
@@ -258,6 +269,21 @@ export async function getAdminAiSettings() {
     },
   };
 
+  if (config.customProviders) {
+    for (const custom of config.customProviders) {
+      providers[custom.id] = {
+        label: custom.label,
+        baseUrl: custom.baseUrl,
+        wireApi: 'chat_completions' as AiWireApi,
+        models: [custom.modelId],
+        apiKeyConfigured: Boolean(config.keys[custom.id]?.encrypted),
+        maskedKey: maskKey(undefined, config.keys[custom.id]?.encrypted),
+        keyUpdatedAt: config.keys[custom.id]?.updatedAt,
+        isCustom: true,
+      };
+    }
+  }
+
   return {
     activeProvider: config.activeProvider,
     selectedModels: config.selectedModels,
@@ -267,19 +293,26 @@ export async function getAdminAiSettings() {
   };
 }
 
-export async function updateActiveAiProvider(provider: AiProvider, model?: string) {
+export async function updateActiveAiProvider(provider: string, model?: string) {
   if (!isProvider(provider)) {
     throw new AppError('Invalid AI provider', 400, 'INVALID_AI_PROVIDER');
   }
-  validateModel(provider, model);
 
   const config = await getAiRuntimeConfig();
+  let selectedModel = model;
+  if (provider.startsWith('custom_') && !selectedModel) {
+    const custom = config.customProviders?.find((c) => c.id === provider);
+    selectedModel = custom?.modelId;
+  }
+
+  validateModel(provider, selectedModel);
+
   const next: AiRuntimeConfig = {
     ...config,
     activeProvider: provider,
     selectedModels: provider === 'system'
       ? config.selectedModels
-      : { ...config.selectedModels, [provider]: model },
+      : { ...config.selectedModels, [provider]: selectedModel || '' },
   };
 
   await saveConfig(next);
@@ -317,11 +350,16 @@ export async function getEffectiveAiContextLimits() {
 }
 
 export async function updateAiProviderKey(
-  provider: Exclude<AiProvider, 'system'>,
+  provider: string,
   action: 'replace' | 'clear',
   apiKey?: string,
 ) {
-  if (provider !== 'groq' && provider !== 'codex_router' && provider !== 'openai') {
+  if (
+    provider !== 'groq' &&
+    provider !== 'codex_router' &&
+    provider !== 'openai' &&
+    !provider.startsWith('custom_')
+  ) {
     throw new AppError('Invalid AI provider', 400, 'INVALID_AI_PROVIDER');
   }
 
@@ -346,10 +384,12 @@ export async function updateAiProviderKey(
 }
 
 export async function resolveAiRuntime(override?: {
-  provider?: AiProvider;
+  provider?: string;
   model?: string;
   apiKey?: string;
 }): Promise<AiRuntime> {
+  const config = await getAiRuntimeConfig();
+
   if (override?.provider && override.provider !== 'system' && override.model && override.apiKey?.trim()) {
     validateModel(override.provider, override.model);
     const apiKey = override.apiKey.trim();
@@ -359,10 +399,20 @@ export async function resolveAiRuntime(override?: {
     if (override.provider === 'codex_router') {
       return { provider: override.provider, model: override.model, baseUrl: CODEX_ROUTER_BASE_URL, wireApi: 'responses', apiKey, source: 'admin' };
     }
+    if (override.provider.startsWith('custom_')) {
+      const custom = config.customProviders?.find((c) => c.id === override.provider);
+      return {
+        provider: override.provider,
+        model: override.model,
+        baseUrl: custom?.baseUrl || '',
+        wireApi: 'chat_completions',
+        apiKey,
+        source: 'admin',
+      };
+    }
     return { provider: override.provider, model: override.model, wireApi: 'chat_completions', apiKey, source: 'admin' };
   }
 
-  const config = await getAiRuntimeConfig();
   const provider = override?.provider || config.activeProvider;
 
   if (provider === 'system') {
@@ -373,6 +423,29 @@ export async function resolveAiRuntime(override?: {
       wireApi: 'chat_completions',
       apiKey: process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY,
       source: 'env',
+    };
+  }
+
+  if (provider.startsWith('custom_')) {
+    const custom = config.customProviders?.find((c) => c.id === provider);
+    if (!custom) {
+      throw new AppError(`Custom provider ${provider} not found`, 404, 'CUSTOM_PROVIDER_NOT_FOUND');
+    }
+    const model = override?.model || config.selectedModels[provider] || custom.modelId;
+    validateModel(provider, model);
+
+    const encrypted = config.keys[provider]?.encrypted;
+    const apiKey = override?.apiKey?.trim() || decryptApiKey(encrypted);
+    if (!apiKey) {
+      throw new AppError(`AI API key is not configured for ${custom.label}`, 503, 'AI_API_KEY_NOT_CONFIGURED');
+    }
+    return {
+      provider,
+      model,
+      baseUrl: custom.baseUrl,
+      wireApi: 'chat_completions',
+      apiKey,
+      source: 'admin',
     };
   }
 
@@ -642,4 +715,120 @@ export async function getAiDebugLog(limit?: number) {
 
 export async function clearAiDebugLog() {
   return clearAiDebugEvents();
+}
+
+export async function addCustomProvider(input: {
+  label: string;
+  baseUrl: string;
+  modelId: string;
+  apiKey: string;
+}) {
+  const config = await getAiRuntimeConfig();
+  const id = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+  const customProviders = config.customProviders ? [...config.customProviders] : [];
+  customProviders.push({
+    id,
+    label: input.label.trim(),
+    baseUrl: input.baseUrl.trim(),
+    modelId: input.modelId.trim(),
+  });
+
+  const keys = { ...config.keys };
+  if (input.apiKey.trim()) {
+    keys[id] = {
+      encrypted: encryptApiKey(input.apiKey.trim()),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const selectedModels = { ...config.selectedModels };
+  selectedModels[id] = input.modelId.trim();
+
+  await saveConfig({
+    ...config,
+    customProviders,
+    keys,
+    selectedModels,
+  });
+
+  return getAdminAiSettings();
+}
+
+export async function updateCustomProvider(
+  id: string,
+  input: {
+    label: string;
+    baseUrl: string;
+    modelId: string;
+    apiKey?: string;
+  }
+) {
+  const config = await getAiRuntimeConfig();
+  if (!config.customProviders) {
+    throw new AppError('Custom provider not found', 404, 'CUSTOM_PROVIDER_NOT_FOUND');
+  }
+
+  const index = config.customProviders.findIndex((c) => c.id === id);
+  if (index === -1) {
+    throw new AppError('Custom provider not found', 404, 'CUSTOM_PROVIDER_NOT_FOUND');
+  }
+
+  const customProviders = [...config.customProviders];
+  customProviders[index] = {
+    id,
+    label: input.label.trim(),
+    baseUrl: input.baseUrl.trim(),
+    modelId: input.modelId.trim(),
+  };
+
+  const keys = { ...config.keys };
+  if (input.apiKey && input.apiKey.trim()) {
+    keys[id] = {
+      encrypted: encryptApiKey(input.apiKey.trim()),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const selectedModels = { ...config.selectedModels };
+  selectedModels[id] = input.modelId.trim();
+
+  await saveConfig({
+    ...config,
+    customProviders,
+    keys,
+    selectedModels,
+  });
+
+  return getAdminAiSettings();
+}
+
+export async function deleteCustomProvider(id: string) {
+  const config = await getAiRuntimeConfig();
+  if (!config.customProviders) {
+    throw new AppError('Custom provider not found', 404, 'CUSTOM_PROVIDER_NOT_FOUND');
+  }
+
+  const customProviders = config.customProviders.filter((c) => c.id !== id);
+
+  const keys = { ...config.keys };
+  delete keys[id];
+
+  const selectedModels = { ...config.selectedModels };
+  delete selectedModels[id];
+
+  let activeProvider = config.activeProvider;
+  if (activeProvider === id) {
+    activeProvider = 'system';
+  }
+
+  await saveConfig({
+    ...config,
+    activeProvider,
+    customProviders,
+    keys,
+    selectedModels,
+  });
+
+  return getAdminAiSettings();
 }

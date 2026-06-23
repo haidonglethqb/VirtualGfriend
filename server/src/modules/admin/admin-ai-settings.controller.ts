@@ -10,6 +10,9 @@ import {
   updateActiveAiProvider,
   updateAiContextLimits,
   updateAiProviderKey,
+  addCustomProvider,
+  updateCustomProvider,
+  deleteCustomProvider,
 } from '../ai/ai-config.service';
 import { AppError } from '../../middlewares/error.middleware';
 
@@ -17,7 +20,7 @@ const providers = ['system', 'groq', 'codex_router', 'openai'] as const;
 const keyProviders = ['groq', 'codex_router', 'openai'] as const;
 
 const providerSchema = z.object({
-  provider: z.enum(providers),
+  provider: z.string().min(1),
   model: z.string().min(1).max(100).optional(),
 }).strict();
 
@@ -27,7 +30,7 @@ const keySchema = z.object({
 }).strict();
 
 const testSchema = z.object({
-  provider: z.enum(providers),
+  provider: z.string().min(1),
   model: z.string().min(1).max(100).optional(),
   apiKey: z.string().min(1).max(500).optional(),
 }).strict();
@@ -81,7 +84,7 @@ export async function updateAiSettingsProvider(req: AdminRequest, res: Response,
 export async function updateAiSettingsKey(req: AdminRequest, res: Response, next: NextFunction) {
   try {
     const provider = req.params.provider;
-    if (!keyProviders.includes(provider as typeof keyProviders[number])) {
+    if (!keyProviders.includes(provider as typeof keyProviders[number]) && !provider.startsWith('custom_')) {
       throw new AppError('Invalid AI key provider', 400, 'INVALID_AI_PROVIDER');
     }
 
@@ -91,7 +94,7 @@ export async function updateAiSettingsKey(req: AdminRequest, res: Response, next
     }
 
     const data = await updateAiProviderKey(
-      provider as typeof keyProviders[number],
+      provider,
       parsed.data.action,
       parsed.data.apiKey,
     );
@@ -124,6 +127,71 @@ export async function testAiSettings(req: AdminRequest, res: Response, next: Nex
 
     const data = await testAiProvider(parsed.data);
     res.json({ success: true, data, message: 'AI provider test succeeded' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+const customProviderSchema = z.object({
+  label: z.string().min(1).max(100),
+  baseUrl: z.string().min(1).max(300).refine((val) => val.startsWith('http://') || val.startsWith('https://'), {
+    message: 'Base URL must start with http:// or https://',
+  }),
+  modelId: z.string().min(1).max(100),
+  apiKey: z.string().min(1).max(500),
+}).strict();
+
+const updateCustomProviderSchema = z.object({
+  label: z.string().min(1).max(100),
+  baseUrl: z.string().min(1).max(300).refine((val) => val.startsWith('http://') || val.startsWith('https://'), {
+    message: 'Base URL must start with http:// or https://',
+  }),
+  modelId: z.string().min(1).max(100),
+  apiKey: z.string().min(1).max(500).optional(),
+}).strict();
+
+export async function createCustomProviderHandler(req: AdminRequest, res: Response, next: NextFunction) {
+  try {
+    const parsed = customProviderSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0]?.message || 'Invalid custom provider payload', 400, 'VALIDATION_ERROR');
+    }
+
+    const data = await addCustomProvider(parsed.data);
+    res.json({ success: true, data, message: 'Custom AI provider added' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateCustomProviderHandler(req: AdminRequest, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    if (!id || !id.startsWith('custom_')) {
+      throw new AppError('Invalid custom provider ID', 400, 'INVALID_PROVIDER_ID');
+    }
+
+    const parsed = updateCustomProviderSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0]?.message || 'Invalid custom provider payload', 400, 'VALIDATION_ERROR');
+    }
+
+    const data = await updateCustomProvider(id, parsed.data);
+    res.json({ success: true, data, message: 'Custom AI provider updated' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteCustomProviderHandler(req: AdminRequest, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    if (!id || !id.startsWith('custom_')) {
+      throw new AppError('Invalid custom provider ID', 400, 'INVALID_PROVIDER_ID');
+    }
+
+    const data = await deleteCustomProvider(id);
+    res.json({ success: true, data, message: 'Custom AI provider deleted' });
   } catch (error) {
     next(error);
   }

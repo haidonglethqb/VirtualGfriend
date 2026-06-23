@@ -44,7 +44,7 @@ import {
 import { getTierConfigs, updateTierConfigHandler } from './admin-tier-config.controller';
 import { getAdminPricing, getStripeLivePricing, updateAdminPricing, syncStripePrice } from './admin-pricing.controller';
 import { getAdminGiftCatalog, getAdminVipGiftPack, updateAdminVipGiftPack } from './admin-vip-pack.controller';
-import { clearAiDebugSettings, getAiDebugSettings, getAiSettings, testAiSettings, updateAiSettingsContext, updateAiSettingsKey, updateAiSettingsProvider } from './admin-ai-settings.controller';
+import { clearAiDebugSettings, getAiDebugSettings, getAiSettings, testAiSettings, updateAiSettingsContext, updateAiSettingsKey, updateAiSettingsProvider, createCustomProviderHandler, updateCustomProviderHandler, deleteCustomProviderHandler } from './admin-ai-settings.controller';
 
 const router = Router();
 
@@ -128,6 +128,9 @@ router.put('/ai-settings/provider', updateAiSettingsProvider);
 router.put('/ai-settings/context', updateAiSettingsContext);
 router.put('/ai-settings/keys/:provider', updateAiSettingsKey);
 router.post('/ai-settings/test', testAiSettings);
+router.post('/ai-settings/custom-providers', createCustomProviderHandler);
+router.put('/ai-settings/custom-providers/:id', updateCustomProviderHandler);
+router.delete('/ai-settings/custom-providers/:id', deleteCustomProviderHandler);
 
 // Pricing management (Stripe)
 router.get('/pricing', getAdminPricing);

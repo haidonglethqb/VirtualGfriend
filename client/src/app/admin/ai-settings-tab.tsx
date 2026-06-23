@@ -1,9 +1,10 @@
 'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Brain, CheckCircle2, Key, RefreshCw, Save, SlidersHorizontal, Trash2, Zap } from 'lucide-react';
+import { Brain, CheckCircle2, Edit, Key, Plus, RefreshCw, Save, SlidersHorizontal, Trash2, X, Zap } from 'lucide-react';
 
-type Provider = 'system' | 'groq' | 'codex_router' | 'openai';
+type Provider = string;
 
 interface ProviderInfo {
   label: string;
@@ -13,14 +14,15 @@ interface ProviderInfo {
   apiKeyConfigured: boolean;
   maskedKey: string | null;
   keyUpdatedAt?: string;
+  isCustom?: boolean;
 }
 
 interface AiSettings {
-  activeProvider: Provider;
-  selectedModels: Record<Exclude<Provider, 'system'>, string>;
+  activeProvider: string;
+  selectedModels: Record<string, string>;
   contextLimits: ContextLimits;
   maxContextLimits: ContextLimits;
-  providers: Record<Provider, ProviderInfo>;
+  providers: Record<string, ProviderInfo>;
 }
 
 interface ContextLimits {
@@ -40,8 +42,8 @@ interface AiDebugLogItem {
   metadata?: Record<string, unknown> | null;
 }
 
-const PROVIDERS: Provider[] = ['system', 'groq', 'codex_router', 'openai'];
-const KEY_PROVIDERS: Array<Exclude<Provider, 'system'>> = ['groq', 'codex_router', 'openai'];
+// Using dynamic providers from backend settings instead of static list
+const KEY_PROVIDERS = ['groq', 'codex_router', 'openai'];
 
 export function AiSettingsTab({
   apiCall,
@@ -66,6 +68,39 @@ export function AiSettingsTab({
   const [debugLogs, setDebugLogs] = useState<AiDebugLogItem[]>([]);
   const [debugLoading, setDebugLoading] = useState(false);
   const [debugClearing, setDebugClearing] = useState(false);
+
+  // Custom AI provider form states
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formLabel, setFormLabel] = useState('');
+  const [formBaseUrl, setFormBaseUrl] = useState('');
+  const [formModelId, setFormModelId] = useState('');
+  const [formApiKey, setFormApiKey] = useState('');
+
+  const customProviders = useMemo(() => {
+    if (!settings?.providers) return [];
+    return Object.entries(settings.providers)
+      .filter(([_, info]) => info.isCustom)
+      .map(([id, info]) => ({ id, ...info }));
+  }, [settings]);
+
+  function resetForm() {
+    setEditingId(null);
+    setFormLabel('');
+    setFormBaseUrl('');
+    setFormModelId('');
+    setFormApiKey('');
+    setShowForm(false);
+  }
+
+  function handleEditCustomProvider(custom: any) {
+    setEditingId(custom.id);
+    setFormLabel(custom.label);
+    setFormBaseUrl(custom.baseUrl);
+    setFormModelId(custom.models[0] || '');
+    setFormApiKey('');
+    setShowForm(true);
+  }
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -137,7 +172,7 @@ export function AiSettingsTab({
     }
   }
 
-  async function updateKey(keyProvider: Exclude<Provider, 'system'>, action: 'replace' | 'clear') {
+  async function updateKey(keyProvider: string, action: 'replace' | 'clear') {
     try {
       const res = await apiCall(`/ai-settings/keys/${keyProvider}`, {
         method: 'PUT',
@@ -201,20 +236,62 @@ export function AiSettingsTab({
     }
   }
 
-  async function clearDebugLogs() {
-    setDebugClearing(true);
+  async function handleSaveCustomProvider(event: React.FormEvent) {
+    event.preventDefault();
+    if (!formLabel.trim() || !formBaseUrl.trim() || !formModelId.trim()) {
+      showToast('All fields are required', 'error');
+      return;
+    }
+    if (!editingId && !formApiKey.trim()) {
+      showToast('API key is required for new custom providers', 'error');
+      return;
+    }
+
+    setSaving(true);
     try {
-      const res = await apiCall('/ai-settings/debug', {
+      const endpoint = editingId
+        ? `/ai-settings/custom-providers/${editingId}`
+        : '/ai-settings/custom-providers';
+      const method = editingId ? 'PUT' : 'POST';
+      const res = await apiCall(endpoint, {
+        method,
+        body: JSON.stringify({
+          label: formLabel,
+          baseUrl: formBaseUrl,
+          modelId: formModelId,
+          ...(formApiKey.trim() ? { apiKey: formApiKey } : {}),
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || json.error || 'Failed to save custom provider');
+
+      setSettings(json.data as AiSettings);
+      showToast(editingId ? 'Custom provider updated' : 'Custom provider added', 'success');
+      resetForm();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to save custom provider', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteCustomProvider(id: string) {
+    if (!confirm('Are you sure you want to delete this custom provider?')) return;
+    try {
+      const res = await apiCall(`/ai-settings/custom-providers/${id}`, {
         method: 'DELETE',
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message || json.error || 'Unable to clear AI debug logs');
-      setDebugLogs([]);
-      showToast(`Cleared ${json.data?.deletedCount || 0} AI debug logs`, 'success');
+      if (!res.ok) throw new Error(json.error?.message || json.error || 'Delete failed');
+
+      setSettings(json.data as AiSettings);
+      if (provider === id) {
+        setProvider('system');
+      }
+      showToast('Custom provider deleted', 'success');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Unable to clear AI debug logs', 'error');
-    } finally {
-      setDebugClearing(false);
+      showToast(error instanceof Error ? error.message : 'Unable to delete custom provider', 'error');
     }
   }
 
@@ -242,11 +319,11 @@ export function AiSettingsTab({
             <span className="text-sm text-gray-300">Active provider</span>
             <select
               value={provider}
-              onChange={(event) => setProvider(event.target.value as Provider)}
+              onChange={(event) => setProvider(event.target.value)}
               className="w-full px-4 py-3 rounded-lg bg-gray-900 border border-gray-700 text-white"
             >
-              {PROVIDERS.map((item) => (
-                <option key={item} value={item}>{settings?.providers[item].label || item}</option>
+              {settings && Object.keys(settings.providers).map((item) => (
+                <option key={item} value={item}>{settings.providers[item].label || item}</option>
               ))}
             </select>
           </label>
@@ -419,6 +496,158 @@ export function AiSettingsTab({
       </div>
 
       <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3">
+            <SlidersHorizontal className="w-6 h-6 text-purple-400" />
+            <div>
+              <h3 className="text-lg font-semibold text-white">Custom AI Providers</h3>
+              <p className="text-sm text-gray-400">Configure your own OpenAI-compatible providers, e.g., local LLMs or custom endpoints.</p>
+            </div>
+          </div>
+          {!showForm && (
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                setShowForm(true);
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Provider
+            </button>
+          )}
+        </div>
+
+        {showForm && (
+          <form onSubmit={handleSaveCustomProvider} className="mb-6 p-4 bg-gray-900/60 rounded-lg border border-gray-700 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-white">{editingId ? 'Edit Custom Provider' : 'Add Custom Provider'}</h4>
+              <button type="button" onClick={resetForm} className="p-1 hover:bg-gray-800 rounded-full text-gray-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="space-y-1 block">
+                <span className="text-xs text-gray-400">Label / Name</span>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. My Local Ollama"
+                  value={formLabel}
+                  onChange={(e) => setFormLabel(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-gray-950 border border-gray-700 text-white text-sm"
+                />
+              </label>
+
+              <label className="space-y-1 block">
+                <span className="text-xs text-gray-400">Base URL</span>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. http://localhost:11434/v1"
+                  value={formBaseUrl}
+                  onChange={(e) => setFormBaseUrl(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-gray-950 border border-gray-700 text-white text-sm"
+                />
+              </label>
+
+              <label className="space-y-1 block">
+                <span className="text-xs text-gray-400">Model ID</span>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. llama3"
+                  value={formModelId}
+                  onChange={(e) => setFormModelId(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-gray-950 border border-gray-700 text-white text-sm"
+                />
+              </label>
+
+              <label className="space-y-1 block">
+                <span className="text-xs text-gray-400">API Key {editingId && '(Leave blank to keep current key)'}</span>
+                <input
+                  type="password"
+                  required={!editingId}
+                  placeholder={editingId ? '••••••••' : 'Enter API Key'}
+                  value={formApiKey}
+                  onChange={(e) => setFormApiKey(e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-gray-950 border border-gray-700 text-white text-sm"
+                />
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={resetForm}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-white text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 rounded-lg text-white text-sm font-semibold"
+              >
+                <Save className="w-4 h-4" />
+                {saving ? 'Saving...' : 'Save Provider'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="space-y-3">
+          {customProviders.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-700 bg-gray-900/40 p-6 text-center text-sm text-gray-400">
+              No custom providers configured yet. Click &quot;Add Provider&quot; above to create one.
+            </div>
+          ) : (
+            customProviders.map((custom) => (
+              <div key={custom.id} className="p-4 bg-gray-900/60 rounded-lg border border-gray-700 flex flex-wrap items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white">{custom.label}</span>
+                    {provider === custom.id && (
+                      <span className="inline-flex items-center gap-1 rounded bg-purple-500/10 px-2 py-0.5 text-xs font-semibold text-purple-400 border border-purple-500/20">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    <span className="text-gray-400">Base URL:</span> {custom.baseUrl} | <span className="text-gray-400">Model:</span> {custom.models[0]}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {custom.apiKeyConfigured ? `Key: ${custom.maskedKey}` : 'No key configured'}
+                    {custom.keyUpdatedAt ? ` - Updated: ${new Date(custom.keyUpdatedAt).toLocaleString()}` : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleEditCustomProvider(custom)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-200 text-xs"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteCustomProvider(custom.id)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 rounded-lg text-red-300 text-xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
           <div className="flex items-center gap-3">
             <Brain className="w-6 h-6 text-emerald-400" />
@@ -439,7 +668,22 @@ export function AiSettingsTab({
             </button>
             <button
               type="button"
-              onClick={clearDebugLogs}
+              onClick={async () => {
+                setDebugClearing(true);
+                try {
+                  const res = await apiCall('/ai-settings/debug', {
+                    method: 'DELETE',
+                  });
+                  const json = await res.json();
+                  if (!res.ok) throw new Error(json.error?.message || json.error || 'Unable to clear AI debug logs');
+                  setDebugLogs([]);
+                  showToast(`Cleared ${json.data?.deletedCount || 0} AI debug logs`, 'success');
+                } catch (error) {
+                  showToast(error instanceof Error ? error.message : 'Unable to clear AI debug logs', 'error');
+                } finally {
+                  setDebugClearing(false);
+                }
+              }}
               disabled={debugClearing || debugLogs.length === 0}
               className="inline-flex items-center gap-2 px-3 py-2 bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 rounded-lg text-red-200"
             >
