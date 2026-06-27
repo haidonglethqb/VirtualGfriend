@@ -46,6 +46,9 @@ jobs:
   e2e-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
     env:
       TEST_SUITE: ${{ github.event.inputs.test_suite || 'all' }}
       TARGET_ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
@@ -54,31 +57,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # ── Notify: Test Started ──────────────────
-      - name: Notify Telegram - Test Started
-        run: |
-          SUITE="${TEST_SUITE}"
-          ENV="${TARGET_ENVIRONMENT}"
-          BROWSER="${E2E_BROWSER}"
-          ACTOR="${{ github.actor }}"
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-          MESSAGE="🚀 *E2E Tests Started*
-
-          📋 *Suite:* \`${SUITE}\`
-          🌐 *Environment:* \`${ENV}\`
-          🖥️ *Browser:* \`${BROWSER}\`
-          👤 *Triggered by:* ${ACTOR}
-          🔗 [View Run](${RUN_URL})
-
-          ⏳ Running tests..."
-
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d parse_mode="Markdown" \
-            -d text="${MESSAGE}" \
-            -d disable_web_page_preview=true
 
       # ── Setup Node.js ─────────────────────────
       - name: Setup Node.js
@@ -114,35 +92,6 @@ jobs:
             echo "api_url=${{ secrets.STAGING_API_URL || 'https://staging.vgfriend.io.vn/api' }}" >> $GITHUB_OUTPUT
           fi
 
-      # ── Build test command ────────────────────
-      - name: Determine test command
-        id: test-cmd
-        run: |
-          SUITE="${TEST_SUITE}"
-          BROWSER="${E2E_BROWSER}"
-
-          case "$SUITE" in
-            api)       CMD="npm run test:api" ;;
-            smoke)     CMD="npm run test:smoke" ;;
-            regression) CMD="npm run test:regression" ;;
-            auth)      CMD="npm run test:auth" ;;
-            chat)      CMD="npm run test:chat" ;;
-            dashboard) CMD="npm run test:dashboard" ;;
-            all)
-              case "$BROWSER" in
-                chromium) CMD="npm run test:headless" ;;
-                firefox)  CMD="npx playwright test --project=firefox" ;;
-                webkit)   CMD="npx playwright test --project=webkit" ;;
-                all-browsers) CMD="npm run test:all-browsers" ;;
-                *)        CMD="npm run test:headless" ;;
-              esac
-              ;;
-            *) CMD="npm run test:headless" ;;
-          esac
-
-          echo "command=${CMD}" >> $GITHUB_OUTPUT
-          echo "Test command: ${CMD}"
-
       # ── Run E2E Tests ─────────────────────────
       - name: Run E2E Tests
         id: run-tests
@@ -156,7 +105,24 @@ jobs:
           TEST_ADMIN_EMAIL: ${{ secrets.E2E_TEST_ADMIN_EMAIL }}
           TEST_ADMIN_PASSWORD: ${{ secrets.E2E_TEST_ADMIN_PASSWORD }}
         run: |
-          ${{ steps.test-cmd.outputs.command }} 2>&1 | tee /tmp/test-output.txt
+          case "${TEST_SUITE}" in
+            api) npm run test:api ;;
+            smoke) npm run test:smoke ;;
+            regression) npm run test:regression ;;
+            auth) npm run test:auth ;;
+            chat) npm run test:chat ;;
+            dashboard) npm run test:dashboard ;;
+            all)
+              case "${E2E_BROWSER}" in
+                chromium) npm run test:headless ;;
+                firefox) npx playwright test --project=firefox ;;
+                webkit) npx playwright test --project=webkit ;;
+                all-browsers) npm run test:all-browsers ;;
+                *) npm run test:headless ;;
+              esac
+              ;;
+            *) npm run test:headless ;;
+          esac 2>&1 | tee /tmp/test-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
         continue-on-error: true
 
@@ -199,60 +165,6 @@ jobs:
             e2e/playwright-report/
             e2e/test-results/
           retention-days: 7
-
-      # ── Notify Telegram: Results ──────────────
-      - name: Notify Telegram - Test Results
-        if: always()
-        run: |
-          EXIT_CODE="${{ steps.run-tests.outputs.exit_code }}"
-          TOTAL="${{ steps.parse-results.outputs.total }}"
-          PASSED="${{ steps.parse-results.outputs.passed }}"
-          FAILED="${{ steps.parse-results.outputs.failed }}"
-          SKIPPED="${{ steps.parse-results.outputs.skipped }}"
-          DURATION="${{ steps.parse-results.outputs.duration }}"
-          SUITE="${TEST_SUITE}"
-          ENV="${TARGET_ENVIRONMENT}"
-          BROWSER="${E2E_BROWSER}"
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          REPORT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
-
-          if [ "$EXIT_CODE" == "0" ] || [ "$FAILED" == "0" ]; then
-            STATUS_ICON="✅"
-            STATUS_TEXT="PASSED"
-          else
-            STATUS_ICON="❌"
-            STATUS_TEXT="FAILED"
-          fi
-
-          # Calculate pass rate
-          if [ "$TOTAL" -gt "0" ] 2>/dev/null; then
-            PASS_RATE=$(python3 -c "print(f'{($PASSED/$TOTAL)*100:.1f}%')" 2>/dev/null || echo "N/A")
-          else
-            PASS_RATE="N/A"
-          fi
-
-          MESSAGE="${STATUS_ICON} *E2E Tests ${STATUS_TEXT}*
-
-          📋 *Suite:* \`${SUITE}\`
-          🌐 *Environment:* \`${ENV}\`
-          🖥️ *Browser:* \`${BROWSER}\`
-
-          📊 *Test Results:*
-          ✅ Passed: ${PASSED}
-          ❌ Failed: ${FAILED}
-          ⏭️ Skipped: ${SKIPPED}
-          📝 Total: ${TOTAL}
-          📈 Pass Rate: ${PASS_RATE}
-          ⏱️ Duration: ${DURATION}
-
-          🔗 [View Run](${RUN_URL})
-          📄 [Download Report](${REPORT_URL})"
-
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d parse_mode="Markdown" \
-            -d text="${MESSAGE}" \
-            -d disable_web_page_preview=true
 
       # ── Fail job if tests failed ──────────────
       - name: Check test results
