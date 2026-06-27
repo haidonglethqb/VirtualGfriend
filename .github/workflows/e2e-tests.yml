@@ -66,13 +66,13 @@ jobs:
 
           MESSAGE="🚀 *E2E Tests Started*
 
-📋 *Suite:* \`${SUITE}\`
-🌐 *Environment:* \`${ENV}\`
-🖥️ *Browser:* \`${BROWSER}\`
-👤 *Triggered by:* ${ACTOR}
-🔗 [View Run](${RUN_URL})
+          📋 *Suite:* \`${SUITE}\`
+          🌐 *Environment:* \`${ENV}\`
+          🖥️ *Browser:* \`${BROWSER}\`
+          👤 *Triggered by:* ${ACTOR}
+          🔗 [View Run](${RUN_URL})
 
-⏳ Running tests..."
+          ⏳ Running tests..."
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
@@ -233,20 +233,20 @@ jobs:
 
           MESSAGE="${STATUS_ICON} *E2E Tests ${STATUS_TEXT}*
 
-📋 *Suite:* \`${SUITE}\`
-🌐 *Environment:* \`${ENV}\`
-🖥️ *Browser:* \`${BROWSER}\`
+          📋 *Suite:* \`${SUITE}\`
+          🌐 *Environment:* \`${ENV}\`
+          🖥️ *Browser:* \`${BROWSER}\`
 
-📊 *Test Results:*
-✅ Passed: ${PASSED}
-❌ Failed: ${FAILED}
-⏭️ Skipped: ${SKIPPED}
-📝 Total: ${TOTAL}
-📈 Pass Rate: ${PASS_RATE}
-⏱️ Duration: ${DURATION}
+          📊 *Test Results:*
+          ✅ Passed: ${PASSED}
+          ❌ Failed: ${FAILED}
+          ⏭️ Skipped: ${SKIPPED}
+          📝 Total: ${TOTAL}
+          📈 Pass Rate: ${PASS_RATE}
+          ⏱️ Duration: ${DURATION}
 
-🔗 [View Run](${RUN_URL})
-📄 [Download Report](${REPORT_URL})"
+          🔗 [View Run](${RUN_URL})
+          📄 [Download Report](${REPORT_URL})"
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
