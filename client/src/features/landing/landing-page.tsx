@@ -428,7 +428,7 @@ function HeroSection() {
                 <span className="block text-white sm:hidden">Không Bao<br />Giờ</span>
                 <span className="hidden text-white sm:block">Không Bao Giờ</span>
                 <span className="block bg-gradient-to-r from-love via-pink-400 to-purple-400 bg-clip-text text-transparent">
-                  Cô Đơn Nữa
+                  Cô Đơn Nữa Đâu
                 </span>
               </h1>
 
