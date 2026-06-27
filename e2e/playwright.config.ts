@@ -7,6 +7,11 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001/api';
+const isLocalUrl = (url: string) =>
+  url.includes('localhost') || url.includes('127.0.0.1');
+const shouldStartWebServer =
+  process.env.E2E_START_SERVERS === 'true' ||
+  (!process.env.CI && isLocalUrl(BASE_URL) && isLocalUrl(API_BASE_URL));
 
 export default defineConfig({
   // Test directory
@@ -156,19 +161,21 @@ export default defineConfig({
     },
   ],
 
-  // Run your local dev server before starting the tests
-  webServer: [
-    {
-      command: 'cd ../server && npm run dev',
-      url: API_BASE_URL.replace('/api', '/health'),
-      timeout: 120 * 1000,
-      reuseExistingServer: !process.env.CI,
-    },
-    {
-      command: 'cd ../client && npm run dev',
-      url: BASE_URL,
-      timeout: 120 * 1000,
-      reuseExistingServer: !process.env.CI,
-    },
-  ],
+  // Run local dev servers only for local URLs. CI targets deployed environments.
+  webServer: shouldStartWebServer
+    ? [
+        {
+          command: 'cd ../server && npm run dev',
+          url: API_BASE_URL.replace('/api', '/health'),
+          timeout: 120 * 1000,
+          reuseExistingServer: true,
+        },
+        {
+          command: 'cd ../client && npm run dev',
+          url: BASE_URL,
+          timeout: 120 * 1000,
+          reuseExistingServer: true,
+        },
+      ]
+    : undefined,
 });

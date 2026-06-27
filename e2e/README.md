@@ -83,7 +83,10 @@ TEST_USER_PASSWORD=Test123456
 # Options
 HEADLESS=true
 CI=false
+E2E_START_SERVERS=false
 ```
+
+`E2E_START_SERVERS=true` starts the local client/server before tests. CI runs against the configured deployed URLs and leaves this off.
 
 ## Chay Tests
 
