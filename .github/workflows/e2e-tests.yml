@@ -105,26 +105,31 @@ jobs:
           TEST_ADMIN_EMAIL: ${{ secrets.E2E_TEST_ADMIN_EMAIL }}
           TEST_ADMIN_PASSWORD: ${{ secrets.E2E_TEST_ADMIN_PASSWORD }}
         run: |
-          case "${TEST_SUITE}" in
-            api) npm run test:api ;;
-            smoke) npm run test:smoke ;;
-            regression) npm run test:regression ;;
-            auth) npm run test:auth ;;
-            chat) npm run test:chat ;;
-            dashboard) npm run test:dashboard ;;
-            all)
-              case "${E2E_BROWSER}" in
-                chromium) npm run test:headless ;;
-                firefox) npx playwright test --project=firefox ;;
-                webkit) npx playwright test --project=webkit ;;
-                all-browsers) npm run test:all-browsers ;;
-                *) npm run test:headless ;;
-              esac
-              ;;
-            *) npm run test:headless ;;
-          esac 2>&1 | tee /tmp/test-output.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
-        continue-on-error: true
+          set +e
+          {
+            case "${TEST_SUITE}" in
+              api) npm run test:api ;;
+              smoke) npm run test:smoke ;;
+              regression) npm run test:regression ;;
+              auth) npm run test:auth ;;
+              chat) npm run test:chat ;;
+              dashboard) npm run test:dashboard ;;
+              all)
+                case "${E2E_BROWSER}" in
+                  chromium) npm run test:headless ;;
+                  firefox) npx playwright test --project=firefox ;;
+                  webkit) npx playwright test --project=webkit ;;
+                  all-browsers) npm run test:all-browsers ;;
+                  *) npm run test:headless ;;
+                esac
+                ;;
+              *) npm run test:headless ;;
+            esac
+          } 2>&1 | tee /tmp/test-output.txt
+          TEST_EXIT_CODE=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=${TEST_EXIT_CODE}" >> $GITHUB_OUTPUT
+          exit "${TEST_EXIT_CODE}"
 
       # ── Parse Test Results ────────────────────
       - name: Parse test results
@@ -166,9 +171,31 @@ jobs:
             e2e/test-results/
           retention-days: 7
 
-      # ── Fail job if tests failed ──────────────
+      # ── Fail job unless all discovered tests passed ──────────────
       - name: Check test results
-        if: steps.run-tests.outputs.exit_code != '0'
+        if: always()
         run: |
-          echo "❌ E2E tests failed! Check the Playwright report artifact for details."
-          exit 1
+          EXIT_CODE="${{ steps.run-tests.outputs.exit_code }}"
+          TOTAL="${{ steps.parse-results.outputs.total }}"
+          PASSED="${{ steps.parse-results.outputs.passed }}"
+          FAILED="${{ steps.parse-results.outputs.failed }}"
+          SKIPPED="${{ steps.parse-results.outputs.skipped }}"
+
+          echo "E2E summary: total=${TOTAL}, passed=${PASSED}, failed=${FAILED}, skipped=${SKIPPED}, exit_code=${EXIT_CODE}"
+
+          if [ "${EXIT_CODE:-1}" != "0" ]; then
+            echo "E2E command failed. Check the Playwright report artifact for details."
+            exit 1
+          fi
+
+          if [ "${TOTAL:-0}" -le 0 ]; then
+            echo "No E2E tests were reported. Treating this as a failure."
+            exit 1
+          fi
+
+          if [ "${FAILED:-0}" -ne 0 ] || [ "${SKIPPED:-0}" -ne 0 ] || [ "${PASSED:-0}" -ne "${TOTAL:-0}" ]; then
+            echo "E2E must pass 100%. Failed or skipped tests are not allowed."
+            exit 1
+          fi
+
+          echo "E2E passed 100%."
